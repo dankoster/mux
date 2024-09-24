@@ -1,0 +1,16 @@
+{
+  "imports": {
+    "solid-js": "npm:solid-js@^1.8.23"
+  },
+  "compilerOptions": {
+    "lib": [
+      "dom", "dom.iterable"
+    ]
+  },
+  "tasks": {
+    "serve": "deno task build && deno run --allow-read='./dist' --allow-env --env --allow-net --watch ./server/server.ts",
+    "vite": "deno run -A --node-modules-dir npm:vite",
+    "build": "deno run -A --node-modules-dir npm:vite build",
+    "preview": "deno run -A --unstable --node-modules-dir npm:vite preview"
+  }
+}

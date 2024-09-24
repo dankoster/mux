@@ -1,0 +1,35 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # This is required to allow the GitHub Action to authenticate with Deno Deploy.
+      contents: read
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: vx.x.x
+
+      - name: Build
+        run: deno task build
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@1.12.0
+        with:
+          project: mux # the name of the project on Deno Deploy
+          entrypoint: ./server/server.ts
+          root: ./
