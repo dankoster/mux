@@ -31,5 +31,5 @@ jobs:
         uses: denoland/deployctl@1.12.0
         with:
           project: muxgg # the name of the project on Deno Deploy
-          entrypoint: ./server/server.ts
+          entrypoint: ../server/server.ts
           root: ./
