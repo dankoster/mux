@@ -1,9 +1,11 @@
-export type cacheWatcher<T> = (key: string, value?: T) => void;
+import { ApiRoute } from "./api.ts";
+
+export type cacheWatcher<T> = (key: ApiRoute, value?: T) => void;
 export class cacheValue<T> {
-  #key: string;
+  #key: ApiRoute;
   #value: T | undefined;
   #watchers: Array<cacheWatcher<T>> = [];
-  constructor(key: string, value?: T) {
+  constructor(key: ApiRoute, value?: T) {
     this.#key = key;
     this.#value = value;
   }

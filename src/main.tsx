@@ -1,14 +1,14 @@
-import { onCleanup, createSignal } from "solid-js";
 import { render } from "solid-js/web";
+import { data, connections } from "./data/useData";
 
-const CountingComponent = () => {
-  const [count, setCount] = createSignal(0);
-  const interval = setInterval(
-    () => setCount(count => count + 1),
-    1000
-  );
-  onCleanup(() => clearInterval(interval));
-  return <div>Count value is {count()}</div>;
+const App = () => {
+
+  return <>
+    <div>data: {data()}</div>
+    <ul>
+      {connections().map(c => <li>{c}</li>)}
+    </ul>
+  </>;
 };
 
-render(() => <CountingComponent />, document.getElementById("root"));
+render(() => <App />, document.getElementById("root"));

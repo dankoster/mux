@@ -1,21 +1,26 @@
 import { Router } from "jsr:@oak/oak@17/router";
-import { cacheWatcher, cacheValue } from "./cacheWatcher.ts";
-import { turso } from "./turso.ts";
+
 
 export const api = new Router();
+export type ApiRoute = "sse" | "hello"
 
-export type ApiRoute =
-	"sse" |
-	"projects";
-
-const apiRoute: { [Property in ApiRoute]: `/${Property}` } = {
-	sse: "/sse",
-	projects: "/projects"
+const apiRoute: { [Property in ApiRoute]: Property } = {
+	sse: "sse",
+	hello: "hello"
 };
 
-//https://deno.com/blog/deploy-streams
-//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+type player = {
+	id: string,
+	color: string
+}
+type room = {
+	id: number,
+	players: player[]
+}
+type rooms = room[]
 
+
+//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
 function sseMessage(event: string, data?: string, id?: string) {
 	const lines = [];
 	if (event) lines.push(`event: ${event}`);
@@ -26,42 +31,49 @@ function sseMessage(event: string, data?: string, id?: string) {
 	return new TextEncoder().encode(msg);
 }
 
-const cache = {
-	projects: new cacheValue("projects", ""),
-};
+type connection = {
+	ip: string,
+	update: (key: string, value: string) => void
+}
 
-api.get(apiRoute.sse, async (context) => {
-	let onProjectsUpdated: cacheWatcher<string>;
+const connections: Array<connection> = []
+
+function notifyAllConnections() {
+	const value = connections.map(c => c.ip)
+	console.log('-- notifyAllConnections', value)
+	connections.forEach(con => con.update(apiRoute.sse, JSON.stringify(value)))
+}
+
+async function getHelloData() {
+	return { data: 'hello world' }
+}
+
+//https://deno.com/blog/deploy-streams
+api.get(`/${apiRoute.sse}`, async (context) => {
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		start(controller) {
-			onProjectsUpdated = (key, value) => controller.enqueue(sseMessage(key, value));
-			cache.projects.addWatcher(onProjectsUpdated);
+			console.log('SSE connected', context.request.ip)
+			if (!connections.some(c => c.ip === context.request.ip)) {
+				connections.push({
+					ip: context.request.ip,
+					update: (key, value) => controller.enqueue(sseMessage(key, value))
+				})
+			}
+			notifyAllConnections()
 		},
 		cancel() {
-			cache.projects.removeWatcher(onProjectsUpdated);
+			console.log('SSE disconnected', context.request.ip)
+			const index = connections.findIndex(c => c.ip === context.request.ip)
+			if (index >= 0) 
+				connections.splice(index, 1)
+			notifyAllConnections()
 		},
 	});
 });
 
-async function getProjects() {
-	// const projects = await turso?.execute("SELECT * FROM project ORDER BY ID DESC");
-	//return projects.rows;
+api.get(`/${apiRoute.hello}`, async (context) => {
+	const data = JSON.stringify(await getHelloData());
+	context.response.body = data;
 
-	return { project: 'hello world' }
-}
-
-api.get(apiRoute.projects, async (context) => {
-	if (cache.projects.value) {
-		//send the cached value immediately
-		context.response.body = cache.projects.value;
-
-		//request new values and update the cache
-		getProjects().then(projects => cache.projects.value = JSON.stringify(projects));
-	}
-	else {
-		const projects = JSON.stringify(await getProjects());
-		context.response.body = projects;
-		cache.projects.value = projects;
-	}
 });
