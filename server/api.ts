@@ -33,13 +33,14 @@ function sseMessage(event: string, data?: string, id?: string) {
 
 type connection = {
 	ip: string,
+	id: number,
 	update: (key: string, value: string) => void
 }
 
 const connections: Array<connection> = []
 
 function notifyAllConnections() {
-	const value = connections.map(c => c.ip)
+	const value = connections.map(c => `${c.ip}-${c.id}`)
 	console.log('-- notifyAllConnections', value)
 	connections.forEach(con => con.update(apiRoute.sse, JSON.stringify(value)))
 }
@@ -50,13 +51,16 @@ async function getHelloData() {
 
 //https://deno.com/blog/deploy-streams
 api.get(`/${apiRoute.sse}`, async (context) => {
+	const id = Date.now()
+	context.response.headers.append("set-cookie", `sse_id=${id}`)
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		start(controller) {
-			console.log('SSE connected', context.request.ip)
-			if (!connections.some(c => c.ip === context.request.ip)) {
+			console.log('SSE connected', context.request.ip, id)
+			if (!connections.some(c => c.ip === context.request.ip && c.id === id)) {
 				connections.push({
 					ip: context.request.ip,
+					id,
 					update: (key, value) => controller.enqueue(sseMessage(key, value))
 				})
 			}
@@ -64,7 +68,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 		cancel() {
 			console.log('SSE disconnected', context.request.ip)
-			const index = connections.findIndex(c => c.ip === context.request.ip)
+			const index = connections.findIndex(c => context.request.ip === c.ip && id === c.id)
 			if (index >= 0) 
 				connections.splice(index, 1)
 			notifyAllConnections()
