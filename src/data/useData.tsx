@@ -1,44 +1,42 @@
 import { API_URI } from "./API_URI";
-import type { ApiRoute } from "../../server/api";
+import type { ApiRoute, Connection, SSEvent } from "../../server/api";
 import { createSignal } from "solid-js";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
-	hello: "hello"
+	setColor: "setColor"
 };
+const sse: { [Property in SSEvent]: Property} = {
+	pk: "pk",
+	id: "id",
+	connections: "connections"
+}
 
-const [data, setData] = createSignal("");
-const [dataError, setDataError] = createSignal("")
-const [dataLoading, setDataLoading] = createSignal(false)
-const [connections, setConnections] = createSignal<Array<string>>([])
-
-export { data, dataError as error, dataLoading as loading, connections }
+const [connections, setConnections] = createSignal<Connection[]>([])
+const [id, setId] = createSignal<number>(undefined)
+const [pk, setPk] = createSignal("")
+export default { id, connections, setColor }
 
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
 const eventStream = new EventSource(`${API_URI}/${apiRoute.sse}`);
-eventStream.onmessage = (event) => {
-	//handle generic messages
-	console.log([event.lastEventId, event.data].filter(s => s).join(': '))
-};
-eventStream.addEventListener(apiRoute.sse, (event) => {
-	setConnections(JSON.parse(event.data))
+eventStream.addEventListener(sse.connections, (event) => {
+	const data = JSON.parse(event.data) as Connection[]
+	setConnections(data)
+});
+eventStream.addEventListener(sse.pk, (event) => {
+	setPk(event.data)
+});
+eventStream.addEventListener(sse.id, (event) => {
+	setId(event.data)
 });
 
-fetch(`${API_URI}/${apiRoute.hello}`)
-	.then(response => {
-		if (!response.ok)
-			throw `HTTP-${response.status}: ${response.statusText}`;
-
-		return response.json();
+function setColor(color: string) {
+	fetch(`${API_URI}/${apiRoute.setColor}`, {
+		method: "POST",
+		body: color,
+		headers: {
+			"pk": pk()
+		}
 	})
-	.then(json => {
-		console.log(apiRoute.hello, json)
-		setData(json.data)
-		setDataLoading(false)
-	})
-	.catch(error => {
-		setDataError(error)
-		setDataLoading(false)
-	})
-
+}

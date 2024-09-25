@@ -1,0 +1,13 @@
+.connections {
+    margin: 1rem;
+    display: grid;
+    gap: 1rem;
+
+	.connection {
+        padding: 1rem;
+        border-radius: 15px;
+        display: grid;
+        grid-auto-flow: column;
+        justify-content: space-between;
+	}
+}

@@ -1,14 +1,32 @@
+import "./index.css"
+import "./main.css"
+
+import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
-import { data, connections } from "./data/useData";
+import server from "./data/useData";
+import { Connection } from "../server/api";
+
+const ConnectionPanel = (props: { connection: Connection, showColorPicker: boolean }) => {
+	const c = props.connection;
+	const [color, setColor] = createSignal(c.color)
+
+	return <div class="connection" style={{ "background-color": color() }}>
+		<div>{c.id}</div>
+		{props.showColorPicker && <input
+			type="color"
+			oninput={(e) => setColor(e.target.value)}
+			onchange={(e) => server.setColor(e.target.value)}
+			value={color()} />}
+	</div>
+}
 
 const App = () => {
 
-  return <>
-    <div>data: {data()}</div>
-    <ul>
-      {connections().map(c => <li>{c}</li>)}
-    </ul>
-  </>;
+	return <>
+		<div class="connections">
+			{server.connections().map(c => <ConnectionPanel connection={c} showColorPicker={c.id == server.id()} />)}
+		</div>
+	</>;
 };
 
 render(() => <App />, document.getElementById("root"));

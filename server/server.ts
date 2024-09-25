@@ -22,10 +22,25 @@ const router = new Router();
 router.use('/api', api.routes())
 router.use(api.allowedMethods());
 
+const origins = [
+	"localhost"
+]
 
 const app = new Application();
-app.use(logRouteDuration);
-app.use(oakCors()); // Enable CORS for All Routes
+// app.use(logRouteDuration);
+app.use(oakCors())
+// app.use(oakCors({
+// 	origin: async (requestOrigin) => {
+// 		if(requestOrigin == null) 
+// 			return false
+
+// 		const url = URL.parse(requestOrigin)
+// 		if(url == null)
+// 			return false
+
+// 		return origins.includes(url.hostname)
+// 	  },
+// })); // Enable CORS for All Routes
 app.use(router.routes());
 
 //serve static files from /dist
@@ -43,9 +58,9 @@ app.use(async (context, next) => {
 app.use(router.allowedMethods());
 
 app.addEventListener("listen", ({ hostname, port, secure }) => {
+	const origin = `${secure ? "https://" : "http://"}${hostname ?? "localhost"}`
 	console.log(
-		`Listening on: ${secure ? "https://" : "http://"}${hostname ?? "localhost"
-		}:${port}`,
+		`Listening on: ${origin}:${port}`,
 	);
 });
 
