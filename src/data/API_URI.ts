@@ -9,7 +9,7 @@ const {
 	//@ts-ignore
 } = import.meta.env ?? {};
 
-export const API_URI = (DEV ? location.origin.replace(location.port, VITE_SERVER_PORT ?? 8080) : "") + VITE_API_URI;
+export const API_URI = (DEV ? location.origin.replace(location.port, VITE_SERVER_PORT ?? 8080) : "") + (VITE_API_URI ?? "/api");
 
 // console.log("VITE_SERVER_PORT", VITE_SERVER_PORT)
 // console.log('API_URI', API_URI)
