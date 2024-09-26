@@ -1,10 +1,12 @@
 # MUX 
 
-Set a color and it will be [instantly shared](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) to anyone else on the site. 
+Set a color and a text message.
 
-Taste the rainbow 🌈 https://muxgg.deno.dev/
+Your changes will will be [instantly shared](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) to anyone else on the site... as long as you're there too. 
 
-## Running
+Taste the rainbow (with friends) 🌈 https://muxgg.deno.dev/
+
+## Running the code locally
 
 Install Deno v1.46.3 or later
 
