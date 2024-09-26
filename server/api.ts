@@ -48,6 +48,13 @@ api.post(`/${apiRoute.setColor}`, async (context) => {
 	const id = getId(pk)
 	const color = await context.request.body.text()
 	const index = connections.findIndex(c => c.id === id)
+	
+	if(!connections[index]){
+		console.error(`${index} not found in connections`, {id, connections})
+		context.response.status = 500
+		return
+	}
+
 	connections[index].color = color
 	context.response.status = 200
 	notifyAllConnections()
