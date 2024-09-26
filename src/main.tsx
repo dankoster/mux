@@ -6,23 +6,33 @@ import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
 
-const ConnectionPanel = (props: { connection: Connection, showColorPicker: boolean }) => {
+const ConnectionPanel = (props: { connection: Connection, showControls: boolean }) => {
 	const c = props.connection;
 	const [color, setColor] = createSignal(c.color)
+	const [text, setText] = createSignal(c.text)
 
-	return <div id={`${c.id}`} class="connection" style={{ "background-color": color() }}>
-		{props.showColorPicker && <input
-			type="color"
-			oninput={(e) => setColor(e.target.value)}
-			onchange={(e) => server.setColor(e.target.value)}
-			value={color()} />}
+	return <div class="connection" style={{ "background-color": color() }}>
+		{!props.showControls && <h2>{text()}</h2>}
+		{props.showControls && <>
+			<input
+				type="text"
+				oninput={(e) => setText(e.target.value)}
+				onchange={(e) => server.setText(e.target.value)}
+				onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
+				value={text()} />
+			<input
+				type="color"
+				oninput={(e) => setColor(e.target.value)}
+				onchange={(e) => server.setColor(e.target.value)}
+				value={color()} />
+		</>}
 	</div>
 }
 
 const App = () => {
 	return <>
 		<div class="connections">
-			{server.connections().map(c => <ConnectionPanel connection={c} showColorPicker={c.id == server.id()} />)}
+			{server.connections().map(c => <ConnectionPanel connection={c} showControls={c.id == server.id()} />)}
 		</div>
 	</>;
 };

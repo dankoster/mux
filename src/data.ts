@@ -4,7 +4,8 @@ import { createSignal } from "solid-js";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
-	setColor: "setColor"
+	setColor: "setColor",
+	setText: "setText"
 };
 const sse: { [Property in SSEvent]: Property} = {
 	pk: "pk",
@@ -15,7 +16,8 @@ const sse: { [Property in SSEvent]: Property} = {
 const [connections, setConnections] = createSignal<Connection[]>([])
 const [id, setId] = createSignal<number>(undefined)
 const [pk, setPk] = createSignal("")
-export default { id, connections, setColor }
+
+export default { id, connections, setColor, setText }
 
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
@@ -25,9 +27,14 @@ eventStream.addEventListener(sse.connections, (event) => {
 	setConnections(data)
 });
 eventStream.addEventListener(sse.pk, (event) => {
-	setPk(event.data)
+	const key = event.data
+	setPk(key)
+	
 	const prevColor = localStorage.getItem('color')
-	if(prevColor) setColor(prevColor, event.data)
+	if(prevColor) setColor(prevColor, key)
+		
+	const prevText = localStorage.getItem('text')
+	if(prevText) setText(prevText, key)
 });
 eventStream.addEventListener(sse.id, (event) => {
 	setId(event.data)
@@ -38,8 +45,14 @@ function setColor(color: string, key?: string) {
 	fetch(`${API_URI}/${apiRoute.setColor}`, {
 		method: "POST",
 		body: color,
-		headers: {
-			"pk": key ?? pk()
-		}
+		headers: { "pk": key ?? pk() }
+	})
+}
+function setText(text: string, key?: string) {
+	localStorage.setItem('text', text)
+	fetch(`${API_URI}/${apiRoute.setText}`, {
+		method: "POST",
+		body: text,
+		headers: { "pk": key ?? pk() }
 	})
 }

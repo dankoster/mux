@@ -1,13 +1,15 @@
+import { Request } from "https://jsr.io/@oak/oak/17.0.0/request.ts";
 import { Router } from "jsr:@oak/oak@17/router";
 
 
 export const api = new Router();
-export type ApiRoute = "sse" | "setColor"
+export type ApiRoute = "sse" | "setColor" | "setText"
 export type SSEvent = "pk" | "id" | "connections"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	setColor: "setColor",
+	setText: "setText"
 };
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
@@ -24,6 +26,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 export type Connection = {
 	id: number,
 	color?: string,
+	text?: string,
 	update: (key: string, value: string) => void
 }
 
@@ -40,22 +43,21 @@ function notifyAllConnections() {
 	connections.forEach(con => con.update(apiRoute.sse, value))
 }
 
+api.post(`/${apiRoute.setText}`, async (context) => {
+	const pk = getPkHeader(context.request);
+	const id = getId(pk);
+	const index = getConnectionIndex(id);
+	connections[index].text = await context.request.body.text();
+	console.log('SET TEXT', connections[index])
+	context.response.status = 200
+	notifyAllConnections()
+})
+
 api.post(`/${apiRoute.setColor}`, async (context) => {
-	const pk = context.request.headers.get('pk')
-	if (!pk)
-		throw new Error('missing pk header')
-
-	const id = getId(pk)
-	const color = await context.request.body.text()
-	const index = connections.findIndex(c => c.id === id)
-	
-	if(!connections[index]){
-		console.error(`${index} not found in connections`, {id, connections})
-		context.response.status = 500
-		return
-	}
-
-	connections[index].color = color
+	const pk = getPkHeader(context.request);
+	const id = getId(pk);
+	const index = getConnectionIndex(id);
+	connections[index].color = await context.request.body.text();
 	context.response.status = 200
 	notifyAllConnections()
 });
@@ -88,3 +90,19 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
+
+
+function getPkHeader(request: Request) {
+	const pk = request.headers.get('pk');
+	if (!pk)
+		throw new Error('missing pk header');
+	return pk;
+}
+
+function getConnectionIndex(id: string | number | undefined) {
+	const index = connections.findIndex(c => c.id === id);
+
+	if (!connections[index]) throw new Error(`${index} not found in connections`);
+	
+	return index;
+}
