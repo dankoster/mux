@@ -1,28 +1,10 @@
 import { Request } from "https://jsr.io/@oak/oak/17.0.0/request.ts";
 import { Router } from "jsr:@oak/oak@17/router";
 
+export { api }
 
-export const api = new Router();
 export type ApiRoute = "sse" | "setColor" | "setText"
 export type SSEvent = "pk" | "id" | "connections"
-
-const apiRoute: { [Property in ApiRoute]: Property } = {
-	sse: "sse",
-	setColor: "setColor",
-	setText: "setText"
-};
-
-//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-function sseMessage(event: SSEvent, data?: string, id?: string) {
-	const lines = [];
-	if (event) lines.push(`event: ${event}`);
-	if (id) lines.push(`id: ${id}`);
-	if (data) lines.push(`data: ${data}`);
-	lines.push('\r\n');
-	const msg = lines.join('\r\n');
-	return new TextEncoder().encode(msg);
-}
-
 export type Connection = {
 	id: number,
 	color?: string,
@@ -30,19 +12,52 @@ export type Connection = {
 	update: (key: string, value: string) => void
 }
 
+const apiRoute: { [Property in ApiRoute]: Property } = {
+	sse: "sse",
+	setColor: "setColor",
+	setText: "setText"
+};
+
 const connections: Array<Connection> = []
 const privateKeys: { [key: string]: string } = {}
 
-function getId(pk: string) {
-	const str = Object.keys(privateKeys).find(id => privateKeys[id] === pk)
-	return str && Number.parseInt(str)
-}
+function sseMessage(event: SSEvent, data?: string, id?: string) {
+	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+	const lines = [];
+	if (event) lines.push(`event: ${event}`);
+	if (id) lines.push(`id: ${id}`);
+	if (data) lines.push(`data: ${data}`);
+	lines.push('\r\n');
+	const msg = lines.join('\r\n');
+	return new TextEncoder().encode(msg);
+}	
 
 function notifyAllConnections() {
 	const value = JSON.stringify(connections)
 	connections.forEach(con => con.update(apiRoute.sse, value))
 }
 
+function getId(pk: string) {
+	const str = Object.keys(privateKeys).find(id => privateKeys[id] === pk)
+	return str && Number.parseInt(str)
+}
+
+function getPkHeader(request: Request) {
+	const pk = request.headers.get('pk');
+	if (!pk)
+		throw new Error('missing pk header');
+	return pk;
+}
+
+function getConnectionIndex(id: string | number | undefined) {
+	const index = connections.findIndex(c => c.id === id);
+
+	if (!connections[index]) throw new Error(`${index} not found in connections`);
+	
+	return index;
+}
+
+const api = new Router();
 api.post(`/${apiRoute.setText}`, async (context) => {
 	const pk = getPkHeader(context.request);
 	const id = getId(pk);
@@ -89,19 +104,3 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
-
-
-function getPkHeader(request: Request) {
-	const pk = request.headers.get('pk');
-	if (!pk)
-		throw new Error('missing pk header');
-	return pk;
-}
-
-function getConnectionIndex(id: string | number | undefined) {
-	const index = connections.findIndex(c => c.id === id);
-
-	if (!connections[index]) throw new Error(`${index} not found in connections`);
-	
-	return index;
-}
