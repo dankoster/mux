@@ -5,15 +5,28 @@
 
 	.connection {
 		padding: 2rem;
-		gap: 2rem;
-		border-radius: 15px;
-		display: grid;
-		grid-auto-flow: column;
-		justify-content: center;
 		outline: 1px solid #cccccc1f;
+		border-radius: 15px;
+		
+		&.controls {
+			display: grid;
+			gap: 2rem;
+			justify-content: center;
+			align-items: center;
+			grid-template-columns: 1fr max-content;			
+		}
 
-		input {
+		h2 {
+			text-align: center;
+		}
+
+		input[type="text"] {
 			font-size: 16px;
+			background-color: transparent;
+			border-style: none;
+			border-radius: 5px;
+			padding: 0.5rem;
+			text-align: center;
 		}
 	}
 }

@@ -11,15 +11,19 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 	const [color, setColor] = createSignal(c.color)
 	const [text, setText] = createSignal(c.text)
 
-	return <div class="connection" style={{ "background-color": color() }}>
-		{!props.showControls && <h2>{text()}</h2>}
+	return <div
+		class="connection"
+		classList={{ "controls": props.showControls }}
+		style={{ "background-color": color() }}>
+		{!props.showControls && <h2>{text() ?? "🌈 🤔"}</h2>}
 		{props.showControls && <>
 			<input
 				type="text"
+				placeholder="Say hello! 👋 Set a color 👉"
 				oninput={(e) => setText(e.target.value)}
 				onchange={(e) => server.setText(e.target.value)}
 				onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
-				value={text()} />
+				value={text() ?? ''} />
 			<input
 				type="color"
 				oninput={(e) => setColor(e.target.value)}
