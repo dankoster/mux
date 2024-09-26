@@ -26,17 +26,20 @@ eventStream.addEventListener(sse.connections, (event) => {
 });
 eventStream.addEventListener(sse.pk, (event) => {
 	setPk(event.data)
+	const prevColor = localStorage.getItem('color')
+	if(prevColor) setColor(prevColor, event.data)
 });
 eventStream.addEventListener(sse.id, (event) => {
 	setId(event.data)
 });
 
-function setColor(color: string) {
+function setColor(color: string, key?: string) {
+	localStorage.setItem('color', color)
 	fetch(`${API_URI}/${apiRoute.setColor}`, {
 		method: "POST",
 		body: color,
 		headers: {
-			"pk": pk()
+			"pk": key ?? pk()
 		}
 	})
 }
