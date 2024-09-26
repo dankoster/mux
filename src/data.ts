@@ -12,6 +12,7 @@ const sse: { [Property in SSEvent]: Property} = {
 	id: "id",
 	connections: "connections"
 }
+const AUTH_TOKEN_HEADER_NAME = sse.pk
 
 const [connections, setConnections] = createSignal<Connection[]>([])
 const [id, setId] = createSignal<number>(undefined)
@@ -42,17 +43,21 @@ eventStream.addEventListener(sse.id, (event) => {
 
 function setColor(color: string, key?: string) {
 	localStorage.setItem('color', color)
+	const headers = {}
+	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
 	fetch(`${API_URI}/${apiRoute.setColor}`, {
 		method: "POST",
 		body: color,
-		headers: { "pk": key ?? pk() }
+		headers
 	})
 }
 function setText(text: string, key?: string) {
 	localStorage.setItem('text', text)
+	const headers = {}
+	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
 	fetch(`${API_URI}/${apiRoute.setText}`, {
 		method: "POST",
 		body: text,
-		headers: { "pk": key ?? pk() }
+		headers
 	})
 }
