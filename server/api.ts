@@ -11,10 +11,10 @@ export type Connection = {
 	text?: string,
 }
 
-const sseEvent: { [Property in SSEvent]: Property} = {
-  pk: "pk",
-  id: "id",
-  connections: "connections"
+const sseEvent: { [Property in SSEvent]: Property } = {
+	pk: "pk",
+	id: "id",
+	connections: "connections"
 }
 
 const AUTH_TOKEN_HEADER_NAME = sseEvent.pk
@@ -56,15 +56,23 @@ function updateConnectionProperty(req: Request, prop: keyof Connection, value: s
 
 const api = new Router();
 api.post(`/${apiRoute.setText}`, async (context) => {
-	updateConnectionProperty(context.request, "text", await context.request.body.text());
-	context.response.status = 200
-	notifyAllConnections()
+	try {
+		updateConnectionProperty(context.request, "text", await context.request.body.text());
+		context.response.status = 200
+		notifyAllConnections()
+	} catch (err) {
+		console.error(err, {connectionByUUID})
+	}
 })
 
 api.post(`/${apiRoute.setColor}`, async (context) => {
-	updateConnectionProperty(context.request, "color", await context.request.body.text());
-	context.response.status = 200
-	notifyAllConnections()
+	try {
+		updateConnectionProperty(context.request, "color", await context.request.body.text());
+		context.response.status = 200
+		notifyAllConnections()
+	} catch (err) {
+		console.error(err)
+	}
 });
 
 //https://deno.com/blog/deploy-streams
