@@ -10,8 +10,7 @@ const ConnectionPanel = (props: { connection: Connection, showColorPicker: boole
 	const c = props.connection;
 	const [color, setColor] = createSignal(c.color)
 
-	return <div class="connection" style={{ "background-color": color() }}>
-		<div>{c.id}</div>
+	return <div id={`${c.id}`} class="connection" style={{ "background-color": color() }}>
 		{props.showColorPicker && <input
 			type="color"
 			oninput={(e) => setColor(e.target.value)}
