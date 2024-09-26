@@ -48,7 +48,6 @@ api.post(`/${apiRoute.setText}`, async (context) => {
 	const id = getId(pk);
 	const index = getConnectionIndex(id);
 	connections[index].text = await context.request.body.text();
-	console.log('SET TEXT', connections[index])
 	context.response.status = 200
 	notifyAllConnections()
 })
