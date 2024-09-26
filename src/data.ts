@@ -1,5 +1,5 @@
 import { API_URI } from "./API_URI";
-import type { ApiRoute, Connection, SSEvent } from "../../server/api";
+import type { ApiRoute, Connection, SSEvent } from "../server/api";
 import { createSignal } from "solid-js";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {

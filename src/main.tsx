@@ -3,7 +3,7 @@ import "./main.css"
 
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
-import server from "./data/useData";
+import server from "./data";
 import { Connection } from "../server/api";
 
 const ConnectionPanel = (props: { connection: Connection, showColorPicker: boolean }) => {
@@ -20,7 +20,6 @@ const ConnectionPanel = (props: { connection: Connection, showColorPicker: boole
 }
 
 const App = () => {
-
 	return <>
 		<div class="connections">
 			{server.connections().map(c => <ConnectionPanel connection={c} showColorPicker={c.id == server.id()} />)}
