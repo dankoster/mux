@@ -1,7 +1,7 @@
 import "./index.css"
 import "./main.css"
 
-import { createSignal } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
@@ -11,6 +11,13 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 	const [color, setColor] = createSignal(c.color)
 	const [text, setText] = createSignal(c.text)
 
+	let ref: HTMLInputElement
+
+	// when the component is mounted, the button will be disabled
+	onMount(() => {
+	  ref?.focus()
+	})
+
 	return <div
 		class="connection"
 		classList={{ "controls": props.showControls }}
@@ -19,6 +26,7 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 		{props.showControls && <>
 			<input
 				type="text"
+				ref={ref}
 				placeholder="Say hello! 👋 Set a color 👉"
 				oninput={(e) => setText(e.target.value)}
 				onchange={(e) => server.setText(e.target.value)}
