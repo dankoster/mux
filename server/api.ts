@@ -3,12 +3,14 @@ import { Router } from "jsr:@oak/oak@17/router";
 
 export { api }
 
+export type AuthTokenName = "Authorization"
 export type ApiRoute = "sse" | "setColor" | "setText"
 export type SSEvent = "pk" | "id" | "connections"
 export type Connection = {
 	id: string,
 	color?: string,
 	text?: string,
+	status?: string
 }
 
 const sseEvent: { [Property in SSEvent]: Property } = {
@@ -17,7 +19,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	connections: "connections"
 }
 
-const AUTH_TOKEN_HEADER_NAME = "Authorization"
+const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -28,22 +30,22 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 const connectionByUUID = new Map<string, Connection>()
 const updateFunctionByUUID = new Map<string, (value: string) => void>()
 
-async function initKV() {
-	const kv = await Deno.openKv();
-	const connections = await kv.get(['connections'])
+// async function initKV() {
+// 	const kv = await Deno.openKv();
+// 	const connections = await kv.get(['connections'])
 
-	console.log(connections)
+// 	console.log(connections)
 
-	return kv
-}
+// 	return kv
+// }
 
-const kv = await initKV()
+// const kv = await initKV()
 
-async function persist(kv: Deno.Kv) {
-	// const connections = Array.from(connectionByUUID.values())
-	//console.log('persist', connectionByUUID)
-	await kv.set(['connections'], connectionByUUID)
-}
+// async function persist(kv: Deno.Kv) {
+// 	// const connections = Array.from(connectionByUUID.values())
+// 	//console.log('persist', connectionByUUID)
+// 	await kv.set(['connections'], connectionByUUID)
+// }
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
@@ -57,7 +59,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function notifyAllConnections() {
-	persist(kv)
+	// persist(kv)
 
 	const connections = Array.from(connectionByUUID.values())
 	const value = JSON.stringify(connections)
@@ -80,7 +82,7 @@ api.post(`/${apiRoute.setText}`, async (context) => {
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
-		console.error(err, {connectionByUUID})
+		console.error(err, { connectionByUUID })
 	}
 })
 
@@ -90,29 +92,42 @@ api.post(`/${apiRoute.setColor}`, async (context) => {
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
-		console.error(err)
+		console.error(err, { connectionByUUID })
 	}
 });
 
 //https://deno.com/blog/deploy-streams
 api.get(`/${apiRoute.sse}`, async (context) => {
-	const uuid = crypto.randomUUID()
-	// console.log('SSE', 'new connection!', context.request.headers)
+	//get the user's bearer token or create a new one
+	const oldId = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
+	const uuid = oldId ?? crypto.randomUUID()
+
+	const old = connectionByUUID.has(uuid)
+
+	console.log("SSE", `Connect (${old ? "old": "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		start(controller) {
-			const id = Date.now().toString()
-			const connection = { id }
-			connectionByUUID.set(uuid, connection)
-			updateFunctionByUUID.set(uuid, (value) => controller.enqueue(sseMessage('connections', value)))
+			let connection = connectionByUUID.get(uuid)
+			if (!connection) {
+				connection = { id: Date.now().toString() }
+				connectionByUUID.set(uuid, connection)
+			}
 
-			controller.enqueue(sseMessage(sseEvent.id, id.toString()))
+			connection.status = "online"
+
+			updateFunctionByUUID.set(uuid, (value) => controller.enqueue(sseMessage(sseEvent.connections, value)))
+
+			controller.enqueue(sseMessage(sseEvent.id, connection?.id ?? "ERROR"))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			notifyAllConnections()
 		},
 		cancel() {
 			updateFunctionByUUID.delete(uuid)
-			connectionByUUID.delete(uuid)
+			const connection = connectionByUUID.get(uuid)
+			if(connection) connection.status = ""
+			//console.log("SSE Disconnect", uuid, connection)
 			notifyAllConnections()
 		},
 	});

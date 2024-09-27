@@ -15,14 +15,17 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 
 	// when the component is mounted, the button will be disabled
 	onMount(() => {
-	  ref?.focus()
+		ref?.focus()
 	})
 
 	return <div
 		class="connection"
 		classList={{ "controls": props.showControls }}
 		style={{ "background-color": color() }}>
-		{!props.showControls && <h2>{text() ?? "🌈 🤔"}</h2>}
+		{!props.showControls && <>
+			<span class="status">{c.status === "online" ? "👀" : "😴"}</span>
+			<h2>{text() ?? "🌈 🤔"}</h2>
+		</>}
 		{props.showControls && <>
 			<input
 				type="text"

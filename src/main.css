@@ -7,13 +7,20 @@
 		padding: 2rem;
 		outline: 1px solid #cccccc1f;
 		border-radius: 15px;
-		
+
 		&.controls {
 			display: grid;
 			gap: 2rem;
 			justify-content: center;
 			align-items: center;
-			grid-template-columns: 1fr max-content;			
+			grid-template-columns: 1fr max-content;
+		}
+
+		.status {
+            font-size: x-large;
+            position: fixed;
+            right: 1.5rem;
+            transform: translateY(-2rem);
 		}
 
 		h2 {
