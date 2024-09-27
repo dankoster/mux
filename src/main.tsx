@@ -45,7 +45,7 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 const App = () => {
 	return <>
 		<Show when={!server.serverOnline()}>
-			<div>Server OFFLINE</div>
+			<div class="offlineMessage">connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
 			<div class="connections">

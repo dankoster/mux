@@ -125,22 +125,20 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			})
 
 			console.log("SSE connection   ", uuid, connection)
-			// console.log(connectionByUUID)
-			// console.log(updateFunctionByUUID)
 
 			controller.enqueue(sseMessage(sseEvent.id, connection?.id ?? "ERROR"))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			notifyAllConnections()
 		},
 		cancel() {
-			updateFunctionByUUID.delete(uuid)
 			const connection = connectionByUUID.get(uuid)
 			if (connection) connection.status = ""
-
 			console.log("SSE Disconnect   ", uuid, connection)
-			// console.log(connectionByUUID)
-			// console.log(updateFunctionByUUID)
 
+			//no persistent connection for now because of something wierd with iOS
+			connectionByUUID.delete(uuid)
+			updateFunctionByUUID.delete(uuid)
+			
 			notifyAllConnections()
 		},
 	});

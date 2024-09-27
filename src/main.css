@@ -1,3 +1,10 @@
+.offlineMessage {
+	display: grid;
+	align-items: center;
+	min-height: 100svh;
+	justify-content: center;
+}
+
 .connections {
 	margin: 1rem;
 	display: grid;
