@@ -28,6 +28,23 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 const connectionByUUID = new Map<string, Connection>()
 const updateFunctionByUUID = new Map<string, (value: string) => void>()
 
+async function initKV() {
+	const kv = await Deno.openKv();
+	const connections = await kv.get(['connections'])
+
+	console.log(connections)
+
+	return kv
+}
+
+const kv = await initKV()
+
+async function persist(kv: Deno.Kv) {
+	// const connections = Array.from(connectionByUUID.values())
+	//console.log('persist', connectionByUUID)
+	await kv.set(['connections'], connectionByUUID)
+}
+
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
 	const lines = [];
@@ -40,6 +57,8 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function notifyAllConnections() {
+	persist(kv)
+
 	const connections = Array.from(connectionByUUID.values())
 	const value = JSON.stringify(connections)
 	updateFunctionByUUID.forEach(update => update(value))
@@ -78,6 +97,7 @@ api.post(`/${apiRoute.setColor}`, async (context) => {
 //https://deno.com/blog/deploy-streams
 api.get(`/${apiRoute.sse}`, async (context) => {
 	const uuid = crypto.randomUUID()
+	// console.log('SSE', 'new connection!', context.request.headers)
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		start(controller) {
