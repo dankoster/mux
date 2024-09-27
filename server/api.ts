@@ -82,7 +82,7 @@ api.post(`/${apiRoute.setText}`, async (context) => {
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
-		console.error(err, { connectionByUUID })
+		console.error(err, context.request)
 	}
 })
 
@@ -92,7 +92,7 @@ api.post(`/${apiRoute.setColor}`, async (context) => {
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
-		console.error(err, { connectionByUUID })
+		console.error(err, context.request)
 	}
 });
 
@@ -103,8 +103,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 	const uuid = oldId ?? crypto.randomUUID()
 
 	const old = connectionByUUID.has(uuid)
-
-	console.log("SSE", `Connect (${old ? "old": "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
 
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
@@ -117,7 +116,17 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			connection.status = "online"
 
-			updateFunctionByUUID.set(uuid, (value) => controller.enqueue(sseMessage(sseEvent.connections, value)))
+			updateFunctionByUUID.set(uuid, (value) => {
+				try {
+					controller.enqueue(sseMessage(sseEvent.connections, value))
+				} catch (error) {
+					console.error(uuid, error)
+				}
+			})
+
+			console.log("SSE connection   ", uuid, connection)
+			// console.log(connectionByUUID)
+			// console.log(updateFunctionByUUID)
 
 			controller.enqueue(sseMessage(sseEvent.id, connection?.id ?? "ERROR"))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
@@ -126,8 +135,12 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		cancel() {
 			updateFunctionByUUID.delete(uuid)
 			const connection = connectionByUUID.get(uuid)
-			if(connection) connection.status = ""
-			//console.log("SSE Disconnect", uuid, connection)
+			if (connection) connection.status = ""
+
+			console.log("SSE Disconnect   ", uuid, connection)
+			// console.log(connectionByUUID)
+			// console.log(updateFunctionByUUID)
+
 			notifyAllConnections()
 		},
 	});

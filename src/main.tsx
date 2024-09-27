@@ -1,35 +1,33 @@
 import "./index.css"
 import "./main.css"
 
-import { createSignal, onMount } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
 
 const ConnectionPanel = (props: { connection: Connection, showControls: boolean }) => {
-	const c = props.connection;
-	const [color, setColor] = createSignal(c.color)
-	const [text, setText] = createSignal(c.text)
 
-	let ref: HTMLInputElement
+	const [color, setColor] = createSignal(props.connection.color)
+	const [text, setText] = createSignal(props.connection.text)
 
-	// when the component is mounted, the button will be disabled
-	onMount(() => {
-		ref?.focus()
-	})
+	// let ref: HTMLInputElement
+
+	// onMount(() => {
+	// 	ref?.focus()
+	// })
 
 	return <div
 		class="connection"
 		classList={{ "controls": props.showControls }}
 		style={{ "background-color": color() }}>
 		{!props.showControls && <>
-			<span class="status">{c.status === "online" ? "👀" : "😴"}</span>
-			<h2>{text() ?? "🌈 🤔"}</h2>
+			<h2>{props.connection.status === "online" ? text() ?? "🌈 🤔" : "😴"}</h2>
 		</>}
 		{props.showControls && <>
 			<input
 				type="text"
-				ref={ref}
+				// ref={ref}
 				placeholder="Say hello! 👋 Set a color 👉"
 				oninput={(e) => setText(e.target.value)}
 				onchange={(e) => server.setText(e.target.value)}
@@ -46,10 +44,15 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 
 const App = () => {
 	return <>
-		<div class="connections">
-			{server.connections().map(c => <ConnectionPanel connection={c} showControls={c.id == server.id()} />)}
-		</div>
-	</>;
+		<Show when={!server.serverOnline()}>
+			<div>Server OFFLINE</div>
+		</Show>
+		<Show when={server.serverOnline()}>
+			<div class="connections">
+				{server.connections().map(c => <ConnectionPanel connection={c} showControls={c.id == server.id()} />)}
+			</div>
+		</Show>
+	</>
 };
 
 render(() => <App />, document.getElementById("root"));

@@ -12,30 +12,39 @@ const sse: { [Property in SSEvent]: Property } = {
 	id: "id",
 	connections: "connections"
 }
-const AUTH_TOKEN_HEADER_NAME:AuthTokenName = "Authorization"
+const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 const [connections, setConnections] = createSignal<Connection[]>([])
 const [id, setId] = createSignal("")
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
+const [serverOnline, setServerOnline] = createSignal(false)
 
-export default { id, connections, setColor, setText }
+export default { id, pk, connections, setColor, setText, serverOnline }
 
- 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
 async function initSSE(route: string, token: string) {
-	const headers = new Headers()
-	headers.set('Content-Type', 'text/event-stream')
-	if(token) headers.set(AUTH_TOKEN_HEADER_NAME, token)
-	const response = await fetch(route, { method: 'GET', headers })
-	const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
-
 	while (true) {
-		const { value, done } = await reader.read()
-		if (done) break
+		try {
+			const headers = new Headers()
+			headers.set('Content-Type', 'text/event-stream')
+			if (token) headers.set(AUTH_TOKEN_HEADER_NAME, token)
+			const response = await fetch(route, { method: 'GET', headers })
+			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+			setServerOnline(true)
 
-		const events = parseEventStream(value)
-		events.forEach(event => handleSseEvent(event))
+			while (true) {
+				const { value, done } = await reader.read()
+				if (done) break
+
+				const events = parseEventStream(value)
+				events.forEach(event => handleSseEvent(event))
+			}
+		} catch (error) {
+			setServerOnline(false)
+			await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
+			console.log('SSE retrying...')
+		}
 	}
 }
 

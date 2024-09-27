@@ -17,10 +17,10 @@
 		}
 
 		.status {
-            font-size: x-large;
-            position: fixed;
-            right: 1.5rem;
-            transform: translateY(-2rem);
+			font-size: x-large;
+			position: fixed;
+			right: 1.5rem;
+			transform: translateY(-2rem);
 		}
 
 		h2 {
