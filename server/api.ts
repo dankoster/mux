@@ -17,7 +17,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	connections: "connections"
 }
 
-const AUTH_TOKEN_HEADER_NAME = sseEvent.pk
+const AUTH_TOKEN_HEADER_NAME = "Authorization"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",

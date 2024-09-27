@@ -1,5 +1,7 @@
 {
 	"compilerOptions": {
+		"target": "ES2023",
+		"module": "Preserve",
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
 	}
