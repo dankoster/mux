@@ -5,12 +5,14 @@ import { createSignal } from "solid-js";
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	setColor: "setColor",
-	setText: "setText"
+	setText: "setText",
+	clear: "clear"
 };
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
-	connections: "connections"
+	connections: "connections",
+	reconnect: "reconnect"
 }
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
@@ -43,7 +45,7 @@ async function initSSE(route: string, token: string) {
 		} catch (error) {
 			setServerOnline(false)
 			await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
-			console.log('SSE retrying...')
+			console.log('SSE', error || 'reconnect...')
 		}
 	}
 }
@@ -93,6 +95,8 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections(data);
 			console.log(`${event.event}`, data);
 			break;
+		case sse.reconnect:
+			throw "reconnect requested by server"
 		default:
 			console.warn(`Unknown SSE field "${event.event}"`, event.data)
 			break;

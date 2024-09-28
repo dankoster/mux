@@ -4,8 +4,8 @@ import { Router } from "jsr:@oak/oak@17/router";
 export { api }
 
 export type AuthTokenName = "Authorization"
-export type ApiRoute = "sse" | "setColor" | "setText"
-export type SSEvent = "pk" | "id" | "connections"
+export type ApiRoute = "sse" | "setColor" | "setText" | "clear"
+export type SSEvent = "pk" | "id" | "connections" | "reconnect"
 export type Connection = {
 	id: string,
 	color?: string,
@@ -16,7 +16,8 @@ export type Connection = {
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
-	connections: "connections"
+	connections: "connections",
+	reconnect: "reconnect"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -24,17 +25,18 @@ const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	setColor: "setColor",
-	setText: "setText"
+	setText: "setText",
+	clear: "clear"
 }
 
+const KV_KEY_connections = ['connections']
 const kv = await Deno.openKv();
-const connections = await kv.get<Map<string, Connection>>(['connections'])
+const connections = await kv.get<Map<string, Connection>>(KV_KEY_connections)
 const connectionByUUID = connections.value ?? new Map<string, Connection>()
-const updateFunctionByUUID = new Map<string, (value: string) => void>()
+const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
 
 console.log("Got connections from KV:", connectionByUUID)
 
-//kv.delete(['connections'])
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
@@ -48,10 +50,10 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function notifyAllConnections() {
-	kv.set(['connections'], connectionByUUID)
+	kv.set(KV_KEY_connections, connectionByUUID)
 	const connections = Array.from(connectionByUUID.values())
 	const value = JSON.stringify(connections)
-	updateFunctionByUUID.forEach(update => update(value))
+	updateFunctionByUUID.forEach(update => update(sseEvent.connections, value))
 }
 
 function updateConnectionProperty(req: Request, prop: keyof Connection, value: string) {
@@ -64,10 +66,22 @@ function updateConnectionProperty(req: Request, prop: keyof Connection, value: s
 }
 
 const api = new Router();
+api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
+	if (ctx.params.key !== Deno.env.get("KV_CLEAR_KEY")) {
+		ctx.response.status = 401 //unauthorized
+		return
+	}
+	console.log("CLEAR")
+	await kv.delete(KV_KEY_connections)
+	connectionByUUID.clear()
+	notifyAllConnections()
+	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
+	ctx.response.status = 200
+})
 api.post(`/${apiRoute.setText}`, async (context) => {
 	try {
-		const text =  await context.request.body.text()
-		if(text.length > 123) throw new Error("invalid text")
+		const text = await context.request.body.text()
+		if (text.length > 123) throw new Error("invalid text")
 		updateConnectionProperty(context.request, "text", text);
 		context.response.status = 200
 		notifyAllConnections()
@@ -80,7 +94,7 @@ api.post(`/${apiRoute.setText}`, async (context) => {
 api.post(`/${apiRoute.setColor}`, async (context) => {
 	try {
 		const color = await context.request.body.text()
-		if(!color.startsWith("#") || color.length > 9) throw new Error("invalid color")
+		if (!color.startsWith("#") || color.length > 9) throw new Error("invalid color")
 		updateConnectionProperty(context.request, "color", color);
 		context.response.status = 200
 		notifyAllConnections()
@@ -110,9 +124,9 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			connection.status = "online"
 
-			updateFunctionByUUID.set(uuid, (value) => {
+			updateFunctionByUUID.set(uuid, (event, value) => {
 				try {
-					controller.enqueue(sseMessage(sseEvent.connections, value))
+					controller.enqueue(sseMessage(event, value))
 				} catch (error) {
 					console.error(uuid, error)
 				}
