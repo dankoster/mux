@@ -71,12 +71,15 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 		ctx.response.status = 401 //unauthorized
 		return
 	}
-	console.log("CLEAR")
+
+	const oldData = objectFrom(connectionByUUID);
+	console.log("CLEAR", oldData)
+	ctx.response.body = oldData
+
 	await kv.delete(KV_KEY_connections)
 	connectionByUUID.clear()
 	notifyAllConnections()
 	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
-	ctx.response.status = 200
 })
 api.post(`/${apiRoute.setText}`, async (context) => {
 	try {
@@ -151,3 +154,11 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
+
+function objectFrom<V>(map: Map<string, V>) {
+  const obj: {[key:string]:V} = {};
+  for (const [key, val] of map) {
+    obj[key] = val;
+  }
+  return obj;
+}
