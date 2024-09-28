@@ -72,10 +72,10 @@ function parseEventStream(value: string) {
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.pk:
-			setPk(event.data);
 			const key = event.data
+			setPk(key);
 			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, key)
-			console.log(`${event.event}`, event.data);
+			console.log(`${event.event}`, key);
 
 			const prevColor = localStorage.getItem('color')
 			if (prevColor) setColor(prevColor, key)
@@ -99,23 +99,27 @@ function handleSseEvent(event: SSEventPayload) {
 	}
 }
 
-function setColor(color: string, key?: string) {
-	localStorage.setItem('color', color)
+async function setColor(color: string, key?: string) {
 	const headers = {}
 	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
-	fetch(`${API_URI}/${apiRoute.setColor}`, {
+	const response = await fetch(`${API_URI}/${apiRoute.setColor}`, {
 		method: "POST",
 		body: color,
 		headers
 	})
+	if (response.ok)
+		localStorage.setItem('color', color)
+
 }
-function setText(text: string, key?: string) {
-	localStorage.setItem('text', text)
+async function setText(text: string, key?: string) {
 	const headers = {}
 	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
-	fetch(`${API_URI}/${apiRoute.setText}`, {
+	const response = await fetch(`${API_URI}/${apiRoute.setText}`, {
 		method: "POST",
 		body: text,
 		headers
 	})
+	if (response.ok)
+		localStorage.setItem('text', text)
+
 }

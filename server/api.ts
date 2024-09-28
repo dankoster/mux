@@ -27,25 +27,14 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	setText: "setText"
 }
 
-const connectionByUUID = new Map<string, Connection>()
+const kv = await Deno.openKv();
+const connections = await kv.get<Map<string, Connection>>(['connections'])
+const connectionByUUID = connections.value ?? new Map<string, Connection>()
 const updateFunctionByUUID = new Map<string, (value: string) => void>()
 
-// async function initKV() {
-// 	const kv = await Deno.openKv();
-// 	const connections = await kv.get(['connections'])
+console.log("Got connections from KV:", connectionByUUID)
 
-// 	console.log(connections)
-
-// 	return kv
-// }
-
-// const kv = await initKV()
-
-// async function persist(kv: Deno.Kv) {
-// 	// const connections = Array.from(connectionByUUID.values())
-// 	//console.log('persist', connectionByUUID)
-// 	await kv.set(['connections'], connectionByUUID)
-// }
+//kv.delete(['connections'])
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
@@ -59,8 +48,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function notifyAllConnections() {
-	// persist(kv)
-
+	kv.set(['connections'], connectionByUUID)
 	const connections = Array.from(connectionByUUID.values())
 	const value = JSON.stringify(connections)
 	updateFunctionByUUID.forEach(update => update(value))
@@ -78,21 +66,27 @@ function updateConnectionProperty(req: Request, prop: keyof Connection, value: s
 const api = new Router();
 api.post(`/${apiRoute.setText}`, async (context) => {
 	try {
-		updateConnectionProperty(context.request, "text", await context.request.body.text());
+		const text =  await context.request.body.text()
+		if(text.length > 123) throw new Error("invalid text")
+		updateConnectionProperty(context.request, "text", text);
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
 		console.error(err, context.request)
+		context.response.status = 400
 	}
 })
 
 api.post(`/${apiRoute.setColor}`, async (context) => {
 	try {
-		updateConnectionProperty(context.request, "color", await context.request.body.text());
+		const color = await context.request.body.text()
+		if(!color.startsWith("#") || color.length > 9) throw new Error("invalid color")
+		updateConnectionProperty(context.request, "color", color);
 		context.response.status = 200
 		notifyAllConnections()
 	} catch (err) {
 		console.error(err, context.request)
+		context.response.status = 400
 	}
 });
 
@@ -135,10 +129,10 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			if (connection) connection.status = ""
 			console.log("SSE Disconnect   ", uuid, connection)
 
-			//no persistent connection for now because of something wierd with iOS
-			connectionByUUID.delete(uuid)
+			//persistent connections work with a backing store (denoKV in this case)
+			//connectionByUUID.delete(uuid)
 			updateFunctionByUUID.delete(uuid)
-			
+
 			notifyAllConnections()
 		},
 	});

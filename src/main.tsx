@@ -18,15 +18,17 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 	// })
 
 	return <div
-		class="connection"
-		classList={{ "controls": props.showControls }}
+		class="connection controls"
+		// classList={{ "controls": props.showControls }}
 		style={{ "background-color": color() }}>
 		{!props.showControls && <>
-			<h2>{props.connection.status === "online" ? text() ?? "🌈 🤔" : "😴"}</h2>
+			<h2>{text() || "🌈 🤔"}</h2>
+			<h2>{props.connection.status === "online" ? "👀" : `😴`}</h2>
 		</>}
 		{props.showControls && <>
 			<input
 				type="text"
+				maxlength="123"
 				// ref={ref}
 				placeholder="Say hello! 👋 Set a color 👉"
 				oninput={(e) => setText(e.target.value)}
