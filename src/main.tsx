@@ -1,7 +1,7 @@
 import "./index.css"
 import "./main.css"
 
-import { createSignal, Show } from "solid-js";
+import { createSignal, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
@@ -11,11 +11,11 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 	const [color, setColor] = createSignal(props.connection.color)
 	const [text, setText] = createSignal(props.connection.text)
 
-	// let ref: HTMLInputElement
+	let ref: HTMLInputElement
 
-	// onMount(() => {
-	// 	ref?.focus()
-	// })
+	onMount(() => {
+		ref?.focus()
+	})
 
 	return <div
 		class="connection controls"
@@ -27,10 +27,10 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 		</>}
 		{props.showControls && <>
 			<input
+				ref={ref}
 				type="text"
 				maxlength="123"
-				// ref={ref}
-				placeholder="Say hello! 👋 Set a color 👉"
+				placeholder="Leave a message! 👋 🌈 👉"
 				oninput={(e) => setText(e.target.value)}
 				onchange={(e) => server.setText(e.target.value)}
 				onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
