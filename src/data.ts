@@ -73,14 +73,15 @@ function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.pk:
 			setPk(event.data);
-			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, event.data)
+			const key = event.data
+			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, key)
 			console.log(`${event.event}`, event.data);
 
-			// 	const prevColor = localStorage.getItem('color')
-			// 	if(prevColor) setColor(prevColor, key)
+			const prevColor = localStorage.getItem('color')
+			if (prevColor) setColor(prevColor, key)
 
-			// 	const prevText = localStorage.getItem('text')
-			// 	if(prevText) setText(prevText, key)
+			const prevText = localStorage.getItem('text')
+			if (prevText) setText(prevText, key)
 
 			break;
 		case sse.id:
