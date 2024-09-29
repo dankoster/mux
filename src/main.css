@@ -5,14 +5,31 @@
 	justify-content: center;
 }
 
+.header {
+	display: flex;
+	gap: 2rem;
+	outline: 1px solid;
+	align-items: center;
+
+	.logo {
+		padding-left: 2rem;
+	}
+	.stats {
+		.userCount {
+
+		}
+	}
+}
+
 .connections {
 	margin: 1rem;
 	display: grid;
 	gap: 1rem;
 
 	.connection {
-		padding: 2rem;
-		outline: 1px solid #cccccc1f;
+		padding-block: 1rem;
+		padding-inline: 2rem;
+		border: 1px solid #cccccc1f;
 		border-radius: 15px;
 
 		&.controls {
@@ -32,6 +49,7 @@
 
 		h2 {
 			text-align: center;
+			margin: auto;
 		}
 
 		input[type="text"] {

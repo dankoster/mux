@@ -22,7 +22,7 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 		// classList={{ "controls": props.showControls }}
 		style={{ "background-color": color() }}>
 		{!props.showControls && <>
-			<h2>{text() || "🌈 🤔"}</h2>
+			<h2 textContent={text() || "🌈 🤔"}></h2>
 			<h2>{props.connection.status === "online" ? "👀" : `😴`}</h2>
 		</>}
 		{props.showControls && <>
@@ -50,7 +50,14 @@ const App = () => {
 			<div class="offlineMessage">connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
-			<div class="connections">
+		<div class="header">
+			<h1 class="logo">⨳ MUX</h1>
+			<div class="stats">
+				<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
+				<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline  😴</div>
+			</div>
+		</div>
+		<div class="connections">
 				{server.connections().map(c => <ConnectionPanel connection={c} showControls={c.id == server.id()} />)}
 			</div>
 		</Show>

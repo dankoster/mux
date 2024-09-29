@@ -16,12 +16,18 @@ const sse: { [Property in SSEvent]: Property } = {
 }
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
+type Stats = {
+	online: number;
+	offline: number;
+}
+
 const [connections, setConnections] = createSignal<Connection[]>([])
 const [id, setId] = createSignal("")
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
+const [stats, setStats] = createSignal<Stats>()
 
-export default { id, pk, connections, setColor, setText, serverOnline }
+export default { id, pk, connections, stats, serverOnline, setColor, setText }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
@@ -45,7 +51,7 @@ async function initSSE(route: string, token: string) {
 		} catch (error) {
 			setServerOnline(false)
 			await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
-			console.log('SSE', error || 'reconnect...')
+			console.error('SSE', error || 'reconnect...')
 		}
 	}
 }
@@ -94,8 +100,12 @@ function handleSseEvent(event: SSEventPayload) {
 			console.log(`${event.event}`, event.data);
 			break;
 		case sse.connections:
-			const data = JSON.parse(event.data);
+			const data = JSON.parse(event.data) as Connection[]
 			setConnections(data);
+			setStats({
+				online: data.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
+				offline: data.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
+			})
 			console.log(`${event.event}`, data);
 			break;
 		case sse.reconnect:
