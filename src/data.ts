@@ -56,19 +56,22 @@ type SSEventPayload = {
 	id?: string;
 	retry?: string;
 }
+const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
+	id: "id",
+	data: "data",
+	retry: "retry",
+	event: "event"
+}
 
 function parseEventStream(value: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
 	return value.split('\r\n\r\n')
 		.filter(e => e)
 		.map(s => s.split('\r\n'))
-		.map(event => {
-			const eventObj: SSEventPayload = {};
-			event.map(e => e.split(': ')).forEach(part => {
-				eventObj[part[0]] = part[1];
-			});
-			return eventObj;
-		});
+		.map((event): SSEventPayload => ({
+			[payload.event]: event[0].split(`${payload.event}: `)[1],
+			[payload.data]: event[1].split(`${payload.data}: `)[1]
+		}))
 }
 
 function handleSseEvent(event: SSEventPayload) {
