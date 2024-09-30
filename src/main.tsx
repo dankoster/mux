@@ -1,7 +1,7 @@
 import "./index.css"
 import "./main.css"
 
-import { createSignal, For, onMount, Show } from "solid-js";
+import { For, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
@@ -33,6 +33,7 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 				value={props.connection.text ?? ''} />
 			<input
 				type="color"
+				oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value }
 				onchange={(e) => server.setColor(e.target.value)}
 				value={props.connection.color} />
 		</>}
