@@ -37,6 +37,9 @@ export default { id, pk, connections, stats, serverOnline, setColor, setText }
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
 async function initSSE(route: string, token: string) {
+	let retries = 0
+	const interval = 500
+	const maxInterval = 15000
 	while (true) {
 		try {
 			const headers = new Headers()
@@ -45,6 +48,7 @@ async function initSSE(route: string, token: string) {
 			const response = await fetch(route, { method: 'GET', headers })
 			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
 			setServerOnline(true)
+			retries = 0
 
 			while (true) {
 				const { value, done } = await reader.read()
@@ -55,8 +59,12 @@ async function initSSE(route: string, token: string) {
 			}
 		} catch (error) {
 			setServerOnline(false)
-			await new Promise<void>(resolve => setTimeout(() => resolve(), 3000))
-			console.error('SSE', error || 'reconnect...')
+			if(retries * interval < maxInterval) 
+				retries++ 
+
+			await new Promise<void>(resolve => setTimeout(() => resolve(), retries * interval))
+			if((error?.message ?? '') !== "Failed to fetch")
+				console.error('SSE', error || 'reconnect...')
 		}
 	}
 }
