@@ -1,6 +1,7 @@
 import { API_URI } from "./API_URI";
-import type { ApiRoute, AuthTokenName, Connection, SSEvent } from "../server/api";
+import type { ApiRoute, AuthTokenName, Connection, SSEvent, Update } from "../server/api";
 import { createSignal } from "solid-js";
+import { createStore } from "solid-js/store"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -12,7 +13,8 @@ const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
 	connections: "connections",
-	reconnect: "reconnect"
+	reconnect: "reconnect",
+	upate: "upate"
 }
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
@@ -21,7 +23,7 @@ type Stats = {
 	offline: number;
 }
 
-const [connections, setConnections] = createSignal<Connection[]>([])
+const [connections, setConnections] = createStore<Connection[]>([])
 const [id, setId] = createSignal("")
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
@@ -87,13 +89,6 @@ function handleSseEvent(event: SSEventPayload) {
 			setPk(key);
 			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, key)
 			console.log(`${event.event}`, key);
-
-			// const prevColor = localStorage.getItem('color')
-			// if (prevColor) setColor(prevColor, key)
-
-			// const prevText = localStorage.getItem('text')
-			// if (prevText) setText(prevText, key)
-
 			break;
 		case sse.id:
 			setId(event.data);
@@ -110,7 +105,15 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
+		case sse.upate:
+			const update = JSON.parse(event.data) as Update
+			const index = connections.findIndex(con => con.id === update.connectionId)
+			if(!(index >= 0)) throw new Error('TODO: ask server for an updated list')
+			//https://docs.solidjs.com/concepts/stores#range-specification
+			setConnections({ from: index, to: index }, update.field, update.value)
+			break;
 		default:
+			debugger
 			console.warn(`Unknown SSE field "${event.event}"`, event.data)
 			break;
 	}

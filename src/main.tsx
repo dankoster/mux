@@ -1,15 +1,12 @@
 import "./index.css"
 import "./main.css"
 
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import { Connection } from "../server/api";
 
 const ConnectionPanel = (props: { connection: Connection, showControls: boolean }) => {
-
-	const [color, setColor] = createSignal(props.connection.color)
-	const [text, setText] = createSignal(props.connection.text)
 
 	let ref: HTMLInputElement
 
@@ -20,9 +17,9 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 	return <div
 		class="connection controls"
 		// classList={{ "controls": props.showControls }}
-		style={{ "background-color": color() }}>
+		style={{ "background-color": props.connection.color }}>
 		{!props.showControls && <>
-			<h2 textContent={text() || "🌈 🤔"}></h2>
+			<h2 textContent={props.connection.text || "🌈 🤔"}></h2>
 			<h2>{props.connection.status === "online" ? "👀" : `😴`}</h2>
 		</>}
 		{props.showControls && <>
@@ -31,15 +28,13 @@ const ConnectionPanel = (props: { connection: Connection, showControls: boolean 
 				type="text"
 				maxlength="123"
 				placeholder="Leave a message! 👋 🌈 👉"
-				oninput={(e) => setText(e.target.value)}
 				onchange={(e) => server.setText(e.target.value)}
 				onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
-				value={text() ?? ''} />
+				value={props.connection.text ?? ''} />
 			<input
 				type="color"
-				oninput={(e) => setColor(e.target.value)}
 				onchange={(e) => server.setColor(e.target.value)}
-				value={color()} />
+				value={props.connection.color} />
 		</>}
 	</div>
 }
@@ -50,15 +45,17 @@ const App = () => {
 			<div class="offlineMessage">connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
-		<div class="header">
-			<h1 class="logo">⨳ MUX</h1>
-			<div class="stats">
-				<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
-				<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline  😴</div>
+			<div class="header">
+				<h1 class="logo">⨳ MUX</h1>
+				<div class="stats">
+					<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
+					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
+				</div>
 			</div>
-		</div>
-		<div class="connections">
-				{server.connections().map(c => <ConnectionPanel connection={c} showControls={c.id == server.id()} />)}
+			<div class="connections">
+				<For each={server.connections}>
+					{(con)=><ConnectionPanel connection={con} showControls={con.id == server.id()} />}
+				</For>
 			</div>
 		</Show>
 	</>

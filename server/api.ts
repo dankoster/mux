@@ -5,19 +5,25 @@ export { api }
 
 export type AuthTokenName = "Authorization"
 export type ApiRoute = "sse" | "setColor" | "setText" | "clear"
-export type SSEvent = "pk" | "id" | "connections" | "reconnect"
+export type SSEvent = "pk" | "id" | "connections" | "upate" | "reconnect"
 export type Connection = {
 	id: string,
 	color?: string,
 	text?: string,
 	status?: string
 }
+export type Update = {
+	connectionId: string,
+	field: keyof Connection,
+	value: string,
+}
 
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
 	connections: "connections",
-	reconnect: "reconnect"
+	reconnect: "reconnect",
+	upate: "upate"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -56,13 +62,17 @@ function notifyAllConnections() {
 	updateFunctionByUUID.forEach(update => update(sseEvent.connections, value))
 }
 
-function updateConnectionProperty(req: Request, prop: keyof Connection, value: string) {
+function updateAllConnections(update: Update) {
+	updateFunctionByUUID.forEach(fn => fn(sseEvent.upate, JSON.stringify(update)))
+}
+
+function updateConnectionProperty(req: Request, field: keyof Connection, value: string): Update {
 	const uuid = req.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 	const con = connectionByUUID.get(uuid);
 	if (!con) throw new Error(`No connection found for key ${uuid}`);
-	con[prop] = value;
-	connectionByUUID.set(uuid, con);
+	con[field] = value;
+	return { connectionId: con.id, field, value }
 }
 
 const api = new Router();
@@ -84,10 +94,12 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 api.post(`/${apiRoute.setText}`, async (context) => {
 	try {
 		const text = await context.request.body.text()
-		if (text.length > 123) throw new Error("invalid text")
-		updateConnectionProperty(context.request, "text", text);
+		if (text.length > 123)
+			throw new Error("invalid text")
+
+		const update = updateConnectionProperty(context.request, "text", text)
+		updateAllConnections(update)
 		context.response.status = 200
-		notifyAllConnections()
 	} catch (err) {
 		console.error(err, context.request)
 		context.response.status = 400
@@ -97,10 +109,12 @@ api.post(`/${apiRoute.setText}`, async (context) => {
 api.post(`/${apiRoute.setColor}`, async (context) => {
 	try {
 		const color = await context.request.body.text()
-		if (!color.startsWith("#") || color.length > 9) throw new Error("invalid color")
-		updateConnectionProperty(context.request, "color", color);
+		if (!color.startsWith("#") || color.length > 9)
+			throw new Error("invalid color")
+
+		const update = updateConnectionProperty(context.request, "color", color)
+		updateAllConnections(update)
 		context.response.status = 200
-		notifyAllConnections()
 	} catch (err) {
 		console.error(err, context.request)
 		context.response.status = 400
@@ -156,9 +170,9 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 });
 
 function objectFrom<V>(map: Map<string, V>) {
-  const obj: {[key:string]:V} = {};
-  for (const [key, val] of map) {
-    obj[key] = val;
-  }
-  return obj;
+	const obj: { [key: string]: V } = {};
+	for (const [key, val] of map) {
+		obj[key] = val;
+	}
+	return obj;
 }
