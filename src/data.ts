@@ -100,7 +100,19 @@ function handleSseEvent(event: SSEventPayload) {
 			}
 
 			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, newKey)
-			console.log(event.event, newKey);
+
+			const OLD_KEYS = `${AUTH_TOKEN_HEADER_NAME}History`
+			const oldKeys = localStorage.getItem(OLD_KEYS)
+			const updatedOldKeys = [newKey, oldKeys?.split(',') ?? '']
+				.flat()
+				.filter(k => k)
+				.reduce((acc, cur) => {
+					!acc.includes(cur) && acc.push(cur)
+					return acc
+				}, [])
+				.join()
+			localStorage.setItem(OLD_KEYS, updatedOldKeys)
+			console.log(event.event, newKey, { history: updatedOldKeys.split(',') });
 			break;
 		case sse.id:
 			setId(event.data);
