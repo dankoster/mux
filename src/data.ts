@@ -77,8 +77,8 @@ function parseEventStream(value: string) {
 		.filter(e => e)
 		.map(s => s.split('\r\n'))
 		.map((event): SSEventPayload => ({
-			[payload.event]: event[0].split(`${payload.event}: `)[1],
-			[payload.data]: event[1].split(`${payload.data}: `)[1]
+			[payload.event]: event[0]?.split(`${payload.event}: `)[1],
+			[payload.data]: event[1]?.split(`${payload.data}: `)[1]
 		}))
 }
 
