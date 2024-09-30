@@ -113,6 +113,11 @@ function handleSseEvent(event: SSEventPayload) {
 			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
+			setStats({
+				online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
+				offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
+			})
+
 			break;
 		case sse.new_connection:
 			const new_connection = JSON.parse(event.data) as Connection
