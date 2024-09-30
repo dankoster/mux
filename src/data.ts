@@ -14,7 +14,8 @@ const sse: { [Property in SSEvent]: Property } = {
 	id: "id",
 	connections: "connections",
 	reconnect: "reconnect",
-	upate: "upate"
+	upate: "upate",
+	new_connection: "new_connection"
 }
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
@@ -107,10 +108,17 @@ function handleSseEvent(event: SSEventPayload) {
 			throw "reconnect requested by server"
 		case sse.upate:
 			const update = JSON.parse(event.data) as Update
+			console.log(event.event, update)
 			const index = connections.findIndex(con => con.id === update.connectionId)
-			if(!(index >= 0)) throw new Error('TODO: ask server for an updated list')
+			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
+			break;
+		case sse.new_connection:
+			const new_connection = JSON.parse(event.data) as Connection
+			console.log(event.event, new_connection)
+			setConnections(connections.length, new_connection)
+			console.log(connections)
 			break;
 		default:
 			debugger

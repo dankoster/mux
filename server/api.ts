@@ -5,7 +5,7 @@ export { api }
 
 export type AuthTokenName = "Authorization"
 export type ApiRoute = "sse" | "setColor" | "setText" | "clear"
-export type SSEvent = "pk" | "id" | "connections" | "upate" | "reconnect"
+export type SSEvent = "pk" | "id" | "connections" | 'new_connection' | "upate" | "reconnect"
 export type Connection = {
 	id: string,
 	color?: string,
@@ -23,7 +23,8 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	id: "id",
 	connections: "connections",
 	reconnect: "reconnect",
-	upate: "upate"
+	upate: "upate",
+	new_connection: "new_connection"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -63,7 +64,30 @@ function notifyAllConnections() {
 }
 
 function updateAllConnections(update: Update) {
-	updateFunctionByUUID.forEach(fn => fn(sseEvent.upate, JSON.stringify(update)))
+	console.log(sseEvent.upate.toUpperCase(), update)
+	kv.set(KV_KEY_connections, connectionByUUID)
+	var updateUuid = getUUID(update.connectionId);
+	updateFunctionByUUID.forEach((fn, uuid) => {
+		if (uuid !== updateUuid)
+			fn(sseEvent.upate, JSON.stringify(update))
+	})
+}
+
+function updateAllConnections_newConnection(connection: Connection) {
+	console.log(sseEvent.upate.toUpperCase(), connection)
+	kv.set(KV_KEY_connections, connectionByUUID)
+	var updateUuid = getUUID(connection.id);
+	updateFunctionByUUID.forEach((fn, uuid) => {
+		if (uuid !== updateUuid)
+			fn(sseEvent.new_connection, JSON.stringify(connection))
+	})
+}
+
+function getUUID(connectionId: string) {
+	for (const [uuid, con] of connectionByUUID.entries()) {
+		if (con.id === connectionId)
+			return uuid
+	}
 }
 
 function updateConnectionProperty(req: Request, field: keyof Connection, value: string): Update {
@@ -135,11 +159,20 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		start(controller) {
 			let connection = connectionByUUID.get(uuid)
 			if (!connection) {
-				connection = { id: Date.now().toString() }
+				connection = {
+					id: Date.now().toString(),
+					status: "online"
+				}
 				connectionByUUID.set(uuid, connection)
+				updateAllConnections_newConnection(connection)
+			} else {
+				connection.status = "online"
+				updateAllConnections({
+					connectionId: connection.id,
+					field: "status",
+					value: "online"
+				})
 			}
-
-			connection.status = "online"
 
 			updateFunctionByUUID.set(uuid, (event, value) => {
 				try {
@@ -153,18 +186,19 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			controller.enqueue(sseMessage(sseEvent.id, connection?.id ?? "ERROR"))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
-			notifyAllConnections()
+			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 		},
 		cancel() {
 			const connection = connectionByUUID.get(uuid)
-			if (connection) connection.status = ""
-			console.log("SSE Disconnect   ", uuid, connection)
+			if (!connection)
+				throw new Error(`orphan disconnected! ${uuid}}`)
 
-			//persistent connections work with a backing store (denoKV in this case)
-			//connectionByUUID.delete(uuid)
+			console.log("SSE Disconnect   ", uuid, connection)
+			connection.status = ""
 			updateFunctionByUUID.delete(uuid)
 
-			notifyAllConnections()
+			const update = updateConnectionProperty(context.request, "status", "")
+			updateAllConnections(update)
 		},
 	});
 });
