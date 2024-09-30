@@ -4,8 +4,8 @@ import { Router } from "jsr:@oak/oak@17/router";
 export { api }
 
 export type AuthTokenName = "Authorization"
-export type ApiRoute = "sse" | "setColor" | "setText" | "clear"
-export type SSEvent = "pk" | "id" | "connections" | 'new_connection' | "upate" | "reconnect"
+export type ApiRoute = "sse" | "setColor" | "setText" | "clear" | "discardKey"
+export type SSEvent = "pk" | "id" | "connections" | "new_connection" | "delete_connection" | "update" | "reconnect"
 export type Connection = {
 	id: string,
 	color?: string,
@@ -15,7 +15,7 @@ export type Connection = {
 export type Update = {
 	connectionId: string,
 	field: keyof Connection,
-	value: string,
+	value: string
 }
 
 const sseEvent: { [Property in SSEvent]: Property } = {
@@ -23,8 +23,9 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	id: "id",
 	connections: "connections",
 	reconnect: "reconnect",
-	upate: "upate",
-	new_connection: "new_connection"
+	new_connection: "new_connection",
+	delete_connection: "delete_connection",
+	update: "update"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -33,16 +34,16 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	setColor: "setColor",
 	setText: "setText",
-	clear: "clear"
+	clear: "clear",
+	discardKey: "discardKey"
 }
 
 const KV_KEY_connections = ['connections']
 const kv = await Deno.openKv();
-const connections = await kv.get<Map<string, Connection>>(KV_KEY_connections)
-const connectionByUUID = connections.value ?? new Map<string, Connection>()
+const result = await kv.get<Map<string, Connection>>(KV_KEY_connections)
+const connectionByUUID = result.value ?? new Map<string, Connection>()
 const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
-
-console.log("Got connections from KV:", connectionByUUID)
+console.log("INIT Got connections from KV:", connectionByUUID)
 
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
@@ -64,22 +65,32 @@ function notifyAllConnections() {
 }
 
 function updateAllConnections(update: Update) {
-	console.log(sseEvent.upate.toUpperCase(), update)
+	console.log(sseEvent.update.toUpperCase(), update)
 	kv.set(KV_KEY_connections, connectionByUUID)
 	var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
-			fn(sseEvent.upate, JSON.stringify(update))
+			fn(sseEvent.update, JSON.stringify(update))
 	})
 }
 
 function updateAllConnections_newConnection(connection: Connection) {
-	console.log(sseEvent.upate.toUpperCase(), connection)
+	console.log(sseEvent.update.toUpperCase(), connection)
 	kv.set(KV_KEY_connections, connectionByUUID)
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
 			fn(sseEvent.new_connection, JSON.stringify(connection))
+	})
+}
+
+function updateAllConnections_deleteConnection(connection: Connection) {
+	console.log(sseEvent.update.toUpperCase(), connection)
+	kv.set(KV_KEY_connections, connectionByUUID)
+	var updateUuid = getUUID(connection.id);
+	updateFunctionByUUID.forEach((fn, uuid) => {
+		if (uuid !== updateUuid)
+			fn(sseEvent.delete_connection, connection.id)
 	})
 }
 
@@ -99,7 +110,32 @@ function updateConnectionProperty(req: Request, field: keyof Connection, value: 
 	return { connectionId: con.id, field, value }
 }
 
+function objectFrom<V>(map: Map<string, V>) {
+	const obj: { [key: string]: V } = {};
+	for (const [key, val] of map) {
+		obj[key] = val;
+	}
+	return obj;
+}
+
 const api = new Router();
+api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
+
+	const oldId = ctx.params.key
+	const oldCon = connectionByUUID.get(oldId)
+	console.log(apiRoute.discardKey.toUpperCase(), oldId, oldCon)
+
+	const success = connectionByUUID.delete(oldId)
+	if (success) {
+		kv.set(KV_KEY_connections, connectionByUUID)
+		if (oldCon) updateAllConnections_deleteConnection(oldCon)
+	}
+
+	ctx.response.body = success
+})
+
 api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	if (ctx.params.key !== Deno.env.get("KV_CLEAR_KEY")) {
 		ctx.response.status = 401 //unauthorized
@@ -148,8 +184,8 @@ api.post(`/${apiRoute.setColor}`, async (context) => {
 //https://deno.com/blog/deploy-streams
 api.get(`/${apiRoute.sse}`, async (context) => {
 	//get the user's bearer token or create a new one
-	const oldId = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
-	const uuid = oldId ?? crypto.randomUUID()
+	const oldKey = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
+	const uuid = oldKey ?? crypto.randomUUID()
 
 	const old = connectionByUUID.has(uuid)
 	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
@@ -184,7 +220,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			console.log("SSE connection   ", uuid, connection)
 
-			controller.enqueue(sseMessage(sseEvent.id, connection?.id ?? "ERROR"))
+			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 		},
@@ -199,14 +235,15 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			const update = updateConnectionProperty(context.request, "status", "")
 			updateAllConnections(update)
+
+			// //TEST DELETE!
+			// console.log("DELETE", uuid, connection)
+			// const success = connectionByUUID.delete(uuid)
+			// if (success) {
+			// 	kv.set(KV_KEY_connections, connectionByUUID)
+			// 	updateAllConnections_deleteConnection(connection)
+			// }
+
 		},
 	});
 });
-
-function objectFrom<V>(map: Map<string, V>) {
-	const obj: { [key: string]: V } = {};
-	for (const [key, val] of map) {
-		obj[key] = val;
-	}
-	return obj;
-}

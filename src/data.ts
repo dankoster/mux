@@ -7,15 +7,17 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	setColor: "setColor",
 	setText: "setText",
-	clear: "clear"
+	clear: "clear",
+	discardKey: "discardKey"
 };
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
 	connections: "connections",
 	reconnect: "reconnect",
-	upate: "upate",
-	new_connection: "new_connection"
+	update: "update",
+	new_connection: "new_connection",
+	delete_connection: "delete_connection"
 }
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
@@ -86,44 +88,53 @@ function parseEventStream(value: string) {
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.pk:
-			const key = event.data
-			setPk(key);
-			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, key)
-			console.log(`${event.event}`, key);
+			const newKey = event.data
+			setPk(newKey);
+			const oldKey = localStorage.getItem(AUTH_TOKEN_HEADER_NAME)
+			if (oldKey && oldKey !== newKey) {
+				//oh hey, I had this old bearer token but 
+				// I'll use the new one instead so go ahead
+				// and cleanup that old trash kthxbye
+				console.log(apiRoute.discardKey, { newKey, oldKey });
+				POST(apiRoute.discardKey, { subRoute: oldKey })
+			}
+
+			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, newKey)
+			console.log(event.event, newKey);
 			break;
 		case sse.id:
 			setId(event.data);
-			console.log(`${event.event}`, event.data);
+			console.log(event.event, event.data);
 			break;
 		case sse.connections:
 			const data = JSON.parse(event.data) as Connection[]
 			setConnections(data);
-			setStats({
-				online: data.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
-				offline: data.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
-			})
-			console.log(`${event.event}`, data);
+			updateConnectionStatus()
+			console.log(event.event, data);
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
-		case sse.upate:
+		case sse.update:
 			const update = JSON.parse(event.data) as Update
 			console.log(event.event, update)
 			const index = connections.findIndex(con => con.id === update.connectionId)
 			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
-			setStats({
-				online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
-				offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
-			})
-
+			updateConnectionStatus()
 			break;
 		case sse.new_connection:
 			const new_connection = JSON.parse(event.data) as Connection
 			console.log(event.event, new_connection)
 			setConnections(connections.length, new_connection)
+			updateConnectionStatus()
 			console.log(connections)
+			break;
+		case sse.delete_connection:
+			const conId = event.data
+			console.log(event.event, conId)
+			setConnections(connections.filter(con => con.id !== conId))
+			updateConnectionStatus()
 			break;
 		default:
 			debugger
@@ -132,27 +143,28 @@ function handleSseEvent(event: SSEventPayload) {
 	}
 }
 
-async function setColor(color: string, key?: string) {
-	const headers = {}
-	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
-	const response = await fetch(`${API_URI}/${apiRoute.setColor}`, {
-		method: "POST",
-		body: color,
-		headers
-	})
-	if (response.ok)
-		localStorage.setItem('color', color)
+function updateConnectionStatus() {
+	setStats({
+		online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
+		offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
+	});
+}
 
+async function setColor(color: string, key?: string) {
+	return await POST(apiRoute.setColor, { body: color, authToken: key })
 }
 async function setText(text: string, key?: string) {
-	const headers = {}
-	headers[AUTH_TOKEN_HEADER_NAME] = key ?? pk()
-	const response = await fetch(`${API_URI}/${apiRoute.setText}`, {
-		method: "POST",
-		body: text,
-		headers
-	})
-	if (response.ok)
-		localStorage.setItem('text', text)
-
+	return await POST(apiRoute.setText, { body: text, authToken: key });
 }
+type PostOptions = { subRoute?: string, body?: string, authToken?: string }
+async function POST(route: ApiRoute, { subRoute, body, authToken }: PostOptions) {
+	const headers = {};
+	headers[AUTH_TOKEN_HEADER_NAME] = authToken ?? pk();
+	const url = [API_URI, route, subRoute].filter(s => s).join('/')
+	return await fetch(url, {
+		method: "POST",
+		body,
+		headers
+	});
+}
+
