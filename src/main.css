@@ -13,11 +13,33 @@
 
 	.logo {
 		padding-left: 2rem;
+		text-wrap: nowrap;
 	}
+
 	.stats {
 		.userCount {
-
+			text-wrap: nowrap;
 		}
+	}
+}
+
+.rooms {
+	display: flex;
+	gap: 1rem;
+	flex-wrap: wrap;
+	border-bottom: 1px solid;
+	padding: 1.5rem;
+	align-content: stretch;
+
+	.room {
+		font-size: xx-large;
+		border: 1px solid;
+		border-radius: 5px;
+		padding-inline: 1rem;
+		font-family: monospace;
+		font-weight: bold;
+		cursor: pointer;
+		background: transparent;
 	}
 }
 
@@ -29,8 +51,9 @@
 	.connection {
 		padding-block: 1rem;
 		padding-inline: 2rem;
-		border: 1px solid #cccccc1f;
 		border-radius: 15px;
+		border: 1px solid #cccccc1f;
+		box-shadow: 2px 2px 15px #0000004a;
 
 		&.controls {
 			display: grid;

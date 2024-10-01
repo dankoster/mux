@@ -1,5 +1,5 @@
 import { API_URI } from "./API_URI";
-import type { ApiRoute, AuthTokenName, Connection, SSEvent, Update } from "../server/api";
+import type { ApiRoute, AuthTokenName, Connection, Room, SSEvent, Update } from "../server/api";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 
@@ -8,8 +8,10 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	setColor: "setColor",
 	setText: "setText",
 	clear: "clear",
-	discardKey: "discardKey"
+	discardKey: "discardKey",
+	room: "room"
 };
+
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
@@ -17,8 +19,12 @@ const sse: { [Property in SSEvent]: Property } = {
 	reconnect: "reconnect",
 	update: "update",
 	new_connection: "new_connection",
-	delete_connection: "delete_connection"
+	delete_connection: "delete_connection",
+	rooms: "rooms",
+	new_room: "new_room",
+	delete_room: "delete_room"
 }
+
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 type Stats = {
@@ -26,13 +32,17 @@ type Stats = {
 	offline: number;
 }
 
+const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
 const [id, setId] = createSignal("")
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
-export default { id, pk, connections, stats, serverOnline, setColor, setText }
+export default {
+	id, pk, connections, rooms, stats, serverOnline,
+	setColor, setText, createRoom, exitRoom
+}
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
@@ -59,11 +69,11 @@ async function initSSE(route: string, token: string) {
 			}
 		} catch (error) {
 			setServerOnline(false)
-			if(retries * interval < maxInterval) 
-				retries++ 
+			if (retries * interval < maxInterval)
+				retries++
 
 			await new Promise<void>(resolve => setTimeout(() => resolve(), retries * interval))
-			if((error?.message ?? '') !== "Failed to fetch")
+			if ((error?.message ?? '') !== "Failed to fetch")
 				console.error('SSE', error || 'reconnect...')
 		}
 	}
@@ -80,6 +90,13 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 	data: "data",
 	retry: "retry",
 	event: "event"
+}
+
+async function createRoom() {
+	return await POST(apiRoute.room)
+}
+async function exitRoom(roomId: string) {
+	return await DELETE(apiRoute.room, roomId)
 }
 
 function parseEventStream(value: string) {
@@ -127,10 +144,15 @@ function handleSseEvent(event: SSEventPayload) {
 			console.log(event.event, event.data);
 			break;
 		case sse.connections:
-			const data = JSON.parse(event.data) as Connection[]
-			setConnections(data);
+			const conData = JSON.parse(event.data) as Connection[]
+			setConnections(conData);
 			updateConnectionStatus()
-			console.log(event.event, data);
+			console.log(event.event, conData);
+			break;
+		case sse.rooms:
+			const roomData = JSON.parse(event.data) as Room[]
+			setRooms(roomData)
+			console.log(event.event, roomData)
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
@@ -143,10 +165,20 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections({ from: index, to: index }, update.field, update.value)
 			updateConnectionStatus()
 			break;
+		case sse.new_room:
+			const newRoom = JSON.parse(event.data) as Room
+			console.log(event.event, newRoom)
+			setRooms(rooms.length, newRoom)
+			break;
+		case sse.delete_room:
+			const room = JSON.parse(event.data) as Room
+			console.log(event.event, room)
+			setRooms(rooms.filter(r => r.id !== room.id))
+			break;
 		case sse.new_connection:
-			const new_connection = JSON.parse(event.data) as Connection
-			console.log(event.event, new_connection)
-			setConnections(connections.length, new_connection)
+			const newCon = JSON.parse(event.data) as Connection
+			console.log(event.event, newCon)
+			setConnections(connections.length, newCon)
 			updateConnectionStatus()
 			console.log(connections)
 			break;
@@ -176,15 +208,22 @@ async function setColor(color: string, key?: string) {
 async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key });
 }
+
 type PostOptions = { subRoute?: string, body?: string, authToken?: string }
-async function POST(route: ApiRoute, { subRoute, body, authToken }: PostOptions) {
+async function POST(route: ApiRoute, options?: PostOptions) {
 	const headers = {};
-	headers[AUTH_TOKEN_HEADER_NAME] = authToken ?? pk();
-	const url = [API_URI, route, subRoute].filter(s => s).join('/')
+	headers[AUTH_TOKEN_HEADER_NAME] = options?.authToken ?? pk();
+	const url = [API_URI, route, options?.subRoute].filter(s => s).join('/')
 	return await fetch(url, {
 		method: "POST",
-		body,
+		body: options?.body,
 		headers
 	});
 }
 
+async function DELETE(route: ApiRoute, subRoute: string) {
+	const headers = {};
+	headers[AUTH_TOKEN_HEADER_NAME] = pk();
+	const url = [API_URI, route, subRoute].join('/')
+	return await fetch(url, { method: "DELETE", headers });
+}

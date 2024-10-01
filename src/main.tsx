@@ -19,9 +19,15 @@ const App = () => {
 					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
 				</div>
 			</div>
+			<div class="rooms">
+				<button class="room" onclick={() => server.createRoom()}>+</button>
+				<For each={server.rooms}>
+					{(room, index) => <div class="room" onclick={() => server.exitRoom(room.id)}>{index()}</div>}
+				</For>
+			</div>
 			<div class="connections">
 				<For each={server.connections}>
-					{(con)=><ConnectionPanel connection={con} showControls={con.id == server.id()} />}
+					{(con) => <ConnectionPanel connection={con} showControls={con.id == server.id()} />}
 				</For>
 			</div>
 		</Show>
