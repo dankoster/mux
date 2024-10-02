@@ -3,23 +3,52 @@
 	align-items: center;
 	min-height: 100svh;
 	justify-content: center;
+	touch-action: none;
 }
 
 .header {
 	display: flex;
 	gap: 2rem;
-	outline: 1px solid;
+	border-bottom: 1px solid;
 	align-items: center;
+	touch-action: none;
 
 	.logo {
 		padding-left: 2rem;
 		text-wrap: nowrap;
+		touch-action: none;
 	}
 
 	.stats {
+		touch-action: none;
+
 		.userCount {
+			touch-action: none;
 			text-wrap: nowrap;
 		}
+	}
+}
+
+.me {
+	padding: 2rem;
+    border-bottom: 1px solid;
+	position: relative;
+
+	display: grid;
+	gap: 1rem;
+	justify-content: center;
+	align-items: center;
+	grid-template-columns: minmax(1rem, 1fr) min-content min-content;
+	touch-action: none;
+
+	input[type="text"] {
+		touch-action: none;
+		font-size: 16px;
+		background-color: transparent;
+		border-style: none;
+		border-radius: 5px;
+		padding: 0.5rem;
+		text-align: center;
 	}
 }
 
@@ -30,23 +59,41 @@
 	border-bottom: 1px solid;
 	padding: 1.5rem;
 	align-content: stretch;
+	touch-action: none;
+	position: relative;
 
-	.room {
-		font-size: xx-large;
-		border: 1px solid;
-		border-radius: 5px;
-		padding-inline: 1rem;
-		font-family: monospace;
-		font-weight: bold;
-		cursor: pointer;
-		background: transparent;
+	&::before {
+		content: "rooms";
+		top: -1.1rem;
+		position: absolute;
+		color: #ffffff0d;
+		font-size: 50px;
+		font-weight: bolder;
+		z-index: -1;
+		left: -0.1rem;
+		text-transform: uppercase;
 	}
+}
+
+.room-button {
+	color: white;
+	font-size: xx-large;
+	border: 1px solid;
+	border-radius: 5px;
+	padding-inline: 1rem;
+	font-family: monospace;
+	font-weight: bold;
+	cursor: pointer;
+	background: transparent;
+	text-wrap: nowrap;
+	touch-action: none;
 }
 
 .connections {
 	margin: 1rem;
 	display: grid;
 	gap: 1rem;
+	touch-action: none;
 
 	.connection {
 		padding-block: 1rem;
@@ -55,15 +102,16 @@
 		border: 1px solid #cccccc1f;
 		box-shadow: 2px 2px 15px #0000004a;
 
-		&.controls {
-			display: grid;
-			gap: 2rem;
-			justify-content: center;
-			align-items: center;
-			grid-template-columns: 1fr max-content;
-		}
+		display: grid;
+		gap: 1rem;
+		justify-content: center;
+		align-items: center;
+		grid-template-columns: minmax(1rem, 1fr) min-content min-content;
+		touch-action: none;
+
 
 		.status {
+			touch-action: none;
 			font-size: x-large;
 			position: fixed;
 			right: 1.5rem;
@@ -71,17 +119,9 @@
 		}
 
 		h2 {
+			touch-action: none;
 			text-align: center;
 			margin: auto;
-		}
-
-		input[type="text"] {
-			font-size: 16px;
-			background-color: transparent;
-			border-style: none;
-			border-radius: 5px;
-			padding: 0.5rem;
-			text-align: center;
 		}
 	}
 }

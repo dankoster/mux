@@ -26,8 +26,6 @@ export type SSEvent = "pk"
 export type Room = {
 	id: string,
 	ownerId: string
-	name: string,
-	color: string,
 }
 
 export type Connection = {
@@ -37,6 +35,7 @@ export type Connection = {
 	status?: string,
 	roomId?: string,
 }
+
 export type Update = {
 	connectionId: string,
 	field: keyof Connection,
@@ -83,7 +82,7 @@ connectionByUUID.forEach(con => {
 const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? []
 const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
 console.log("INIT Got connections from KV:", connectionByUUID)
-
+console.log("INIT Got rooms from KV:", rooms)
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
@@ -106,9 +105,9 @@ function notifyAllConnections() {
 function updateAllConnections(update: Update) {
 	console.log(sseEvent.update.toUpperCase(), update)
 	kv.set(KV_KEYS.connections, connectionByUUID)
-	var updateUuid = getUUID(update.connectionId);
+	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
-		if (uuid !== updateUuid)
+		// if (uuid !== updateUuid)
 			fn(sseEvent.update, JSON.stringify(update))
 	})
 }
@@ -124,11 +123,13 @@ function updateAllConnections_newConnection(connection: Connection) {
 }
 
 function updateAllConnections_newRoom(room: Room) {
+	kv.set(KV_KEYS.rooms, rooms)
 	console.log(sseEvent.new_room.toUpperCase(), room)
 	updateFunctionByUUID.forEach((fn) =>
 		fn(sseEvent.new_room, JSON.stringify(room)))
 }
 function updateAllConnections_deleteRoom(room: Room) {
+	kv.set(KV_KEYS.rooms, rooms)
 	console.log(sseEvent.delete_room, room)
 	updateFunctionByUUID.forEach(fn =>
 		fn(sseEvent.delete_room, JSON.stringify(room)))
@@ -169,39 +170,98 @@ function objectFrom<V>(map: Map<string, V>) {
 }
 
 const api = new Router();
+
+api.post(`/${apiRoute.room}/:id`, async (ctx) => {
+	console.log("POST", apiRoute.room.toUpperCase(), ctx.params.id)
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
+
+	const con = connectionByUUID.get(uuid)
+	if (!con) throw new Error(`${uuid} not found in ${[...connectionByUUID.keys()]}`)
+
+	const room = rooms.find(room => room.id === ctx.params.id)
+	if (!room) {
+		ctx.response.status = 404
+		return
+	}
+
+	con.roomId = room?.id
+	updateAllConnections({
+		connectionId: con.id,
+		field: "roomId",
+		value: room.id
+	})
+})
+
 api.post(`/${apiRoute.room}`, async (ctx) => {
 
 	console.log("POST", apiRoute.room.toUpperCase())
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
-	const conId = connectionByUUID.get(uuid)?.id
-	if (!conId) throw new Error(`${uuid} not found in ${[...connectionByUUID.keys()]}`)
+	const con = connectionByUUID.get(uuid)
+	if (!con) throw new Error(`${uuid} not found in ${[...connectionByUUID.keys()]}`)
 
 	const room: Room = {
 		id: crypto.randomUUID(),
-		ownerId: conId,
-		name: "",
-		color: ""
+		ownerId: con.id,
 	}
 
+	con.roomId = room.id
 	rooms.push(room)
+
+	updateAllConnections({
+		connectionId: con.id,
+		field: "roomId",
+		value: room.id
+	})
 	updateAllConnections_newRoom(room)
 
 	ctx.response.body = JSON.stringify(room)
 })
 
 api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
+	console.log("DELETE", apiRoute.room.toUpperCase(), ctx.params)
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
-	//TODO: check for room ownership
-	
-	const [room] = rooms.splice(rooms.findIndex(room => room.id === ctx.params.id), 1)
-	if (!room) {
-		ctx.response.status = 404
+	const con = connectionByUUID.get(uuid)
+	if (!con) {
+		ctx.response.status = 403 //forbidden
 		return
 	}
-	updateAllConnections_deleteRoom(room)
-	ctx.response.body = room
+
+	//remove the room reference regardless (we're leaving the room)
+	delete con.roomId
+	updateAllConnections({
+		connectionId: con.id,
+		field: "roomId",
+		value: ""
+	})
+
+	//are we the owner? Nuke it!
+	const room = rooms.find(room => room.id === ctx.params.id)
+	if (room && room.ownerId == con.id) {
+
+		//kick all users from the room
+		connectionByUUID.forEach(c => {
+			if(c.roomId === room.id){
+				delete c.roomId
+				updateAllConnections({
+					connectionId: c.id,
+					field: "roomId",
+					value: ""
+				})
+			}
+		})
+
+		//delete the room
+		rooms.splice(rooms.indexOf(room), 1)
+		updateAllConnections_deleteRoom(room)
+		ctx.response.body = room //200 success
+	} else {
+		ctx.response.status = 403 //forbidden
+	}
 })
 
 api.get(`/${apiRoute.room}/:id`, async (ctx) => {
@@ -232,11 +292,13 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	}
 
 	const oldData = objectFrom(connectionByUUID);
-	console.log("CLEAR", oldData)
+	console.log("CLEAR", oldData, rooms)
 	ctx.response.body = oldData
 
 	await kv.delete(KV_KEYS.connections)
+	await kv.delete(KV_KEYS.rooms)
 	connectionByUUID.clear()
+	rooms.length = 0
 	notifyAllConnections()
 	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
 })

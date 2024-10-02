@@ -41,7 +41,7 @@ const [stats, setStats] = createSignal<Stats>()
 
 export default {
 	id, pk, connections, rooms, stats, serverOnline,
-	setColor, setText, createRoom, exitRoom
+	setColor, setText, createRoom, exitRoom, joinRoom
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -94,6 +94,9 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 
 async function createRoom() {
 	return await POST(apiRoute.room)
+}
+async function joinRoom(roomId: string) {
+	return await POST(apiRoute.room, { subRoute: roomId })
 }
 async function exitRoom(roomId: string) {
 	return await DELETE(apiRoute.room, roomId)
