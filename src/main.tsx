@@ -5,6 +5,7 @@ import { For, Match, onMount, Show, Switch } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import type { Connection, Room } from "../server/api";
+import VideoCall from "./VideoCall";
 
 const roomShortId = (room: Room) => room?.id.substring(room.id.length - 4)
 
@@ -32,13 +33,12 @@ const App = () => {
 };
 
 function User(props: { con: Connection }) {
-
+	
 	let ref: HTMLInputElement;
-
 	onMount(() => {
 		ref?.focus();
 	});
-
+	
 	return <>
 		<div class="me" style={{ "background-color": props.con.color }}>
 			<input
@@ -60,6 +60,10 @@ function User(props: { con: Connection }) {
 			{!props.con.roomId && <button class="room-button" onclick={() => server.createRoom()}>open room</button>}
 			<RoomLabel con={props.con} />
 		</div>
+		<Show when={props.con.roomId}>
+			<VideoCall roomID={props.con.roomId}/>
+		</Show>
+
 		<Switch>
 			<Match when={!props.con.roomId}>
 				{/* NOT IN A ROOM */}
@@ -85,14 +89,13 @@ function RoomLabel(props: { con: Connection }) {
 	</Show>
 }
 
-
 function countUsers(room: Room) {
 	return server.connections.reduce((count, c) => count += (c.roomId === room.id ? 1 : 0), 0);
 }
 
 function ownerColor(room: Room) {
 	const owner = server.connections.find(con => room.ownerId === con.id)
-	return owner.color
+	return owner?.color
 }
 
 const Rooms = (props: { rooms: Room[] }) => {
@@ -104,7 +107,7 @@ const Rooms = (props: { rooms: Room[] }) => {
 						style={{ "background-color": ownerColor(room) }}
 						onclick={() => server.joinRoom(room.id)}>
 						room {roomShortId(room)}
-						<div>{countUsers(room)} inside</div>
+						<div class="userCount">{countUsers(room)} inside</div>
 					</div>
 				}}
 			</For>
@@ -128,7 +131,4 @@ const Connections = (props: { connections: Connection[] }) => {
 	</div>
 }
 
-
 render(() => <App />, document.getElementById("root"));
-
-

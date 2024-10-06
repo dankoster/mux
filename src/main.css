@@ -29,9 +29,17 @@
 	}
 }
 
+.local-video {
+	transform: scaleX(-1);
+	outline: 1px solid;
+}
+.remote-video {
+	outline: 1px solid;
+}
+
 .me {
 	padding: 2rem;
-    border-bottom: 1px solid;
+	border-bottom: 1px solid;
 	position: relative;
 
 	display: grid;
@@ -61,6 +69,12 @@
 	align-content: stretch;
 	touch-action: none;
 	position: relative;
+
+	.userCount {
+		font-size: x-small;
+		text-align: center;
+		margin-bottom: 0.5rem;
+	}
 
 	&::before {
 		content: "rooms";

@@ -1,4 +1,4 @@
-import { Context } from "jsr:@oak/oak@17";
+import { Context, Status } from "jsr:@oak/oak@17";
 import { Request } from "https://jsr.io/@oak/oak/17.0.0/request.ts";
 import { Router } from "jsr:@oak/oak@17/router";
 
@@ -11,12 +11,23 @@ export type ApiRoute = "sse"
 	| "clear"
 	| "discardKey"
 	| "room"
+	| `room/${RoomRoute}`
+
+export type RoomRoute = "join"
+	| "sessionDescription"
+	| "answerCall"
+	| "addOfferCandidate"
+	| "addAnswerCandidate"
 
 export type SSEvent = "pk"
 	| "id"
 	| "connections"
 	| "new_connection"
 	| "rooms"
+	| "room_sessionDescriptionAdded"
+	| "room_answerCandidateAdded"
+	| "room_offerCandidateAdded"
+	| "room_remoteAnswered"
 	| "new_room"
 	| "delete_connection"
 	| "delete_room"
@@ -52,7 +63,11 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	delete_connection: "delete_connection",
 	update: "update",
 	new_room: "new_room",
-	delete_room: "delete_room"
+	delete_room: "delete_room",
+	room_sessionDescriptionAdded: "room_sessionDescriptionAdded",
+	room_offerCandidateAdded: "room_offerCandidateAdded",
+	room_answerCandidateAdded: "room_answerCandidateAdded",
+	room_remoteAnswered: "room_remoteAnswered"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -63,7 +78,12 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
-	room: "room"
+	room: "room",
+	"room/join": "room/join",
+	"room/addOfferCandidate": "room/addOfferCandidate",
+	"room/answerCall": "room/answerCall",
+	"room/addAnswerCandidate": "room/addAnswerCandidate",
+	"room/sessionDescription": "room/sessionDescription"
 }
 
 const KV_KEYS = {
@@ -72,6 +92,12 @@ const KV_KEYS = {
 }
 
 const kv = await Deno.openKv();
+
+
+// await kv.delete(KV_KEYS.connections)
+// await kv.delete(KV_KEYS.rooms)
+
+
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
 const connectionByUUID = result.value ?? new Map<string, Connection>()
 connectionByUUID.forEach(con => {
@@ -79,7 +105,15 @@ connectionByUUID.forEach(con => {
 		con.status = 'suspect'
 })
 
-const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? []
+//webRTC
+type webRtcSession = {
+	sdp: string,
+	offerCandidates?: string[],
+	answerCandidates?: string[],
+}
+const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
+const webRtcSessionByRoomId = new Map<string, webRtcSession>()
+
 const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
 console.log("INIT Got connections from KV:", connectionByUUID)
 console.log("INIT Got rooms from KV:", rooms)
@@ -108,7 +142,7 @@ function updateAllConnections(update: Update) {
 	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		// if (uuid !== updateUuid)
-			fn(sseEvent.update, JSON.stringify(update))
+		fn(sseEvent.update, JSON.stringify(update))
 	})
 }
 
@@ -128,6 +162,7 @@ function updateAllConnections_newRoom(room: Room) {
 	updateFunctionByUUID.forEach((fn) =>
 		fn(sseEvent.new_room, JSON.stringify(room)))
 }
+
 function updateAllConnections_deleteRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
 	console.log(sseEvent.delete_room, room)
@@ -169,17 +204,208 @@ function objectFrom<V>(map: Map<string, V>) {
 	return obj;
 }
 
+type roomRequestInfo = {
+	status: Status;
+	body?: string;
+	room?: Room;
+	con_req?: Connection;
+}
+async function getRoomInfo(req: Request, { requireOwnership, requireBody = true }
+	: { requireOwnership: boolean, requireBody?: boolean })
+	: Promise<roomRequestInfo> {
+
+	const result: roomRequestInfo = {
+		status: 418 //teapot
+	}
+
+	//do we have a recognized bearer token?
+	const uuid = req.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
+	result.con_req = connectionByUUID.get(uuid);
+	if (!result.con_req) {
+		result.status = 401 //unauthenticated 
+		return result
+	}
+
+	if (requireBody) {
+		result.body = await req.body.text()
+		if (!result.body) {
+			result.status = 400 //bad request
+			return result
+		}
+	}
+
+	//find the room claimed to be owned by this user
+	result.room = rooms.find(room => room.id === result.con_req?.roomId)
+	if (!result.room) {
+		result.status = 404 //not found
+		return result
+	}
+
+	if (requireOwnership) {
+		//check for room ownership
+		if (result.room?.ownerId !== result.con_req?.id) {
+			result.status = 403 //forbidden
+			return result
+		}
+	}
+
+	return result
+}
+
+type roomNotification = { room: Room, event: SSEvent, dontNotify: Connection, value: string }
+function notifyRoom({ room, event, dontNotify, value }: roomNotification) {
+	connectionByUUID.forEach((con, uuid) => {
+		if (con.roomId && con.roomId === room.id && con.id !== dontNotify.id) {
+			const fn = updateFunctionByUUID.get(uuid);
+			if (fn) fn(event, value);
+		}
+	});
+}
+
+
+
 const api = new Router();
 
-api.post(`/${apiRoute.room}/:id`, async (ctx) => {
-	console.log("POST", apiRoute.room.toUpperCase(), ctx.params.id)
+//Add WebRTC SDP for room
+api.post(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
+	const { status, body, room, con_req } = await getRoomInfo(ctx.request, { requireOwnership: true })
+	if (!room || !body || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	console.log(ctx.request.method, ctx.request.url.href)
+
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	session.sdp = body;
+	webRtcSessionByRoomId.set(room.id, session)
+
+	notifyRoom({
+		room,
+		event: sseEvent.room_sessionDescriptionAdded,
+		dontNotify: con_req,
+		value: body
+	});
+
+	ctx.response.status = 200
+})
+
+api.get(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
+	const { status, room, con_req } = await getRoomInfo(ctx.request, {
+		requireOwnership: false,
+		requireBody: false
+	})
+	if (!room || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	console.log(ctx.request.method, ctx.request.url.href)
+	ctx.response.body = session.sdp
+})
+
+//add offer candidate
+api.post(`/${apiRoute["room/addOfferCandidate"]}`, async (ctx) => {
+
+	const { status, body, room, con_req }
+		= await getRoomInfo(ctx.request, { requireOwnership: false })
+	if (!room || !body || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	console.log(ctx.request.method, ctx.request.url.href)
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	if (session.offerCandidates)
+		session.offerCandidates?.push()
+	else
+		session.offerCandidates = [body]
+
+	webRtcSessionByRoomId.set(room.id, session)
+
+	//notify the room occupants of the new connection
+	notifyRoom({
+		room,
+		event: sseEvent.room_offerCandidateAdded,
+		dontNotify: con_req,
+		value: body
+	})
+
+	ctx.response.status = 200
+})
+
+//add answer candidate
+api.post(`/${apiRoute["room/addAnswerCandidate"]}`, async (ctx) => {
+
+	const { status, body, room, con_req }
+		= await getRoomInfo(ctx.request, { requireOwnership: false })
+	if (!room || !body || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	console.log(ctx.request.method, ctx.request.url.href)
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	if (session.answerCandidates)
+		session.answerCandidates?.push()
+	else
+		session.answerCandidates = [body]
+
+	webRtcSessionByRoomId.set(room.id, session)
+
+	//notify the room occupants of the new connection
+	notifyRoom({
+		room,
+		event: sseEvent.room_answerCandidateAdded,
+		dontNotify: con_req,
+		value: body
+	})
+
+	ctx.response.status = 200
+})
+
+//answer call
+api.post(`/${apiRoute["room/answerCall"]}`, async (ctx) => {
+
+	const { status, body, room, con_req }
+		= await getRoomInfo(ctx.request, { requireOwnership: false })
+	if (!room || !body || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	console.log(ctx.request.method, ctx.request.url.href)
+
+	//notify the room occupants of the new connection
+	notifyRoom({
+		room,
+		event: sseEvent.room_remoteAnswered,
+		dontNotify: con_req,
+		value: body
+	})
+
+	ctx.response.status = 200
+
+})
+
+
+
+
+
+
+//Join room by id
+api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
+	const roomId = ctx.params.id
+	console.log("[JOIN ROOM] POST", apiRoute.room.toUpperCase(), roomId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
 	const con = connectionByUUID.get(uuid)
 	if (!con) throw new Error(`${uuid} not found in ${[...connectionByUUID.keys()]}`)
 
-	const room = rooms.find(room => room.id === ctx.params.id)
+	const room = rooms.find(room => room.id === roomId)
 	if (!room) {
 		ctx.response.status = 404
 		return
@@ -193,6 +419,7 @@ api.post(`/${apiRoute.room}/:id`, async (ctx) => {
 	})
 })
 
+//Create a room
 api.post(`/${apiRoute.room}`, async (ctx) => {
 
 	console.log("POST", apiRoute.room.toUpperCase())
@@ -220,6 +447,7 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 	ctx.response.body = JSON.stringify(room)
 })
 
+//Delete room
 api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	console.log("DELETE", apiRoute.room.toUpperCase(), ctx.params)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
@@ -227,7 +455,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 
 	const con = connectionByUUID.get(uuid)
 	if (!con) {
-		ctx.response.status = 403 //forbidden
+		ctx.response.status = 401 //unauthenticated
 		return
 	}
 
@@ -245,7 +473,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 
 		//kick all users from the room
 		connectionByUUID.forEach(c => {
-			if(c.roomId === room.id){
+			if (c.roomId === room.id) {
 				delete c.roomId
 				updateAllConnections({
 					connectionId: c.id,
@@ -264,13 +492,19 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	}
 })
 
+//Get room by id
 api.get(`/${apiRoute.room}/:id`, async (ctx) => {
 	ctx.response.body = rooms.find(room => room.id === ctx.params.id)
 })
 
+//Let a client clean up their old keys
 api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
+
+	//TODO: Do we need to verify that this user owned the previous key? 
+	// they ARE bearer tokens afterall... don't share your keys!
+	// probably just rate limit this to one per day or something
 
 	const oldId = ctx.params.key
 	const oldCon = connectionByUUID.get(oldId)
@@ -285,6 +519,7 @@ api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 	ctx.response.body = success
 })
 
+//nuke it from orbit
 api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	if (ctx.params.key !== Deno.env.get("KV_CLEAR_KEY")) {
 		ctx.response.status = 401 //unauthorized
