@@ -1,3 +1,28 @@
+/* override browser default */
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* use viewport-relative units to cover page fully */
+body {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* include border and padding in element width and height */
+* {
+  box-sizing: border-box;
+}
+
+div#root {
+	display: grid;
+    grid-auto-flow: row;
+    grid-template-rows: min-content 1fr;
+    height: 100svh;
+}
+
 .offlineMessage {
 	display: grid;
 	align-items: center;
@@ -12,6 +37,9 @@
 	border-bottom: 1px solid;
 	align-items: center;
 	touch-action: none;
+    backdrop-filter: blur(10px);
+	/* position: sticky;
+    top: 0; */
 
 	.logo {
 		padding-left: 2rem;
@@ -29,35 +57,40 @@
 	}
 }
 
-.local-video {
-	transform: scaleX(-1);
-	outline: 1px solid;
-}
-.remote-video {
-	outline: 1px solid;
-}
-
-.me {
-	padding: 2rem;
-	border-bottom: 1px solid;
-	position: relative;
-
+.user {
 	display: grid;
-	gap: 1rem;
-	justify-content: center;
-	align-items: center;
-	grid-template-columns: minmax(1rem, 1fr) min-content min-content;
-	touch-action: none;
+    grid-template-rows: 1fr min-content;
+    grid-auto-flow: row;
 
-	input[type="text"] {
-		touch-action: none;
-		font-size: 16px;
-		background-color: transparent;
-		border-style: none;
-		border-radius: 5px;
-		padding: 0.5rem;
-		text-align: center;
+	.them {
+
 	}
+
+	.me {
+		padding: 2rem;
+		border-top: 1px solid;
+        position: sticky;
+        bottom: 0;
+
+		display: grid;
+		gap: 1rem;
+		justify-content: center;
+		align-items: center;
+		grid-template-columns: minmax(1rem, 1fr) min-content min-content;
+		touch-action: none;
+
+		input[type="text"] {
+			touch-action: none;
+			font-size: 16px;
+			background-color: transparent;
+			border-style: none;
+			border-radius: 5px;
+			padding: 0.5rem;
+			text-align: center;
+		}
+	}
+
+
 }
 
 .rooms {

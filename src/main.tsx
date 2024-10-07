@@ -33,13 +33,34 @@ const App = () => {
 };
 
 function User(props: { con: Connection }) {
-	
+
 	let ref: HTMLInputElement;
 	onMount(() => {
 		ref?.focus();
 	});
-	
-	return <>
+
+	return <div class="user">
+		<div class="them">
+			<Show when={props.con.roomId}>
+				<VideoCall roomID={props.con.roomId} />
+			</Show>
+
+			<Switch>
+				<Match when={!props.con.roomId}>
+					{/* NOT IN A ROOM */}
+					<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
+					<Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} />
+				</Match>
+				<Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
+					{/* CREATED A ROOM */}
+					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
+				</Match>
+				<Match when={server.rooms.some(room => room.ownerId !== props.con.id)}>
+					{/* JOINED A ROOM */}
+					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
+				</Match>
+			</Switch>
+		</div>
 		<div class="me" style={{ "background-color": props.con.color }}>
 			<input
 				ref={ref}
@@ -60,26 +81,7 @@ function User(props: { con: Connection }) {
 			{!props.con.roomId && <button class="room-button" onclick={() => server.createRoom()}>open room</button>}
 			<RoomLabel con={props.con} />
 		</div>
-		<Show when={props.con.roomId}>
-			<VideoCall roomID={props.con.roomId}/>
-		</Show>
-
-		<Switch>
-			<Match when={!props.con.roomId}>
-				{/* NOT IN A ROOM */}
-				<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
-				<Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} />
-			</Match>
-			<Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
-				{/* CREATED A ROOM */}
-				<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-			</Match>
-			<Match when={server.rooms.some(room => room.ownerId !== props.con.id)}>
-				{/* JOINED A ROOM */}
-				<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-			</Match>
-		</Switch>
-	</>
+	</div>
 }
 
 function RoomLabel(props: { con: Connection }) {

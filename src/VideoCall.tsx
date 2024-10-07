@@ -3,7 +3,7 @@
 import "./VideoCall.css"
 import server from "./data"
 
-export default function VideoCall2(props: { roomID: string }) {
+export default function VideoCall(props: { roomID: string }) {
 	const servers = {
 		iceServers: [
 			{
@@ -26,7 +26,7 @@ export default function VideoCall2(props: { roomID: string }) {
 	let hangupButton: HTMLButtonElement
 
 	const webcamButton_onclick = async () => {
-		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 		remoteStream = new MediaStream();
 
 		// Push tracks from local stream to peer connection
@@ -120,14 +120,8 @@ export default function VideoCall2(props: { roomID: string }) {
 
 	return <div class="call_container">
 		<div class="videos">
-			<span>
-				<h3>Local Stream</h3>
-				<video ref={webcamVideo} autoplay playsinline></video>
-			</span>
-			<span>
-				<h3>Remote Stream</h3>
-				<video ref={remoteVideo} autoplay playsinline></video>
-			</span>
+			<video class="local" ref={webcamVideo} autoplay playsinline></video>
+			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 		</div>
 
 		<button ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
