@@ -39,7 +39,7 @@ function User(props: { con: Connection }) {
 		ref?.focus();
 	});
 
-	return <div class="user">
+	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
 				<VideoCall roomID={props.con.roomId} />
@@ -61,27 +61,46 @@ function User(props: { con: Connection }) {
 				</Match>
 			</Switch>
 		</div>
-		<div class="me" style={{ "background-color": props.con.color }}>
-			<input
-				ref={ref}
-				type="text"
-				maxlength="123"
-				placeholder="Leave a message! 👋 🌈 👉"
-				onchange={(e) => server.setText(e.target.value)}
-				onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
-				value={props.con.text ?? ''} />
-			<input
-				type="color"
-				oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
-				onchange={(e) => server.setColor(e.target.value)}
-				value={props.con.color} />
-			{props.con.roomId && <button class="room-button" onclick={() => server.exitRoom(props.con.roomId)}>
-				{server.rooms.find(room => room.id === props.con.roomId)?.ownerId === props.con.id ? "Close" : "Leave"} room
-			</button>}
-			{!props.con.roomId && <button class="room-button" onclick={() => server.createRoom()}>open room</button>}
-			<RoomLabel con={props.con} />
+		{/* style={{ "background-color": props.con.color }} */}
+		<div class="toolbar">
+			<div class="public-info">
+				<span class="short-id">{props.con.id.substring(props.con.id.length - 4)}</span>
+				<RoomLabel con={props.con} />
+				<input
+					ref={ref}
+					type="text"
+					maxlength="123"
+					placeholder="Leave a message! 👋 🌈 👉"
+					onchange={(e) => server.setText(e.target.value)}
+					onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
+					value={props.con.text ?? ''} />
+			</div>
+			<div class="buttons">
+				<div class="color-button">
+					<span>color</span>
+					<input
+						type="color"
+						oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
+						onchange={(e) => server.setColor(e.target.value)}
+						value={props.con.color} />
+
+				</div>
+
+				{props.con.roomId &&
+					<button class="room-button" onclick={() => server.exitRoom(props.con.roomId)}>
+						{isRoomOwner(props.con) ? "Close" : "Leave"} room
+					</button>
+				}
+				{!props.con.roomId &&
+					<button class="room-button" onclick={() => server.createRoom()}>open room</button>
+				}
+			</div>
 		</div>
 	</div>
+}
+
+function isRoomOwner(con: Connection) {
+	return server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id;
 }
 
 function RoomLabel(props: { con: Connection }) {
@@ -125,6 +144,7 @@ const Connections = (props: { connections: Connection[] }) => {
 				style={{ "background-color": con.color }}>
 				<h2 textContent={con.text || "🌈 🤔"}></h2>
 				<h2>{con.status === "online" ? "👀" : "😴"}</h2>
+				<span>{con.id.substring(con.id.length - 4)}</span>
 				<Show when={server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id}>
 					OWNER
 				</Show>

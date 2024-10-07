@@ -1,26 +1,26 @@
 /* override browser default */
 html,
 body {
-  margin: 0;
-  padding: 0;
+	margin: 0;
+	padding: 0;
 }
 
 /* use viewport-relative units to cover page fully */
 body {
-  height: 100vh;
-  width: 100vw;
+	height: 100vh;
+	width: 100%;
 }
 
 /* include border and padding in element width and height */
 * {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 div#root {
 	display: grid;
-    grid-auto-flow: row;
-    grid-template-rows: min-content 1fr;
-    height: 100svh;
+	grid-auto-flow: row;
+	grid-template-rows: min-content 1fr;
+	height: 100svh;
 }
 
 .offlineMessage {
@@ -37,7 +37,7 @@ div#root {
 	border-bottom: 1px solid;
 	align-items: center;
 	touch-action: none;
-    backdrop-filter: blur(10px);
+	backdrop-filter: blur(10px);
 	/* position: sticky;
     top: 0; */
 
@@ -57,27 +57,33 @@ div#root {
 	}
 }
 
-.user {
+.user-view {
 	display: grid;
-    grid-template-rows: 1fr min-content;
-    grid-auto-flow: row;
+	grid-template-rows: 1fr min-content;
+	grid-auto-flow: row;
 
-	.them {
+	.them {}
 
-	}
-
-	.me {
-		padding: 2rem;
+	.toolbar {
+		padding: 1rem;
 		border-top: 1px solid;
-        position: sticky;
-        bottom: 0;
+		position: sticky;
+		bottom: 0;
 
-		display: grid;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+
 		gap: 1rem;
 		justify-content: center;
 		align-items: center;
-		grid-template-columns: minmax(1rem, 1fr) min-content min-content;
 		touch-action: none;
+
+		backdrop-filter: saturate(3.5) brightness(0.3) blur(20px);
+		background-color: #1f0e3c;
+
+		container-type: inline-size;
+		container-name: toolbar;
 
 		input[type="text"] {
 			touch-action: none;
@@ -88,9 +94,22 @@ div#root {
 			padding: 0.5rem;
 			text-align: center;
 		}
+
+		.public-info {
+			flex-grow: 1;
+			display: inline-grid;
+		}
+
+		.buttons {
+			display: grid;
+			gap: 0.5rem;
+
+			@container toolbar (width < 400px) {
+				display: flex;
+			}
+		}
+
 	}
-
-
 }
 
 .rooms {
@@ -109,7 +128,7 @@ div#root {
 		margin-bottom: 0.5rem;
 	}
 
-	&::before {
+	/* &::before {
 		content: "rooms";
 		top: -1.1rem;
 		position: absolute;
@@ -119,7 +138,7 @@ div#root {
 		z-index: -1;
 		left: -0.1rem;
 		text-transform: uppercase;
-	}
+	} */
 }
 
 .room-button {
@@ -134,6 +153,55 @@ div#root {
 	background: transparent;
 	text-wrap: nowrap;
 	touch-action: none;
+}
+
+.color-button {
+	color: white;
+	font-size: xx-large;
+	border: 1px solid;
+	border-radius: 5px;
+	padding-inline: 1rem;
+	font-family: monospace;
+	font-weight: bold;
+	cursor: pointer;
+	background: transparent;
+	text-wrap: nowrap;
+	touch-action: none;
+	text-align: center;
+	position: relative;
+
+	span {
+		pointer-events: none;
+		position: relative;
+		z-index: 1;
+	}
+
+	input[type="color"] {
+		appearance: none;
+		-moz-appearance: none;
+		-webkit-appearance: none;
+		background: none;
+		cursor: pointer;
+
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	/* chrome override default padding 
+	https://rebeccamdeprey.com/blog/styling-the-html-color-input
+	*/
+	input[type="color" i]::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+
+	input[type="color" i]::-webkit-color-swatch,
+	input[type="color" i]::-moz-color-swatch {
+		border: none;
+		border-radius: 0;
+	}
 }
 
 .connections {
