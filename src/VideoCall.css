@@ -1,27 +1,22 @@
-.call_container {
+.videos {
+	position: relative;
+	padding: 1rem;
 
-	margin-bottom: 2rem;
+	video {
+		box-shadow: 0px 0px 15px #00000087;
+		border-radius: 15px;
+	}
 
-	.videos {
-		position: relative;
-		padding: 1rem;
+	.local {
+		transform: scaleX(-1);
+		max-width: 100px;
+		z-index: 1;
+		position: fixed;
+		top: 0.5rem;
+		right: 0.5rem;
+	}
 
-		video {
-			box-shadow: 0px 0px 15px #00000087;
-			border-radius: 15px;
-		}
-
-		.local {
-			transform: scaleX(-1);
-			max-width: 100px;
-			z-index: 1;
-			position: fixed;
-			top: 0.5rem;
-			right: 0.5rem;
-		}
-
-		.remote {
-			max-width: 100%;
-		}
+	.remote {
+		max-width: 100%;
 	}
 }

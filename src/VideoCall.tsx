@@ -1,5 +1,6 @@
 
 //from https://github.com/fireship-io/webrtc-firebase-demo
+import { createSignal, Show } from "solid-js";
 import "./VideoCall.css"
 import server from "./data"
 
@@ -13,60 +14,146 @@ export default function VideoCall(props: { roomID: string }) {
 		iceCandidatePoolSize: 10,
 	};
 
-	const pc = new RTCPeerConnection(servers);
-	let localStream = null;
-	let remoteStream = null;
+
+	let localStream: MediaStream = null;
+	let remoteStream = new MediaStream();
 
 	let webcamButton: HTMLButtonElement
 	let webcamVideo: HTMLVideoElement
 	let callButton: HTMLButtonElement
-	let callInput: HTMLInputElement
 	let answerButton: HTMLButtonElement
 	let remoteVideo: HTMLVideoElement
 	let hangupButton: HTMLButtonElement
 
-	const webcamButton_onclick = async () => {
-		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-		remoteStream = new MediaStream();
+	//TODO: create peer connection for each other user in the room!!!!
 
-		// Push tracks from local stream to peer connection
-		localStream.getTracks().forEach((track) => {
-			pc.addTrack(track, localStream);
-		});
+	//TODO: 
+	// require webcam start before anything else can happen
+	// answer button for non-owners only
+	// start call button for room owner only
+	// don't play local audio locally
+	// hangup button for everyone 
+	// close streams when leaving room
+	// ability to join call that is already started
+	// reconnect on page refresh. Same as joining an active call.
 
-		// Pull tracks from remote stream, add to video stream
-		pc.ontrack = (event) => {
-			event.streams[0].getTracks().forEach((track) => {
-				remoteStream.addTrack(track);
-			});
-		};
 
-		webcamVideo.srcObject = localStream;
-		webcamVideo.muted = true;
-		remoteVideo.srcObject = remoteStream;
+	const [onlineStatus, setOnlineStatus] = createSignal<RTCPeerConnectionState>()
+	const [webcamOnline, setWebcamOnline] = createSignal(false)
+	const [localStartedCall, setLocalStartedCall] = createSignal<boolean>()
 
-		callButton.disabled = false;
-		answerButton.disabled = false;
-		webcamButton.disabled = true;
+	const pc = new RTCPeerConnection(servers);
+
+	pc.onconnectionstatechange = (event) => {
+		setOnlineStatus(pc.connectionState)
+
+		if (pc.connectionState === "connected")
+			remoteVideo.srcObject = remoteStream;
+	}
+
+	// Pull tracks from remote stream, add to video stream
+	pc.ontrack = (event) => {
+		const track = event.track
+		console.log(`got ${event.type}: ${track.kind} from peer connection`, track.label)
+		remoteStream.addTrack(track);
+		logTrackEvents(track, 'remote');
 	};
 
+	// Get candidates for caller, save to db
+	pc.onicecandidate = (event) => {
+		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
+
+		//@ts-expect-error
+		if (event.candidate === "") {
+			//there are no further candidates to come in this generation
+		}
+		else if (event.candidate === null) {
+			//all ICE gathering on all transports is complete
+		}
+		else if (event.candidate) {
+			if (localStartedCall()) {
+				console.log('onicecandidate', 'addOfferCandidate')
+				server.addOfferCandidate(event.candidate)
+			} else {
+				console.log('onicecandidate', 'addAnswerCandidate')
+				server.addAnswerCandidate(event.candidate)
+			}
+		}
+		else
+			throw new Error("onicecandidate - unknown candidate state!")
+
+	};
+
+
+
+	function logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
+		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`));
+		track.addEventListener('mute', () => console.log(`MUTE: ${label} ${track.kind}: ${track.label}`));
+		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`));
+	}
+
 	server.onSessionDescriptionAdded((session) => {
+		console.log("onSessionDescriptionAdded", session)
+		//pc.setRemoteDescription(session)
 		callButton.disabled = true;
 		answerButton.disabled = false;
 		webcamButton.disabled = false;
-
-		callInput.value = props.roomID
 	})
+
+	// When answered, add candidate to peer connection
+	server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
+		console.log('onAnswerCandidateAdded', candidate)
+		pc.addIceCandidate(candidate)
+	})
+
+	// Listen for remote answer
+	server.onRemoteAnswered((answer: RTCSessionDescription) => {
+		console.log('onRemoteAnswered', answer)
+		pc.setRemoteDescription(answer)
+	})
+
+	let pendingRemoteDescriptionRequest: Promise<RTCSessionDescriptionInit> = null
+	server.onOfferCandidateAdded(async (candidate) => {
+		console.log('onOfferCandidateAdded', candidate)
+
+		if (pc.remoteDescription) {
+			pc.addIceCandidate(candidate)
+			return
+		}
+
+		if (pendingRemoteDescriptionRequest) {
+			console.log('waiting for remote description request...')
+			await pendingRemoteDescriptionRequest
+			pc.addIceCandidate(candidate)
+			return
+		}
+
+		console.log('fetching getting remote description...')
+		pendingRemoteDescriptionRequest = server.getRoomSessionDescription()
+		const offerDescription = await pendingRemoteDescriptionRequest
+		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+	})
+
+	const webcamButton_onclick = async () => {
+		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+		// Push tracks from local stream to peer connection
+		localStream.getTracks().forEach((track) => {
+			console.log(`adding local ${track.kind} track to peer connection:`, track.label)
+			pc.addTrack(track, localStream);
+			logTrackEvents(track, 'local');
+		});
+
+		webcamVideo.srcObject = localStream;
+		webcamVideo.muted = true;
+
+		setWebcamOnline(true)
+	};
 
 	// 2. Create an offer
 	const callButton_onclick = async () => {
 
-		callInput.value = props.roomID //callDoc.id; //need uuid for this call (use room id)
-
-		// Get candidates for caller, save to db
-		pc.onicecandidate = (event) => {
-			event.candidate && server.addOfferCandidate(event.candidate)
-		};
+		setLocalStartedCall(true)
 
 		// Create offer
 		const offerDescription = await pc.createOffer();
@@ -77,58 +164,48 @@ export default function VideoCall(props: { roomID: string }) {
 			type: offerDescription.type,
 		})
 
-		// Listen for remote answer
-		server.onRemoteAnswered((answer: RTCSessionDescription) => {
-			console.log('onRemoteAnswered', answer)
-			pc.setRemoteDescription(answer)
-		})
-
-		// When answered, add candidate to peer connection
-		server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
-			console.log('onAnswerCandidateAdded', candidate)
-			pc.addIceCandidate(candidate)
-		})
-
 		hangupButton.disabled = false;
 	};
 
 	// 3. Answer the call with the unique ID
 	const answerButton_onclick = async () => {
-		const callId = callInput.value;
 
-		pc.onicecandidate = (event) => {
-			event.candidate && server.addAnswerCandidate(event.candidate)
-		};
-
-		const offerDescription = await server.getRoomSessionDescription()
-		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+		setLocalStartedCall(false)
 
 		const answerDescription = await pc.createAnswer();
 		await pc.setLocalDescription(answerDescription);
 
-		const answer: RTCSessionDescriptionInit = {
+		await server.sendAnswer({
 			type: answerDescription.type,
 			sdp: answerDescription.sdp,
-		};
-
-		await server.sendAnswer(answer)
-
-		server.onOfferCandidateAdded((candidate) => {
-			console.log('onOfferCandidateAdded', candidate)
-			pc.addIceCandidate(candidate);
 		})
 	};
 
-	return <div class="call_container">
+	const hangupButton_onclick = async () => {
+		pc.close()
+
+		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
+		//Make sure that you delete all references to the previous RTCPeerConnection 
+		//before attempting to create a new one that connects to the same remote peer, 
+		//as not doing so might result in some errors depending on the browser.
+	}
+
+	return <div>
+		<h3>onlineStatus: {onlineStatus() || 'unknown'}</h3>
+		<h3>webcamOnline: {webcamOnline() ? "yes" : "no"}</h3>
 		<div class="videos">
 			<video class="local" ref={webcamVideo} autoplay playsinline></video>
-			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 		</div>
+		<Show when={onlineStatus() === "connected"}>
+			<div class="videos">
+				<video class="remote" ref={remoteVideo} autoplay playsinline></video>
+			</div>
+		</Show>
 
 		<button ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
-		<button ref={callButton} disabled onclick={callButton_onclick}>Create Call (offer)</button>
-		<input ref={callInput} />
-		<button ref={answerButton} disabled onclick={answerButton_onclick}>Answer</button>
-		<button ref={hangupButton} disabled>Hangup</button>
+		<button ref={callButton} onclick={callButton_onclick}>Create Call (offer)</button>
+		<button ref={answerButton} onclick={answerButton_onclick}>Answer</button>
+		<button ref={hangupButton} onclick={hangupButton_onclick}>Hangup</button>
 	</div>
 }
+
