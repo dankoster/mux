@@ -42,6 +42,7 @@ export default function VideoCall(props: { roomID: string }) {
 		};
 
 		webcamVideo.srcObject = localStream;
+		webcamVideo.muted = true;
 		remoteVideo.srcObject = remoteStream;
 
 		callButton.disabled = false;
