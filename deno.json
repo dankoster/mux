@@ -1,6 +1,7 @@
 {
   "imports": {
-    "solid-js": "npm:solid-js@^1.8.23"
+    "solid-js": "npm:solid-js@^1.8.23",
+    "solid-primitives/deep": "npm:@solid-primitives/deep@^0.2.9"
   },
   "compilerOptions": {
     "lib": [
@@ -8,8 +9,8 @@
     ]
   },
   "tasks": {
-    "serve": "deno task build && deno run --allow-read='./dist' --allow-env --env --unstable-kv --allow-net --watch ./server/server.ts",
-    "vite": "deno run -A --node-modules-dir npm:vite",
+    "serve": "deno task build && deno run --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/mux-local.crt,$HOME/Lab/certs/out/mux-local.key --allow-env --env --unstable-kv --allow-net --watch ./server/server.ts",
+    "vite": "deno run -A  --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/mux-local.crt,$HOME/Lab/certs/out/mux-local.key --node-modules-dir npm:vite --host",
     "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --unstable --node-modules-dir npm:vite preview"
   }

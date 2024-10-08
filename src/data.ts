@@ -204,28 +204,28 @@ function handleSseEvent(event: SSEventPayload) {
 				}, [])
 				.join()
 			localStorage.setItem(OLD_KEYS, updatedOldKeys)
-			console.log(event.event, newKey, { history: updatedOldKeys.split(',') });
+			console.log('SSE', event.event, newKey, { history: updatedOldKeys.split(',') });
 			break;
 		case sse.id:
 			setId(event.data);
-			console.log(event.event, event.data);
+			console.log('SSE', event.event, event.data);
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData);
 			updateConnectionStatus()
-			console.log(event.event, conData);
+			console.log('SSE', event.event, conData);
 			break;
 		case sse.rooms:
 			const roomData = JSON.parse(event.data) as Room[]
 			setRooms(roomData)
-			console.log(event.event, roomData)
+			console.log('SSE', event.event, roomData)
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
-			console.log(event.event, update)
+			console.log('SSE', event.event, update)
 			const index = connections.findIndex(con => con.id === update.connectionId)
 			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
 			//https://docs.solidjs.com/concepts/stores#range-specification
@@ -234,7 +234,7 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.new_room:
 			const newRoom = JSON.parse(event.data) as Room
-			console.log(event.event, newRoom)
+			console.log('SSE', event.event, newRoom)
 			setRooms(rooms.length, newRoom)
 			break;
 		case sse.room_sessionDescriptionAdded:
@@ -245,19 +245,19 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.delete_room:
 			const room = JSON.parse(event.data) as Room
-			console.log(event.event, room)
+			console.log('SSE', event.event, room)
 			setRooms(rooms.filter(r => r.id !== room.id))
 			break;
 		case sse.new_connection:
 			const newCon = JSON.parse(event.data) as Connection
-			console.log(event.event, newCon)
+			console.log('SSE', event.event, newCon)
 			setConnections(connections.length, newCon)
 			updateConnectionStatus()
 			console.log(connections)
 			break;
 		case sse.delete_connection:
 			const conId = event.data
-			console.log(event.event, conId)
+			console.log('SSE', event.event, conId)
 			setConnections(connections.filter(con => con.id !== conId))
 			updateConnectionStatus()
 			break;

@@ -1,10 +1,27 @@
 
 //from https://github.com/fireship-io/webrtc-firebase-demo
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
+import { trackStore } from "@solid-primitives/deep"
 import "./VideoCall.css"
 import server from "./data"
+import { Connection, Room } from "../server/api";
 
-export default function VideoCall(props: { roomID: string }) {
+export default function VideoCall(props: { user: Connection }) {
+
+	if (!props.user) {
+		return "no user"
+	}
+
+	const [room, setRoom] = createSignal<Room>()
+	const [isRoomOwner, setIsRoomOwner] = createSignal<boolean>()
+
+	createEffect(() => {
+		trackStore(server.rooms);
+		const room = server.rooms.find(room => room.id === props.user.roomId)
+		setRoom(room)
+		setIsRoomOwner(room && room.ownerId === props.user.id)
+	});
+
 	const servers = {
 		iceServers: [
 			{
@@ -40,8 +57,8 @@ export default function VideoCall(props: { roomID: string }) {
 
 	const [onlineStatus, setOnlineStatus] = createSignal<RTCPeerConnectionState>()
 	const [webcamOnline, setWebcamOnline] = createSignal(false)
-	const [localStartedCall, setLocalStartedCall] = createSignal<boolean>()
-
+	const [localStartedCall, setLocalStartedCall] = createSignal(false)
+	const [remoteStartedCall, setRemoteStartedCall] = createSignal(false)
 	const pc = new RTCPeerConnection(servers);
 
 	pc.onconnectionstatechange = (event) => {
@@ -128,10 +145,12 @@ export default function VideoCall(props: { roomID: string }) {
 			return
 		}
 
-		console.log('fetching getting remote description...')
+		console.log('fetching remote description...')
 		pendingRemoteDescriptionRequest = server.getRoomSessionDescription()
 		const offerDescription = await pendingRemoteDescriptionRequest
 		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+
+		setRemoteStartedCall(true)
 	})
 
 	const webcamButton_onclick = async () => {
@@ -144,10 +163,10 @@ export default function VideoCall(props: { roomID: string }) {
 			logTrackEvents(track, 'local');
 		});
 
+		setWebcamOnline(true)
+
 		webcamVideo.srcObject = localStream;
 		webcamVideo.muted = true;
-
-		setWebcamOnline(true)
 	};
 
 	// 2. Create an offer
@@ -163,8 +182,6 @@ export default function VideoCall(props: { roomID: string }) {
 			sdp: offerDescription.sdp,
 			type: offerDescription.type,
 		})
-
-		hangupButton.disabled = false;
 	};
 
 	// 3. Answer the call with the unique ID
@@ -193,19 +210,29 @@ export default function VideoCall(props: { roomID: string }) {
 	return <div>
 		<h3>onlineStatus: {onlineStatus() || 'unknown'}</h3>
 		<h3>webcamOnline: {webcamOnline() ? "yes" : "no"}</h3>
-		<div class="videos">
-			<video class="local" ref={webcamVideo} autoplay playsinline></video>
-		</div>
+		<h3>isRoomOwner: {isRoomOwner() ? "yes" : "no"}</h3>
+		<Show when={!room()}>NO ROOM</Show>
+		<Show when={webcamOnline()}>
+			<div class="videos">
+				<video class="local" ref={webcamVideo} autoplay playsinline></video>
+			</div>
+		</Show>
 		<Show when={onlineStatus() === "connected"}>
 			<div class="videos">
 				<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 			</div>
+			<button ref={hangupButton} onclick={hangupButton_onclick}>Hangup</button>
 		</Show>
-
-		<button ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
-		<button ref={callButton} onclick={callButton_onclick}>Create Call (offer)</button>
-		<button ref={answerButton} onclick={answerButton_onclick}>Answer</button>
-		<button ref={hangupButton} onclick={hangupButton_onclick}>Hangup</button>
+		<Show when={!webcamOnline()}>
+			<button ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
+		</Show>
+		<Show when={webcamOnline() && isRoomOwner() && !localStartedCall()}>
+			<button ref={callButton} onclick={callButton_onclick}>Create Video call</button>
+		</Show>
+		<Show when={webcamOnline() && !isRoomOwner()}>
+			<Show when={remoteStartedCall()} fallback="Waiting for remote to start the call...">
+				<button ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
+			</Show>
+		</Show>
 	</div>
 }
-

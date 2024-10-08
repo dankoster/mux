@@ -14,6 +14,7 @@
       "jsr:@std/io@0.224": "jsr:@std/io@0.224.8",
       "jsr:@std/media-types@^1.0": "jsr:@std/media-types@1.0.3",
       "jsr:@std/path@^1.0": "jsr:@std/path@1.0.6",
+      "npm:@solid-primitives/deep@^0.2.9": "npm:@solid-primitives/deep@0.2.9_solid-js@1.8.23__seroval@1.1.1",
       "npm:path-to-regexp@6.2.1": "npm:path-to-regexp@6.2.1",
       "npm:solid-js@^1.8.23": "npm:solid-js@1.8.23_seroval@1.1.1",
       "npm:vite": "npm:vite@5.4.7",
@@ -421,6 +422,33 @@
         "integrity": "sha512-j8pPKp53/lq9lMXN57S8cFz0MynJk8OWNuUnXct/9KCpKU7DgU3bYMJhwWmcqC0UU29p8Lr0/7KEVcaM6bf47Q==",
         "dependencies": {}
       },
+      "@solid-primitives/deep@0.2.9_solid-js@1.8.23__seroval@1.1.1": {
+        "integrity": "sha512-jO8tYQ2BW4LKHLUpm/HcK6qqdH4vg1zmzHUnoUzspxZrKDqhqgBJTPl+vfmDqtt0hHCOhlEhEEV74+tCFyt3Mg==",
+        "dependencies": {
+          "@solid-primitives/memo": "@solid-primitives/memo@1.3.9_solid-js@1.8.23__seroval@1.1.1",
+          "solid-js": "solid-js@1.8.23_seroval@1.1.1"
+        }
+      },
+      "@solid-primitives/memo@1.3.9_solid-js@1.8.23__seroval@1.1.1": {
+        "integrity": "sha512-OIlGcsEPXr6U23fDaSEm8iqezWDT4SNSjLTekWQVOu4qHostnMPlqU8xo1Jf0I7OgRuqA0wTMQ5cu0bYjeR/ZQ==",
+        "dependencies": {
+          "@solid-primitives/scheduled": "@solid-primitives/scheduled@1.4.3_solid-js@1.8.23__seroval@1.1.1",
+          "@solid-primitives/utils": "@solid-primitives/utils@6.2.3_solid-js@1.8.23__seroval@1.1.1",
+          "solid-js": "solid-js@1.8.23_seroval@1.1.1"
+        }
+      },
+      "@solid-primitives/scheduled@1.4.3_solid-js@1.8.23__seroval@1.1.1": {
+        "integrity": "sha512-HfWN5w7b7FEc6VPLBKnnE302h90jsLMuR28Fcf7neRGGf8jBj6wm6/UFQ00VlKexHFMR6KQ2u4VBh5a1ZcqM8g==",
+        "dependencies": {
+          "solid-js": "solid-js@1.8.23_seroval@1.1.1"
+        }
+      },
+      "@solid-primitives/utils@6.2.3_solid-js@1.8.23__seroval@1.1.1": {
+        "integrity": "sha512-CqAwKb2T5Vi72+rhebSsqNZ9o67buYRdEJrIFzRXz3U59QqezuuxPsyzTSVCacwS5Pf109VRsgCJQoxKRoECZQ==",
+        "dependencies": {
+          "solid-js": "solid-js@1.8.23_seroval@1.1.1"
+        }
+      },
       "@types/babel__core@7.20.5": {
         "integrity": "sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==",
         "dependencies": {
@@ -777,6 +805,7 @@
   },
   "workspace": {
     "dependencies": [
+      "npm:@solid-primitives/deep@^0.2.9",
       "npm:solid-js@^1.8.23"
     ]
   }

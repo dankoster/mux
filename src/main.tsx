@@ -42,7 +42,7 @@ function User(props: { con: Connection }) {
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
-				<VideoCall roomID={props.con.roomId} />
+				<VideoCall user={props.con} />
 			</Show>
 
 			<Switch>
