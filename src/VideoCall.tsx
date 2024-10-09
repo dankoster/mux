@@ -113,16 +113,28 @@ export default function VideoCall(props: { user: Connection }) {
 		console.log("onSessionDescriptionAdded", session)
 	})
 
-	// When answered, add candidate to peer connection
-	server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
-		console.log('onAnswerCandidateAdded', candidate)
-		pc.addIceCandidate(candidate)
+	// Listen for remote answer
+	server.onRemoteAnswered(async (answer: RTCSessionDescription) => {
+		console.log('onRemoteAnswered', answer)
+		await pc.setRemoteDescription(answer)
+		for (const candidate of answerIceCandidates) {
+			console.log('got candidate from the queue!!!', candidate)
+			pc.addIceCandidate(candidate)
+		}
 	})
 
-	// Listen for remote answer
-	server.onRemoteAnswered((answer: RTCSessionDescription) => {
-		console.log('onRemoteAnswered', answer)
-		pc.setRemoteDescription(answer)
+	const answerIceCandidates: RTCIceCandidate[] = []
+	server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
+		console.log('onAnswerCandidateAdded', candidate)
+		//queue these up until we have a remote description
+		if (pc.remoteDescription) {
+			console.log('added ice candidate')
+			pc.addIceCandidate(candidate)
+		} else {
+			console.log('into the queue!!!')
+			answerIceCandidates.push(candidate)
+		}
+
 	})
 
 	let pendingRemoteDescriptionRequest: Promise<RTCSessionDescriptionInit> = null
