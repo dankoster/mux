@@ -117,8 +117,8 @@ async function getRoomSessionDescription(): Promise<RTCSessionDescriptionInit> {
 	try {
 		const result = await response.json()
 		return result as RTCSessionDescriptionInit
-	} catch(error) {
-		if(error?.message === 'Unexpected end of JSON input')
+	} catch (error) {
+		if (error?.message === 'Unexpected end of JSON input')
 			return
 		else throw error
 	}
@@ -159,27 +159,47 @@ const SSEvents = new SSEventEmitter()
 
 function onRemoteAnswered(callback: (answer: RTCSessionDescription) => void) {
 	SSEvents.addEventListener(sse.room_remoteAnswered, (e: CustomEvent) => {
-		const answerDescription = new RTCSessionDescription(JSON.parse(e.detail)) //(data.answer);
-		callback(answerDescription)
+		try {
+			const answerDescription = new RTCSessionDescription(JSON.parse(e.detail)) //(data.answer);
+			callback(answerDescription)
+		} catch (err) {
+			console.log(err.message, e.detail)
+			debugger
+		}
 	})
 }
 function onAnswerCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
 	SSEvents.addEventListener(sse.room_answerCandidateAdded, (e: CustomEvent) => {
-		const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
-		callback(candidate)
+		try {
+			const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
+			callback(candidate)
+		} catch (err) {
+			console.log(err.message, e.detail)
+			debugger
+		}
 	})
 }
 function onOfferCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
 	SSEvents.addEventListener(sse.room_offerCandidateAdded, (e: CustomEvent) => {
-		const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
-		callback(candidate)
+		try {
+			const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
+			callback(candidate)
+		} catch (err) {
+			console.log(err.message, e.detail)
+			debugger
+		}
 	})
 }
 
-function onSessionDescriptionAdded(callback: (session: RTCSessionDescription)=>void) {
+function onSessionDescriptionAdded(callback: (session: RTCSessionDescription) => void) {
 	SSEvents.addEventListener(sse.room_sessionDescriptionAdded, (e: CustomEvent) => {
-		const session = new RTCSessionDescription(JSON.parse(e.detail))
-		callback(session)
+		try {
+			const session = new RTCSessionDescription(JSON.parse(e.detail))
+			callback(session)
+		} catch (err) {
+			console.log(err.message, e.detail)
+			debugger
+		}
 	})
 }
 
@@ -268,10 +288,9 @@ function handleSseEvent(event: SSEventPayload) {
 			updateConnectionStatus()
 			break;
 		default:
+			console.warn(`Unknown SSE field "${event.event}"`, event.data)
 			const nope = (_: never): never => { throw new Error() }
 			nope(event.event) //this will prevent unhandled cases
-
-			console.warn(`Unknown SSE field "${event.event}"`, event.data)
 			break;
 	}
 }
