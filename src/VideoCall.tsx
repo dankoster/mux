@@ -1,6 +1,6 @@
 
 //from https://github.com/fireship-io/webrtc-firebase-demo
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { trackStore } from "@solid-primitives/deep"
 import "./VideoCall.css"
 import server from "./data"
@@ -220,13 +220,32 @@ export default function VideoCall(props: { user: Connection }) {
 	};
 
 	const hangupButton_onclick = async () => {
-		pc.close()
-
 		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
 		//Make sure that you delete all references to the previous RTCPeerConnection 
 		//before attempting to create a new one that connects to the same remote peer, 
 		//as not doing so might result in some errors depending on the browser.
+
+		pc.close()
+
+		localStream.getTracks().forEach((track) => {
+			track.stop()
+		});	
+	
+		webcamVideo.srcObject = null;
+		setWebcamOnline(true)
+		server.exitRoom(props.user.roomId)
 	}
+
+	onCleanup(() => {
+		console.log('VideoCall Cleanup!')
+		pc.close()
+
+		localStream.getTracks().forEach((track) => {
+			track.stop()
+		});	
+	
+		webcamVideo.srcObject = null;
+	})
 
 	return <div class="video-call">
 		<Show when={!room()}>NO ROOM</Show>
@@ -239,13 +258,13 @@ export default function VideoCall(props: { user: Connection }) {
 			<div class="video-container">
 				<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 			</div>
-			<button ref={hangupButton} onclick={hangupButton_onclick}>Hangup</button>
+			<button class="room-button" ref={hangupButton} onclick={hangupButton_onclick}>Exit</button>
 		</Show>
 		<Show when={!webcamOnline()}>
-			<button ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
+			<button class="room-button" ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
 		</Show>
 		<Show when={webcamOnline() && isRoomOwner() && !localStartedCall()}>
-			<button ref={callButton} onclick={callButton_onclick}>Create Video call</button>
+			<button class="room-button" ref={callButton} onclick={callButton_onclick}>Create Video call</button>
 		</Show>
 		<Show when={localStartedCall() && onlineStatus() !== "connected"}>
 			<div>Waiting for other side to join...</div>
@@ -255,7 +274,7 @@ export default function VideoCall(props: { user: Connection }) {
 				<div>Waiting for host to start the call...</div>
 			</Show>
 			<Show when={remoteStartedCall() && webcamOnline()}>
-				<button ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
+				<button class="room-button" ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
 			</Show>
 		</Show>
 	</div>
