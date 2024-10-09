@@ -32,7 +32,7 @@ export default function VideoCall(props: { user: Connection }) {
 	};
 
 
-	let localStream: MediaStream = null;
+	let localStream: MediaStream | undefined
 	let remoteStream = new MediaStream();
 
 	let webcamButton: HTMLButtonElement
@@ -96,12 +96,11 @@ export default function VideoCall(props: { user: Connection }) {
 				server.addAnswerCandidate(event.candidate)
 			}
 		}
-		else
+		else {
+			debugger
 			throw new Error("onicecandidate - unknown candidate state!")
-
+		}
 	};
-
-
 
 	function logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
 		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`));
@@ -109,47 +108,48 @@ export default function VideoCall(props: { user: Connection }) {
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`));
 	}
 
-	server.onSessionDescriptionAdded((session) => {
-		console.log("onSessionDescriptionAdded", session)
-	})
-
 	// Listen for remote answer
 	server.onRemoteAnswered(async (answer: RTCSessionDescription) => {
 		console.log('onRemoteAnswered', answer)
-		await pc.setRemoteDescription(answer)
+		console.assert(!!pc)
+
+		await pc?.setRemoteDescription(answer)
 		for (const candidate of answerIceCandidates) {
 			console.log('got candidate from the queue!!!', candidate)
-			pc.addIceCandidate(candidate)
+			pc?.addIceCandidate(candidate)
 		}
 	})
 
 	const answerIceCandidates: RTCIceCandidate[] = []
 	server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
 		console.log('onAnswerCandidateAdded', candidate)
+		console.assert(!!pc)
+
 		//queue these up until we have a remote description
-		if (pc.remoteDescription) {
+		if (pc?.remoteDescription) {
 			console.log('added ice candidate')
-			pc.addIceCandidate(candidate)
+			pc?.addIceCandidate(candidate)
 		} else {
 			console.log('into the queue!!!')
 			answerIceCandidates.push(candidate)
 		}
-
 	})
 
 	let pendingRemoteDescriptionRequest: Promise<RTCSessionDescriptionInit> = null
 	server.onOfferCandidateAdded(async (candidate) => {
 		console.log('onOfferCandidateAdded', candidate)
 
-		if (pc.remoteDescription) {
-			pc.addIceCandidate(candidate)
+		console.assert(!!pc)
+
+		if (pc?.remoteDescription) {
+			pc?.addIceCandidate(candidate)
 			return
 		}
 
 		if (pendingRemoteDescriptionRequest) {
 			console.log('waiting for remote description request...')
 			await pendingRemoteDescriptionRequest
-			pc.addIceCandidate(candidate)
+			pc?.addIceCandidate(candidate)
 			return
 		}
 
@@ -160,15 +160,17 @@ export default function VideoCall(props: { user: Connection }) {
 			throw new Error('failed to get offer description')
 
 		console.log("got remote description!", offerDescription)
-		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+		await pc?.setRemoteDescription(new RTCSessionDescription(offerDescription));
 		setRemoteStartedCall(true)
 	})
 
 	console.log('joined room: fetching remote description...')
 	server.getRoomSessionDescription().then(async offerDescription => {
+		console.assert(!!pc)
+
 		if (offerDescription) {
 			console.log("got remote description!", offerDescription)
-			await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+			await pc?.setRemoteDescription(new RTCSessionDescription(offerDescription));
 			setRemoteStartedCall(true)
 		}
 		else console.log('no remote description available')
@@ -177,27 +179,39 @@ export default function VideoCall(props: { user: Connection }) {
 	const webcamButton_onclick = async () => {
 		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-		// Push tracks from local stream to peer connection
-		localStream.getTracks().forEach((track) => {
-			console.log(`adding local ${track.kind} track to peer connection:`, track.label)
-			pc.addTrack(track, localStream);
-			logTrackEvents(track, 'local');
-		});
+		console.assert(!!pc)
+		console.assert(!!localStream)
 
-		setWebcamOnline(true)
+		if (localStream) {
+			// Push tracks from local stream to peer connection
+			localStream?.getTracks().forEach((track) => {
+				console.log(`adding local ${track.kind} track to peer connection:`, track.label)
+				pc?.addTrack(track, localStream);
+				logTrackEvents(track, 'local');
+			});
 
-		webcamVideo.srcObject = localStream;
-		webcamVideo.muted = true;
+			setWebcamOnline(true) //causes the webcamVideo element to render
+			if (webcamVideo) {
+				webcamVideo.srcObject = localStream;
+				webcamVideo.muted = true;
+			}
+		}
 	};
 
 	// 2. Create an offer
 	const callButton_onclick = async () => {
+		console.assert(!!pc)
 
 		setLocalStartedCall(true)
 
 		// Create offer
-		const offerDescription = await pc.createOffer();
-		await pc.setLocalDescription(offerDescription);
+		const offerDescription = await pc?.createOffer();
+		if (!offerDescription) {
+			console.log(pc)
+			throw new Error('could not create offer description')
+		}
+
+		await pc?.setLocalDescription(offerDescription);
 
 		await server.setRoomSessionDescription({
 			sdp: offerDescription.sdp,
@@ -207,11 +221,17 @@ export default function VideoCall(props: { user: Connection }) {
 
 	// 3. Answer the call with the unique ID
 	const answerButton_onclick = async () => {
+		console.assert(!!pc)
+		console.assert(!!localStream)
 
 		setLocalStartedCall(false)
 
-		const answerDescription = await pc.createAnswer();
-		await pc.setLocalDescription(answerDescription);
+		const answerDescription = await pc?.createAnswer();
+		if (!answerDescription) {
+			console.log(pc)
+			throw new Error('could not create answer')
+		}
+		await pc?.setLocalDescription(answerDescription);
 
 		await server.sendAnswer({
 			type: answerDescription.type,
@@ -225,26 +245,35 @@ export default function VideoCall(props: { user: Connection }) {
 		//before attempting to create a new one that connects to the same remote peer, 
 		//as not doing so might result in some errors depending on the browser.
 
-		pc.close()
+		console.assert(!!pc)
+		console.assert(!!localStream)
 
-		localStream.getTracks().forEach((track) => {
+		pc?.close()
+
+		localStream?.getTracks().forEach((track) => {
 			track.stop()
-		});	
-	
-		webcamVideo.srcObject = null;
-		setWebcamOnline(true)
+		});
+
+		if (webcamVideo)
+			webcamVideo.srcObject = null;
+
+		setWebcamOnline(false)
 		server.exitRoom(props.user.roomId)
 	}
 
 	onCleanup(() => {
-		console.log('VideoCall Cleanup!')
-		pc.close()
+		console.assert(!!pc)
+		console.assert(!!localStream)
 
-		localStream.getTracks().forEach((track) => {
+		console.log('VideoCall Cleanup!')
+		pc?.close()
+
+		localStream?.getTracks().forEach((track) => {
 			track.stop()
-		});	
-	
-		webcamVideo.srcObject = null;
+		});
+
+		if (webcamVideo)
+			webcamVideo.srcObject = null;
 	})
 
 	return <div class="video-call">
