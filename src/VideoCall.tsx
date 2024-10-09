@@ -246,15 +246,15 @@ export default function VideoCall(props: { user: Connection }) {
 		</Show>
 		<Show when={webcamOnline() && isRoomOwner() && !localStartedCall()}>
 			<button ref={callButton} onclick={callButton_onclick}>Create Video call</button>
-			<Show when={onlineStatus() !== "connected"}>
-				<div>Waiting for other side to join...</div>
-			</Show>
 		</Show>
-		<Show when={webcamOnline() && !isRoomOwner() && onlineStatus() !== "connected"}>
+		<Show when={localStartedCall() && onlineStatus() !== "connected"}>
+			<div>Waiting for other side to join...</div>
+		</Show>
+		<Show when={!isRoomOwner() && onlineStatus() !== "connected"}>
 			<Show when={!remoteStartedCall()}>
 				<div>Waiting for host to start the call...</div>
 			</Show>
-			<Show when={remoteStartedCall()}>
+			<Show when={remoteStartedCall() && webcamOnline()}>
 				<button ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
 			</Show>
 		</Show>
