@@ -235,7 +235,7 @@ async function getRoomInfo(req: Request, { requireOwnership, requireBody = true 
 		}
 	}
 
-	//find the room claimed to be owned by this user
+	//find the room claimed by this user
 	result.room = rooms.find(room => room.id === result.con_req?.roomId)
 	if (!result.room) {
 		result.status = 404 //not found
@@ -466,6 +466,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 		field: "roomId",
 		value: ""
 	})
+	ctx.response.status = 200 //but we did successfully leave the room
 
 	//are we the owner? Nuke it!
 	const room = rooms.find(room => room.id === ctx.params.id)
@@ -483,13 +484,14 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 			}
 		})
 
+		//delete webRTC stuff
+		webRtcSessionByRoomId.delete(room.id)
+
 		//delete the room
 		rooms.splice(rooms.indexOf(room), 1)
 		updateAllConnections_deleteRoom(room)
 		ctx.response.body = room //200 success
-	} else {
-		ctx.response.status = 403 //forbidden
-	}
+	} 
 })
 
 //Get room by id
