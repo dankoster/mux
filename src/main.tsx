@@ -6,6 +6,7 @@ import { render } from "solid-js/web";
 import server from "./data";
 import type { Connection, Room } from "../server/api";
 import VideoCall from "./VideoCall";
+import ConnectionsGraph from "./Connections";
 
 const roomShortId = (room: Room) => room?.id.substring(room.id.length - 4)
 
@@ -34,11 +35,6 @@ const App = () => {
 
 function User(props: { con: Connection }) {
 
-	let ref: HTMLInputElement;
-	onMount(() => {
-		ref?.focus();
-	});
-
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
@@ -47,9 +43,10 @@ function User(props: { con: Connection }) {
 
 			<Switch>
 				<Match when={!props.con.roomId}>
+					<ConnectionsGraph connections={server.connections}/>
 					{/* NOT IN A ROOM */}
 					<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
-					<Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} />
+					{/* <Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} /> */}
 				</Match>
 				<Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
 					{/* CREATED A ROOM */}
@@ -67,10 +64,9 @@ function User(props: { con: Connection }) {
 				<span class="short-id">{props.con.id.substring(props.con.id.length - 4)}</span>
 				<RoomLabel con={props.con} />
 				<input
-					ref={ref}
 					type="text"
 					maxlength="123"
-					placeholder="Leave a message! 👋 🌈 👉"
+					placeholder="status message"
 					onchange={(e) => server.setText(e.target.value)}
 					onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
 					value={props.con.text ?? ''} />
@@ -142,7 +138,7 @@ const Connections = (props: { connections: Connection[] }) => {
 			{(con) => <div
 				class="connection"
 				style={{ "background-color": con.color }}>
-				<h2 textContent={con.text || "🌈 🤔"}></h2>
+				<h2 textContent={con.text || ""}></h2>
 				<h2>{con.status === "online" ? "👀" : "😴"}</h2>
 				<span>{con.id.substring(con.id.length - 4)}</span>
 				<Show when={server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id}>
