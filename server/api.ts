@@ -417,6 +417,7 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 		field: "roomId",
 		value: room.id
 	})
+	ctx.response.status = 200
 })
 
 //Create a room
