@@ -14,7 +14,8 @@ export type ApiRoute = "sse"
 	| `room/${RoomRoute}`
 
 export type RoomRoute = "join"
-	| "sessionDescription"
+	| "offerSessionDescription"
+	| "answerSessionDescription"
 	| "answerCall"
 	| "addOfferCandidate"
 	| "addAnswerCandidate"
@@ -83,7 +84,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	"room/addOfferCandidate": "room/addOfferCandidate",
 	"room/answerCall": "room/answerCall",
 	"room/addAnswerCandidate": "room/addAnswerCandidate",
-	"room/sessionDescription": "room/sessionDescription"
+	"room/offerSessionDescription": "room/offerSessionDescription",
+	"room/answerSessionDescription": "room/answerSessionDescription"
 }
 
 const KV_KEYS = {
@@ -108,6 +110,7 @@ connectionByUUID.forEach(con => {
 //webRTC
 type webRtcSession = {
 	sdp: string,
+	answerSdp: string,
 	offerCandidates?: string[],
 	answerCandidates?: string[],
 }
@@ -268,7 +271,7 @@ function notifyRoom({ room, event, dontNotify, value }: roomNotification) {
 const api = new Router();
 
 //Add WebRTC SDP for room
-api.post(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
+api.post(`/${apiRoute["room/offerSessionDescription"]}`, async (ctx) => {
 	const { status, body, room, con_req } = await getRoomInfo(ctx.request, { requireOwnership: true })
 	if (!room || !body || !con_req) {
 		ctx.response.status = status
@@ -291,7 +294,7 @@ api.post(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
 	ctx.response.status = 200
 })
 
-api.get(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
+api.get(`/${apiRoute["room/offerSessionDescription"]}`, async (ctx) => {
 	const { status, room, con_req } = await getRoomInfo(ctx.request, {
 		requireOwnership: false,
 		requireBody: false
@@ -304,6 +307,21 @@ api.get(`/${apiRoute["room/sessionDescription"]}`, async (ctx) => {
 	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
 	console.log(ctx.request.method, ctx.request.url.href)
 	ctx.response.body = session.sdp
+})
+
+api.get(`/${apiRoute["room/answerSessionDescription"]}`, async (ctx) => {
+	const { status, room, con_req } = await getRoomInfo(ctx.request, {
+		requireOwnership: false,
+		requireBody: false
+	})
+	if (!room || !con_req) {
+		ctx.response.status = status
+		return
+	}
+
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	console.log(ctx.request.method, ctx.request.url.href)
+	ctx.response.body = session.answerSdp
 })
 
 //add offer candidate
@@ -377,6 +395,10 @@ api.post(`/${apiRoute["room/answerCall"]}`, async (ctx) => {
 	}
 
 	console.log(ctx.request.method, ctx.request.url.href)
+	const session = webRtcSessionByRoomId.get(room.id) ?? {} as webRtcSession
+	session.answerSdp = body
+
+	webRtcSessionByRoomId.set(room.id, session)
 
 	//notify the room occupants of the new connection
 	notifyRoom({
@@ -492,7 +514,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 		rooms.splice(rooms.indexOf(room), 1)
 		updateAllConnections_deleteRoom(room)
 		ctx.response.body = room //200 success
-	} 
+	}
 })
 
 //Get room by id

@@ -14,7 +14,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	"room/addOfferCandidate": "room/addOfferCandidate",
 	"room/addAnswerCandidate": "room/addAnswerCandidate",
 	"room/answerCall": "room/answerCall",
-	"room/sessionDescription": "room/sessionDescription"
+	"room/offerSessionDescription": "room/offerSessionDescription",
+	"room/answerSessionDescription": "room/answerSessionDescription"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -110,16 +111,31 @@ async function createRoom() {
 	return await POST(apiRoute.room)
 }
 async function setRoomSessionDescription(sessionDesc: RTCSessionDescriptionInit) {
-	return await POST(apiRoute["room/sessionDescription"], { body: JSON.stringify(sessionDesc) })
+	return await POST(apiRoute["room/offerSessionDescription"], { body: JSON.stringify(sessionDesc) })
 }
 async function getRoomSessionDescription(): Promise<RTCSessionDescriptionInit> {
-	const response = await GET(apiRoute["room/sessionDescription"])
+	const response = await GET(apiRoute["room/offerSessionDescription"])
 	try {
 		const result = await response.json()
 		return result as RTCSessionDescriptionInit
 	} catch (error) {
-		if (error?.message === 'Unexpected end of JSON input')
+		if (error?.message === 'Unexpected end of JSON input'){
+			console.warn(error)
 			return
+		}
+		else throw error
+	}
+}
+async function getAnswerSessionDescription(): Promise<RTCSessionDescriptionInit> {
+	const response = await GET(apiRoute["room/answerSessionDescription"])
+	try {
+		const result = await response.json()
+		return result as RTCSessionDescriptionInit
+	} catch (error) {
+		if (error?.message === 'Unexpected end of JSON input') {
+			console.warn(error)
+			return
+		}
 		else throw error
 	}
 }
@@ -158,20 +174,29 @@ class SSEventEmitter extends EventTarget {
 const SSEvents = new SSEventEmitter()
 
 function onRemoteAnswered(callback: (answer: RTCSessionDescription) => void) {
-	SSEvents.addEventListener(sse.room_remoteAnswered, (e: CustomEvent) => {
+	SSEvents.addEventListener(sse.room_remoteAnswered, async (e: CustomEvent) => {
 		try {
-			const answerDescription = new RTCSessionDescription(JSON.parse(e.detail)) //(data.answer);
+			const answerDescription = new RTCSessionDescription(JSON.parse(e.detail))
 			callback(answerDescription)
 		} catch (err) {
-			console.log(err.message, e.detail)
-			debugger
+			if (err.message?.startsWith("Unterminated string in JSON")) {
+				console.warn(err.message)
+				//The session description was too long for sse, I guess?
+				console.log('making an explicit request for truncated session description...')
+				const init = await getAnswerSessionDescription()
+				const session = new RTCSessionDescription(init)
+				callback(session)
+			} else {
+				console.log(err.message, e.detail)
+				debugger
+			}
 		}
 	})
 }
 function onAnswerCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
 	SSEvents.addEventListener(sse.room_answerCandidateAdded, (e: CustomEvent) => {
 		try {
-			const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
+			const candidate = new RTCIceCandidate(JSON.parse(e.detail))
 			callback(candidate)
 		} catch (err) {
 			console.log(err.message, e.detail)
@@ -182,7 +207,7 @@ function onAnswerCandidateAdded(callback: (candidate: RTCIceCandidate) => void) 
 function onOfferCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
 	SSEvents.addEventListener(sse.room_offerCandidateAdded, (e: CustomEvent) => {
 		try {
-			const candidate = new RTCIceCandidate(JSON.parse(e.detail))  // (change.doc.data());
+			const candidate = new RTCIceCandidate(JSON.parse(e.detail))
 			callback(candidate)
 		} catch (err) {
 			console.log(err.message, e.detail)
@@ -192,13 +217,22 @@ function onOfferCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
 }
 
 function onSessionDescriptionAdded(callback: (session: RTCSessionDescription) => void) {
-	SSEvents.addEventListener(sse.room_sessionDescriptionAdded, (e: CustomEvent) => {
+	SSEvents.addEventListener(sse.room_sessionDescriptionAdded, async (e: CustomEvent) => {
 		try {
 			const session = new RTCSessionDescription(JSON.parse(e.detail))
 			callback(session)
 		} catch (err) {
-			console.log(err.message, e.detail)
-			debugger
+			if (err.message?.startsWith("Unterminated string in JSON")) {
+				console.warn(err.message)
+				//The session description was too long for sse, I guess?
+				console.log('making an explicit request for truncated session description...')
+				const init = await getRoomSessionDescription()
+				const session = new RTCSessionDescription(init)
+				callback(session)
+			} else {
+				console.log(err.message, e.detail)
+				debugger
+			}
 		}
 	})
 }
