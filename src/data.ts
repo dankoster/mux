@@ -114,8 +114,14 @@ async function setRoomSessionDescription(sessionDesc: RTCSessionDescriptionInit)
 }
 async function getRoomSessionDescription(): Promise<RTCSessionDescriptionInit> {
 	const response = await GET(apiRoute["room/sessionDescription"])
-	const result = await response.json()
-	return result as RTCSessionDescriptionInit
+	try {
+		const result = await response.json()
+		return result as RTCSessionDescriptionInit
+	} catch(error) {
+		if(error?.message === 'Unexpected end of JSON input')
+			return
+		else throw error
+	}
 }
 async function sendAnswer(answer: RTCSessionDescriptionInit) {
 	return await POST(apiRoute["room/answerCall"], { body: JSON.stringify(answer) })

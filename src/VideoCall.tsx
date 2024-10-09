@@ -111,10 +111,6 @@ export default function VideoCall(props: { user: Connection }) {
 
 	server.onSessionDescriptionAdded((session) => {
 		console.log("onSessionDescriptionAdded", session)
-		//pc.setRemoteDescription(session)
-		callButton.disabled = true;
-		answerButton.disabled = false;
-		webcamButton.disabled = false;
 	})
 
 	// When answered, add candidate to peer connection
@@ -148,9 +144,22 @@ export default function VideoCall(props: { user: Connection }) {
 		console.log('fetching remote description...')
 		pendingRemoteDescriptionRequest = server.getRoomSessionDescription()
 		const offerDescription = await pendingRemoteDescriptionRequest
-		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+		if (!offerDescription)
+			throw new Error('failed to get offer description')
 
+		console.log("got remote description!", offerDescription)
+		await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
 		setRemoteStartedCall(true)
+	})
+
+	console.log('joined room: fetching remote description...')
+	server.getRoomSessionDescription().then(async offerDescription => {
+		if (offerDescription) {
+			console.log("got remote description!", offerDescription)
+			await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+			setRemoteStartedCall(true)
+		}
+		else console.log('no remote description available')
 	})
 
 	const webcamButton_onclick = async () => {
@@ -207,18 +216,15 @@ export default function VideoCall(props: { user: Connection }) {
 		//as not doing so might result in some errors depending on the browser.
 	}
 
-	return <div>
-		<h3>onlineStatus: {onlineStatus() || 'unknown'}</h3>
-		<h3>webcamOnline: {webcamOnline() ? "yes" : "no"}</h3>
-		<h3>isRoomOwner: {isRoomOwner() ? "yes" : "no"}</h3>
+	return <div class="video-call">
 		<Show when={!room()}>NO ROOM</Show>
 		<Show when={webcamOnline()}>
-			<div class="videos">
+			<div class="video-container">
 				<video class="local" ref={webcamVideo} autoplay playsinline></video>
 			</div>
 		</Show>
 		<Show when={onlineStatus() === "connected"}>
-			<div class="videos">
+			<div class="video-container">
 				<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 			</div>
 			<button ref={hangupButton} onclick={hangupButton_onclick}>Hangup</button>
@@ -228,9 +234,15 @@ export default function VideoCall(props: { user: Connection }) {
 		</Show>
 		<Show when={webcamOnline() && isRoomOwner() && !localStartedCall()}>
 			<button ref={callButton} onclick={callButton_onclick}>Create Video call</button>
+			<Show when={onlineStatus() !== "connected"}>
+				<div>Waiting for other side to join...</div>
+			</Show>
 		</Show>
-		<Show when={webcamOnline() && !isRoomOwner()}>
-			<Show when={remoteStartedCall()} fallback="Waiting for remote to start the call...">
+		<Show when={webcamOnline() && !isRoomOwner() && onlineStatus() !== "connected"}>
+			<Show when={!remoteStartedCall()}>
+				<div>Waiting for host to start the call...</div>
+			</Show>
+			<Show when={remoteStartedCall()}>
 				<button ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
 			</Show>
 		</Show>
