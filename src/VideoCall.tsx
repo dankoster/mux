@@ -24,7 +24,33 @@ export default function VideoCall(props: { user: Connection }) {
 	const servers: RTCConfiguration = {
 		iceServers: [
 			{
-				urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
+				urls: [
+					'stun:stun1.l.google.com:19302',
+					'stun:stun2.l.google.com:19302'
+				],
+			},
+			{
+				urls: "stun:stun.relay.metered.ca:80",
+			},
+			{
+				urls: "turn:global.relay.metered.ca:80",
+				username: "20cd52d0dc022700b2755c26",
+				credential: "MNMabfdDEZeLlOFU",
+			},
+			{
+				urls: "turn:global.relay.metered.ca:80?transport=tcp",
+				username: "20cd52d0dc022700b2755c26",
+				credential: "MNMabfdDEZeLlOFU",
+			},
+			{
+				urls: "turn:global.relay.metered.ca:443",
+				username: "20cd52d0dc022700b2755c26",
+				credential: "MNMabfdDEZeLlOFU",
+			},
+			{
+				urls: "turns:global.relay.metered.ca:443?transport=tcp",
+				username: "20cd52d0dc022700b2755c26",
+				credential: "MNMabfdDEZeLlOFU",
 			},
 		],
 		iceCandidatePoolSize: 10,
