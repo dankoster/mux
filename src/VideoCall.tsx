@@ -1,13 +1,13 @@
 
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { trackStore } from "@solid-primitives/deep"
 import "./VideoCall.css"
 import server from "./data"
 import { Connection, Room } from "../server/api";
 
-export default function VideoCall(props: { user: Connection }) {
+export default function VideoCall(props: { owner: Connection, connections: Connection[] }) {
 
-	if (!props.user) {
+	if (!props.owner) {
 		return "no user"
 	}
 
@@ -16,9 +16,11 @@ export default function VideoCall(props: { user: Connection }) {
 
 	createEffect(() => {
 		trackStore(server.rooms);
-		const room = server.rooms.find(room => room.id === props.user.roomId)
+		const room = server.rooms.find(room => room.id === props.owner.roomId)
 		setRoom(room)
-		setIsRoomOwner(room && room.ownerId === props.user.id)
+		setIsRoomOwner(room && room.ownerId === props.owner.id)
+
+		console.log('trackStore(rooms)', room, isRoomOwner ? 'owner' : 'guest')
 	});
 
 	const servers: RTCConfiguration = {
@@ -61,10 +63,7 @@ export default function VideoCall(props: { user: Connection }) {
 	let remoteStream = new MediaStream();
 
 	let webcamVideo: HTMLVideoElement
-	let callButton: HTMLButtonElement
-	let endButton: HTMLButtonElement
 	let remoteVideo: HTMLVideoElement
-
 
 	const constraints = { audio: true, video: true };
 	const pc = new RTCPeerConnection(servers);
@@ -76,21 +75,36 @@ export default function VideoCall(props: { user: Connection }) {
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`));
 	}
 
-	function end() {
-
+	function endCall() {
+		console.groupCollapsed('end call...')
 		localStream?.getTracks().forEach((track) => {
 			console.log(`stopping ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
 			track.stop()
 		});
+		remoteStream?.getTracks().forEach((track) => {
+			console.log(`stopping ${track.muted ? "muted" : "un-muted"} remote ${track.kind} track:`, track.label)
+			track.stop()
+		});
 
-		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
-		pc?.close();
+		if (webcamVideo) webcamVideo.srcObject = null
+		if (remoteVideo) remoteVideo.srcObject = null
 
-		server.exitRoom(props.user.roomId)
+		try {
+			//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
+			pc?.close();
+		} catch (err) {
+			console.error(err)
+		}
+
+		const roomId = room()?.id
+		if (roomId)
+			server.exitRoom(roomId)
+
+		console.groupEnd()
 	}
 
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
-	async function start() {
+	async function startCall() {
 		try {
 			localStream = await navigator.mediaDevices.getUserMedia(constraints);
 			if (localStream) {
@@ -123,7 +137,7 @@ export default function VideoCall(props: { user: Connection }) {
 		logTrackEvents(track, 'remote');
 	};
 
-	const otherUser = () => server.connections.find(con => con.id !== props.user.id && con.roomId === props.user.roomId)
+	const otherUser = () => server.connections.find(con => con.id !== props.owner.id && con.roomId === props.owner.roomId)
 	const polite = !isRoomOwner()
 
 	let makingOffer = false;
@@ -182,12 +196,24 @@ export default function VideoCall(props: { user: Connection }) {
 	})
 
 	onCleanup(() => {
-		console.log('video call cleanup')
-		end()
+		console.log('video call cleanup ... other side ended call!')
+		endCall()
 	})
 
 	onMount(() => {
-		start()
+		if (otherUser()) {
+			startCall()
+		} else {
+			console.log(`it's quiet... waiting for someone else to join...`)
+		}
+	})
+
+	createEffect(() => {
+		console.log("EFFECT", props.connections)
+		if (props.connections.length > 0) {
+			console.log('someone joined!!!')
+			startCall()
+		}
 	})
 
 	return <div class="video-call">
@@ -197,7 +223,20 @@ export default function VideoCall(props: { user: Connection }) {
 		<div class="video-container">
 			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 		</div>
-		{/* <button class="room-button" ref={callButton} onclick={start}>Join</button>
-		<button class="room-button" ref={endButton} onclick={end}>Exit</button> */}
+		<div class="connections">
+			<Participant roomOwnerId={room()?.ownerId} con={props.owner} />
+			<For each={props.connections}>
+				{con => <Participant roomOwnerId={room()?.ownerId} con={con} />}
+			</For>
+		</div>
+	</div>
+}
+
+function Participant(props: { con: Connection, roomOwnerId: string }) {
+	return <div>
+		{props.roomOwnerId === props.con.id ? "owner" : "guest"}
+		<span style={{ "background-color": props.con.color }}>{props.con.id.substring(props.con.id.length - 4)}</span>
+		{props.con.status}
+		{props.con.text}
 	</div>
 }

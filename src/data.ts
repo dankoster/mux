@@ -347,6 +347,8 @@ function handleSseEvent(event: SSEventPayload) {
 }
 
 function sendDM(userId: string, message: string) {
+	if(!userId) throw new Error(`${userId} is not a valid userId`)
+	if(!message) throw new Error(`${message} is not a valid message`)
 	return POST(apiRoute.dm, { subRoute: userId, body: message })
 }
 

@@ -28,13 +28,13 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 				.attr('cx', (d) => d.x)
 				.attr('cy', (d) => d.y)
 				.attr("fill", d => d.color)
-				.on('click', (d, i: Connection) => {
-					server.sendDM(i.id, JSON.stringify(i))
-				})
+				// .on('click', (d, i: Connection) => {
+				// 	server.sendDM(i.id, JSON.stringify(i))
+				// })
 		}
 	}
 
-	server.onDM(dm => console.log(`DM from: ${dm.senderId}`, JSON.parse(dm.message)))
+	// server.onDM(dm => console.log(`DM from: ${dm.senderId}`, JSON.parse(dm.message)))
 
 	onMount(() => {
 		console.log('d3 with', nodes)

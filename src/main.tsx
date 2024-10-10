@@ -44,24 +44,24 @@ function User(props: { con: Connection }) {
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
-				<VideoCall user={props.con} />
+				<VideoCall owner={props.con} connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
 			</Show>
 
 			<Switch>
+				{/* NOT IN A ROOM */}
 				<Match when={!props.con.roomId}>
 					<ConnectionsGraph connections={server.connections} />
-					{/* NOT IN A ROOM */}
 					<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
 					{/* <Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} /> */}
 				</Match>
-				<Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
-					{/* CREATED A ROOM */}
+				{/* CREATED A ROOM */}
+				{/* <Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
 					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-				</Match>
-				<Match when={server.rooms.some(room => room.ownerId !== props.con.id)}>
-					{/* JOINED A ROOM */}
+				</Match> */}
+				{/* JOINED A ROOM */}
+				{/* <Match when={server.rooms.some(room => room.ownerId !== props.con.id)}>
 					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-				</Match>
+				</Match> */}
 			</Switch>
 		</div>
 		{/* style={{ "background-color": props.con.color }} */}
