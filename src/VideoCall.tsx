@@ -1,6 +1,5 @@
 
-//from https://github.com/fireship-io/webrtc-firebase-demo
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { trackStore } from "@solid-primitives/deep"
 import "./VideoCall.css"
 import server from "./data"
@@ -22,7 +21,7 @@ export default function VideoCall(props: { user: Connection }) {
 		setIsRoomOwner(room && room.ownerId === props.user.id)
 	});
 
-	const servers = {
+	const servers: RTCConfiguration = {
 		iceServers: [
 			{
 				urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
@@ -35,72 +34,15 @@ export default function VideoCall(props: { user: Connection }) {
 	let localStream: MediaStream | undefined
 	let remoteStream = new MediaStream();
 
-	let webcamButton: HTMLButtonElement
 	let webcamVideo: HTMLVideoElement
 	let callButton: HTMLButtonElement
-	let answerButton: HTMLButtonElement
+	let endButton: HTMLButtonElement
 	let remoteVideo: HTMLVideoElement
-	let hangupButton: HTMLButtonElement
-
-	//TODO: create peer connection for each other user in the room!!!!
-
-	//TODO: 
-	// require webcam start before anything else can happen
-	// answer button for non-owners only
-	// start call button for room owner only
-	// don't play local audio locally
-	// hangup button for everyone 
-	// close streams when leaving room
-	// ability to join call that is already started
-	// reconnect on page refresh. Same as joining an active call.
 
 
-	const [onlineStatus, setOnlineStatus] = createSignal<RTCPeerConnectionState>()
-	const [webcamOnline, setWebcamOnline] = createSignal(false)
-	const [localStartedCall, setLocalStartedCall] = createSignal(false)
-	const [remoteStartedCall, setRemoteStartedCall] = createSignal(false)
+	const constraints = { audio: true, video: true };
 	const pc = new RTCPeerConnection(servers);
-
-	pc.onconnectionstatechange = (event) => {
-		setOnlineStatus(pc.connectionState)
-
-		if (pc.connectionState === "connected")
-			remoteVideo.srcObject = remoteStream;
-	}
-
-	// Pull tracks from remote stream, add to video stream
-	pc.ontrack = (event) => {
-		const track = event.track
-		console.log(`got ${event.type}: ${track.kind} from peer connection`, track.label)
-		remoteStream.addTrack(track);
-		logTrackEvents(track, 'remote');
-	};
-
-	// Get candidates for caller, save to db
-	pc.onicecandidate = (event) => {
-		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
-
-		//@ts-expect-error
-		if (event.candidate === "") {
-			//there are no further candidates to come in this generation
-		}
-		else if (event.candidate === null) {
-			//all ICE gathering on all transports is complete
-		}
-		else if (event.candidate) {
-			if (localStartedCall()) {
-				console.log('onicecandidate', 'addOfferCandidate')
-				server.addOfferCandidate(event.candidate)
-			} else {
-				console.log('onicecandidate', 'addAnswerCandidate')
-				server.addAnswerCandidate(event.candidate)
-			}
-		}
-		else {
-			debugger
-			throw new Error("onicecandidate - unknown candidate state!")
-		}
-	};
+	//TODO: create peer connection for each other user in the room!!!!
 
 	function logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
 		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`));
@@ -108,203 +50,128 @@ export default function VideoCall(props: { user: Connection }) {
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`));
 	}
 
-	// Listen for remote answer
-	server.onRemoteAnswered(async (answer: RTCSessionDescription) => {
-		console.log('onRemoteAnswered', answer)
-		console.assert(!!pc)
-
-		await pc?.setRemoteDescription(answer)
-		for (const candidate of answerIceCandidates) {
-			console.log('got candidate from the queue!!!', candidate)
-			pc?.addIceCandidate(candidate)
-		}
-	})
-
-	const answerIceCandidates: RTCIceCandidate[] = []
-	server.onAnswerCandidateAdded((candidate: RTCIceCandidate) => {
-		console.log('onAnswerCandidateAdded', candidate)
-		console.assert(!!pc)
-
-		//queue these up until we have a remote description
-		if (pc?.remoteDescription) {
-			console.log('added ice candidate')
-			pc?.addIceCandidate(candidate)
-		} else {
-			console.log('into the queue!!!')
-			answerIceCandidates.push(candidate)
-		}
-	})
-
-	let pendingRemoteDescriptionRequest: Promise<RTCSessionDescriptionInit> = null
-	server.onOfferCandidateAdded(async (candidate) => {
-		console.log('onOfferCandidateAdded', candidate)
-
-		console.assert(!!pc)
-
-		if (pc?.remoteDescription) {
-			pc?.addIceCandidate(candidate)
-			return
-		}
-
-		if (pendingRemoteDescriptionRequest) {
-			console.log('waiting for remote description request...')
-			await pendingRemoteDescriptionRequest
-			pc?.addIceCandidate(candidate)
-			return
-		}
-
-		console.log('fetching remote description...')
-		pendingRemoteDescriptionRequest = server.getRoomSessionDescription()
-		const offerDescription = await pendingRemoteDescriptionRequest
-		if (!offerDescription)
-			throw new Error('failed to get offer description')
-
-		console.log("got remote description!", offerDescription)
-		await pc?.setRemoteDescription(new RTCSessionDescription(offerDescription));
-		setRemoteStartedCall(true)
-	})
-
-	console.log('joined room: fetching remote description...')
-	server.getRoomSessionDescription().then(async offerDescription => {
-		console.assert(!!pc)
-
-		if (offerDescription) {
-			console.log("got remote description!", offerDescription)
-			await pc?.setRemoteDescription(new RTCSessionDescription(offerDescription));
-			setRemoteStartedCall(true)
-		}
-		else console.log('no remote description available')
-	})
-
-	const webcamButton_onclick = async () => {
-		localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-		console.assert(!!pc)
-		console.assert(!!localStream)
-
-		if (localStream) {
-			// Push tracks from local stream to peer connection
-			localStream?.getTracks().forEach((track) => {
-				console.log(`adding local ${track.kind} track to peer connection:`, track.label)
-				pc?.addTrack(track, localStream);
-				logTrackEvents(track, 'local');
-			});
-
-			setWebcamOnline(true) //causes the webcamVideo element to render
-			if (webcamVideo) {
-				webcamVideo.srcObject = localStream;
-				webcamVideo.muted = true;
-			}
-		}
-	};
-
-	// 2. Create an offer
-	const callButton_onclick = async () => {
-		console.assert(!!pc)
-
-		setLocalStartedCall(true)
-
-		// Create offer
-		const offerDescription = await pc?.createOffer();
-		if (!offerDescription) {
-			console.log(pc)
-			throw new Error('could not create offer description')
-		}
-
-		await pc?.setLocalDescription(offerDescription);
-
-		await server.setRoomSessionDescription({
-			sdp: offerDescription.sdp,
-			type: offerDescription.type,
-		})
-	};
-
-	// 3. Answer the call with the unique ID
-	const answerButton_onclick = async () => {
-		console.assert(!!pc)
-		console.assert(!!localStream)
-
-		setLocalStartedCall(false)
-
-		const answerDescription = await pc?.createAnswer();
-		if (!answerDescription) {
-			console.log(pc)
-			throw new Error('could not create answer')
-		}
-		await pc?.setLocalDescription(answerDescription);
-
-		await server.sendAnswer({
-			type: answerDescription.type,
-			sdp: answerDescription.sdp,
-		})
-	};
-
-	const hangupButton_onclick = async () => {
-		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
-		//Make sure that you delete all references to the previous RTCPeerConnection 
-		//before attempting to create a new one that connects to the same remote peer, 
-		//as not doing so might result in some errors depending on the browser.
-
-		console.assert(!!pc)
-		console.assert(!!localStream)
-
-		pc?.close()
+	function end() {
 
 		localStream?.getTracks().forEach((track) => {
+			console.log(`stopping ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
 			track.stop()
 		});
 
-		if (webcamVideo)
-			webcamVideo.srcObject = null;
+		//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
+		pc?.close();
 
-		setWebcamOnline(false)
 		server.exitRoom(props.user.roomId)
 	}
 
+	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
+	async function start() {
+		try {
+			localStream = await navigator.mediaDevices.getUserMedia(constraints);
+			if (localStream) {
+				// Push tracks from local stream to peer connection
+				localStream?.getTracks().forEach((track) => {
+					console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
+					pc?.addTrack(track, localStream);
+					logTrackEvents(track, 'local');
+				});
+
+				if (webcamVideo) {
+					webcamVideo.srcObject = localStream;
+					webcamVideo.muted = true;
+				}
+
+				if (remoteVideo) {
+					remoteVideo.srcObject = remoteStream;
+				}
+			}
+		} catch (err) {
+			console.error(err);
+		}
+	}
+
+	// Pull tracks from remote stream, add to video stream
+	pc.ontrack = (event) => {
+		const track = event.track
+		console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
+		remoteStream.addTrack(track);
+		logTrackEvents(track, 'remote');
+	};
+
+	const otherUser = () => server.connections.find(con => con.id !== props.user.id && con.roomId === props.user.roomId)
+	const polite = !isRoomOwner()
+
+	let makingOffer = false;
+	pc.onnegotiationneeded = async () => {
+		try {
+			makingOffer = true;
+			await pc.setLocalDescription();
+			await server.sendDM(otherUser()?.id, JSON.stringify({ description: pc.localDescription }))
+		} catch (err) {
+			console.error(err);
+		} finally {
+			makingOffer = false;
+		}
+	};
+
+	pc.oniceconnectionstatechange = () => {
+		if (pc.iceConnectionState === "failed") {
+			pc.restartIce();
+		}
+	};
+
+	pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
+
+	let ignoreOffer = false;
+	server.onDM(async dm => {
+		try {
+			const { description, candidate } = JSON.parse(dm.message)
+			console.log(`DM from: ${dm.senderId}`, { description, candidate })
+
+			if (description) {
+				const offerCollision = description.type === "offer"
+					&& (makingOffer || pc.signalingState !== "stable");
+
+				ignoreOffer = !polite && offerCollision;
+				if (ignoreOffer) {
+					return;
+				}
+
+				await pc.setRemoteDescription(description);
+				if (description.type === "offer") {
+					await pc.setLocalDescription();
+					server.sendDM(otherUser()?.id, JSON.stringify({ description: pc.localDescription }));
+				}
+			} else if (candidate) {
+				try {
+					await pc.addIceCandidate(candidate);
+				} catch (err) {
+					if (!ignoreOffer) {
+						throw err;
+					}
+				}
+			}
+		} catch (err) {
+			console.error(err);
+		}
+	})
+
 	onCleanup(() => {
-		console.assert(!!pc)
-		console.assert(!!localStream)
+		console.log('video call cleanup')
+		end()
+	})
 
-		console.log('VideoCall Cleanup!')
-		pc?.close()
-
-		localStream?.getTracks().forEach((track) => {
-			track.stop()
-		});
-
-		if (webcamVideo)
-			webcamVideo.srcObject = null;
+	onMount(() => {
+		start()
 	})
 
 	return <div class="video-call">
-		<Show when={!room()}>NO ROOM</Show>
-		<Show when={webcamOnline()}>
-			<div class="video-container">
-				<video class="local" ref={webcamVideo} autoplay playsinline></video>
-			</div>
-		</Show>
-		<Show when={onlineStatus() === "connected"}>
-			<div class="video-container">
-				<video class="remote" ref={remoteVideo} autoplay playsinline></video>
-			</div>
-			<button class="room-button" ref={hangupButton} onclick={hangupButton_onclick}>Exit</button>
-		</Show>
-		<Show when={!webcamOnline()}>
-			<button class="room-button" ref={webcamButton} onclick={webcamButton_onclick}>Start webcam</button>
-		</Show>
-		<Show when={webcamOnline() && isRoomOwner() && !localStartedCall()}>
-			<button class="room-button" ref={callButton} onclick={callButton_onclick}>Create Video call</button>
-		</Show>
-		<Show when={localStartedCall() && onlineStatus() !== "connected"}>
-			<div>Waiting for other side to join...</div>
-		</Show>
-		<Show when={!isRoomOwner() && onlineStatus() !== "connected"}>
-			<Show when={!remoteStartedCall()}>
-				<div>Waiting for host to start the call...</div>
-			</Show>
-			<Show when={remoteStartedCall() && webcamOnline()}>
-				<button class="room-button" ref={answerButton} onclick={answerButton_onclick}>Join video call</button>
-			</Show>
-		</Show>
+		<div class="video-container">
+			<video class="local" ref={webcamVideo} autoplay playsinline></video>
+		</div>
+		<div class="video-container">
+			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
+		</div>
+		{/* <button class="room-button" ref={callButton} onclick={start}>Join</button>
+		<button class="room-button" ref={endButton} onclick={end}>Exit</button> */}
 	</div>
 }

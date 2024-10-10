@@ -5,6 +5,7 @@ import { createStore } from "solid-js/store"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
+	dm: "dm",
 	setColor: "setColor",
 	setText: "setText",
 	clear: "clear",
@@ -15,12 +16,13 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	"room/addAnswerCandidate": "room/addAnswerCandidate",
 	"room/answerCall": "room/answerCall",
 	"room/offerSessionDescription": "room/offerSessionDescription",
-	"room/answerSessionDescription": "room/answerSessionDescription"
+	"room/answerSessionDescription": "room/answerSessionDescription",
 };
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
+	dm: "dm",
 	connections: "connections",
 	reconnect: "reconnect",
 	update: "update",
@@ -32,7 +34,7 @@ const sse: { [Property in SSEvent]: Property } = {
 	room_offerCandidateAdded: "room_offerCandidateAdded",
 	room_sessionDescriptionAdded: "room_sessionDescriptionAdded",
 	room_answerCandidateAdded: "room_answerCandidateAdded",
-	room_remoteAnswered: "room_remoteAnswered"
+	room_remoteAnswered: "room_remoteAnswered",
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -56,7 +58,7 @@ export default {
 	setColor, setText, createRoom, exitRoom, joinRoom,
 	setRoomSessionDescription, getRoomSessionDescription, addOfferCandidate, sendAnswer,
 	onRemoteAnswered, onAnswerCandidateAdded, onOfferCandidateAdded, addAnswerCandidate,
-	onSessionDescriptionAdded
+	onSessionDescriptionAdded, sendDM, onDM
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -119,7 +121,7 @@ async function getRoomSessionDescription(): Promise<RTCSessionDescriptionInit> {
 		const result = await response.json()
 		return result as RTCSessionDescriptionInit
 	} catch (error) {
-		if (error?.message === 'Unexpected end of JSON input'){
+		if (error?.message === 'Unexpected end of JSON input') {
 			console.warn(error)
 			return
 		}
@@ -173,6 +175,11 @@ class SSEventEmitter extends EventTarget {
 }
 const SSEvents = new SSEventEmitter()
 
+function onDM(callback: (dm: { senderId: string, message: string }) => void) {
+	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
+		callback(JSON.parse(e.detail))
+	})
+}
 function onRemoteAnswered(callback: (answer: RTCSessionDescription) => void) {
 	SSEvents.addEventListener(sse.room_remoteAnswered, async (e: CustomEvent) => {
 		try {
@@ -301,6 +308,8 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.room_offerCandidateAdded:
 		case sse.room_answerCandidateAdded:
 		case sse.room_remoteAnswered:
+		case sse.dm:
+			// console.log('SSE', event.event, event.data)
 			SSEvents.onSseEvent(event.event, event.data)
 			break;
 		case sse.delete_room:
@@ -323,10 +332,15 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		default:
 			console.warn(`Unknown SSE field "${event.event}"`, event.data)
+			debugger
 			const nope = (_: never): never => { throw new Error() }
 			nope(event.event) //this will prevent unhandled cases
 			break;
 	}
+}
+
+function sendDM(userId: string, message: string) {
+	return POST(apiRoute.dm, { subRoute: userId, body: message })
 }
 
 function updateConnectionStatus() {

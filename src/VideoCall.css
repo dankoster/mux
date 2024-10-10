@@ -1,7 +1,7 @@
 .video-call {
 	align-self: center;
-    justify-self: center;
-	
+	justify-self: center;
+
 	.video-container {
 		position: relative;
 		padding: 1rem;

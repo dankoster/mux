@@ -10,6 +10,7 @@ export type ApiRoute = "sse"
 	| "setText"
 	| "clear"
 	| "discardKey"
+	| "dm"
 	| "room"
 	| `room/${RoomRoute}`
 
@@ -20,8 +21,16 @@ export type RoomRoute = "join"
 	| "addOfferCandidate"
 	| "addAnswerCandidate"
 
+//is there a way to have the RoomRoute be nested under ApiRoute
+// like this { setColor: "setColor", room: { join: "room/join"}}
+// type FullApi = { 
+// 	[Property in ApiRoute | RoomRoute]: 
+// 	Property extends RoomRoute ? `room/${Property}` : Property 
+// }
+
 export type SSEvent = "pk"
 	| "id"
+	| "dm"
 	| "connections"
 	| "new_connection"
 	| "rooms"
@@ -57,6 +66,7 @@ export type Update = {
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
+	dm: "dm",
 	rooms: "rooms",
 	connections: "connections",
 	reconnect: "reconnect",
@@ -68,7 +78,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	room_sessionDescriptionAdded: "room_sessionDescriptionAdded",
 	room_offerCandidateAdded: "room_offerCandidateAdded",
 	room_answerCandidateAdded: "room_answerCandidateAdded",
-	room_remoteAnswered: "room_remoteAnswered"
+	room_remoteAnswered: "room_remoteAnswered",
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -79,13 +89,15 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
+	dm: "dm",
+
 	room: "room",
 	"room/join": "room/join",
 	"room/addOfferCandidate": "room/addOfferCandidate",
 	"room/answerCall": "room/answerCall",
 	"room/addAnswerCandidate": "room/addAnswerCandidate",
 	"room/offerSessionDescription": "room/offerSessionDescription",
-	"room/answerSessionDescription": "room/answerSessionDescription"
+	"room/answerSessionDescription": "room/answerSessionDescription",
 }
 
 const KV_KEYS = {
@@ -414,7 +426,36 @@ api.post(`/${apiRoute["room/answerCall"]}`, async (ctx) => {
 
 
 
+//send DM to user
+api.post(`/${apiRoute.dm}/:userId`, async (ctx) => {
+	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
+	const sender = connectionByUUID.get(uuid)
+	if (!sender){
+		ctx.response.status = 401 //unauthenticated
+		return
+	} 
+
+	const message = await ctx.request.body.text()
+	if (!message) {
+		ctx.response.status = 400 //bad request
+		return
+	}
+
+	const recipientUUID = getUUID(ctx.params.userId)
+	if(!recipientUUID) {
+		ctx.response.status = 404
+		return
+	}
+
+	updateFunctionByUUID.get(recipientUUID)?.call(this, sseEvent.dm, JSON.stringify({
+		senderId: sender.id,
+		message
+	}))
+	ctx.response.status = 200
+})
 
 
 //Join room by id
@@ -425,7 +466,10 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
 	const con = connectionByUUID.get(uuid)
-	if (!con) throw new Error(`${uuid} not found in ${[...connectionByUUID.keys()]}`)
+	if (!con){
+		ctx.response.status = 401 //unauthenticated)
+		return
+	} 
 
 	const room = rooms.find(room => room.id === roomId)
 	if (!room) {

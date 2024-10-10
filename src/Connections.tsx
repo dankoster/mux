@@ -4,6 +4,7 @@ import "./Connections.css"
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { onMount } from "solid-js";
 import { Connection } from "../server/api";
+import server from "./data"
 
 export default function ConnectionsGraph(props: { connections: Connection[] }) {
 
@@ -26,9 +27,14 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 				.attr('r', 10)
 				.attr('cx', (d) => d.x)
 				.attr('cy', (d) => d.y)
-				.attr("fill", d => d.color);
+				.attr("fill", d => d.color)
+				.on('click', (d, i: Connection) => {
+					server.sendDM(i.id, JSON.stringify(i))
+				})
 		}
 	}
+
+	server.onDM(dm => console.log(`DM from: ${dm.senderId}`, JSON.parse(dm.message)))
 
 	onMount(() => {
 		console.log('d3 with', nodes)
