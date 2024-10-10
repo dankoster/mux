@@ -139,7 +139,7 @@ function cleanupRooms() {
 	rooms.forEach(room => {
 		const ownerUUID = getUUID(room.ownerId)
 		if (!ownerUUID) {
-			console.log('cleanupRooms removed', room)
+			console.log('cleanupRooms removed room because no owner found!', room)
 			updateAllConnections_deleteRoom(room)
 			rooms.splice(rooms.indexOf(room), 1)
 			modified = true
@@ -147,7 +147,7 @@ function cleanupRooms() {
 		}
 		const owner = connectionByUUID.get(ownerUUID)
 		if (owner?.roomId !== room.id) {
-			console.log('cleanupRooms removed', room)
+			console.log('cleanupRooms removed room because owner not in room!', room)
 			updateAllConnections_deleteRoom(room)
 			rooms.splice(rooms.indexOf(room), 1)
 			modified = true
