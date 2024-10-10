@@ -127,6 +127,12 @@ type webRtcSession = {
 	answerCandidates?: string[],
 }
 const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
+const webRtcSessionByRoomId = new Map<string, webRtcSession>()
+
+const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
+console.log("INIT Got connections from KV:", connectionByUUID)
+console.log("INIT Got rooms from KV:", rooms)
+
 cleanupRooms()
 function cleanupRooms() {
 	let modified = false
@@ -150,12 +156,6 @@ function cleanupRooms() {
 
 	if(modified) kv.set(KV_KEYS.rooms, rooms)
 }
-
-const webRtcSessionByRoomId = new Map<string, webRtcSession>()
-
-const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
-console.log("INIT Got connections from KV:", connectionByUUID)
-console.log("INIT Got rooms from KV:", rooms)
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
