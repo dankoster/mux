@@ -64,7 +64,9 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	let remoteVideo: HTMLVideoElement
 
 	const constraints = { audio: true, video: true };
+
 	const pc = new RTCPeerConnection(servers);
+	console.log("------------------- Created Peer Connectin! -------------------")
 	//TODO: create peer connection for each other user in the room!!!!
 
 	function logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
@@ -247,8 +249,8 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		<div class="video-container">
 			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 		</div>
-		<div>Owner: {userOwnsRoom() ? "owner" : "guest"}</div>
-		<div>Polite: {polite() ? "yes" : "no"}</div>
+		{/* <div>Owner: {userOwnsRoom() ? "owner" : "guest"}</div>
+		<div>Polite: {polite() ? "yes" : "no"}</div> */}
 		<div class="connections">
 			<Participant con={props.user} ownsRoom={true} />
 			<For each={props.connections}>

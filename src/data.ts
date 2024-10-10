@@ -167,13 +167,13 @@ function parseEventStream(value: string) {
 			[payload.data]: event[1]?.split(`${payload.data}: `)[1]
 		}))
 
-	result.forEach(output => console.assert(!!output.event, {value, result, e: output}))
+	result.forEach(output => console.assert(!!output.event, { value, result, e: output }))
 
 	return result
 }
 
 class SSEventEmitter extends EventTarget {
-	onSseEvent(event: SSEvent, value: string) {
+	onSseEvent(event: SSEvent, value: string | {}) {
 		this.dispatchEvent(new CustomEvent(event, { detail: value }))
 	}
 }
@@ -181,7 +181,7 @@ const SSEvents = new SSEventEmitter()
 
 function onDM(callback: (dm: { senderId: string, message: string }) => void) {
 	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
-		callback(JSON.parse(e.detail))
+		callback(e.detail)
 	})
 }
 function onRemoteAnswered(callback: (answer: RTCSessionDescription) => void) {
@@ -314,7 +314,12 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.room_remoteAnswered:
 		case sse.dm:
 			// console.log('SSE', event.event, event.data)
-			SSEvents.onSseEvent(event.event, event.data)
+			try {
+				const dm = JSON.parse(event.data)
+				SSEvents.onSseEvent(event.event, dm)
+			} catch (error) {
+				console.error("Failed to parse DM", event)
+			}
 			break;
 		case sse.delete_room:
 			const room = JSON.parse(event.data) as Room
@@ -347,8 +352,8 @@ function handleSseEvent(event: SSEventPayload) {
 }
 
 function sendDM(userId: string, message: string) {
-	if(!userId) throw new Error(`${userId} is not a valid userId`)
-	if(!message) throw new Error(`${message} is not a valid message`)
+	if (!userId) throw new Error(`${userId} is not a valid userId`)
+	if (!message) throw new Error(`${message} is not a valid message`)
 	return POST(apiRoute.dm, { subRoute: userId, body: message })
 }
 
