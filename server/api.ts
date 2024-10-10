@@ -127,6 +127,30 @@ type webRtcSession = {
 	answerCandidates?: string[],
 }
 const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
+cleanupRooms()
+function cleanupRooms() {
+	let modified = false
+	rooms.forEach(room => {
+		const ownerUUID = getUUID(room.ownerId)
+		if (!ownerUUID) {
+			console.log('cleanupRooms removed', room)
+			updateAllConnections_deleteRoom(room)
+			rooms.splice(rooms.indexOf(room), 1)
+			modified = true
+			return
+		}
+		const owner = connectionByUUID.get(ownerUUID)
+		if (owner?.roomId !== room.id) {
+			console.log('cleanupRooms removed', room)
+			updateAllConnections_deleteRoom(room)
+			rooms.splice(rooms.indexOf(room), 1)
+			modified = true
+		}
+	})
+
+	if(modified) kv.set(KV_KEYS.rooms, rooms)
+}
+
 const webRtcSessionByRoomId = new Map<string, webRtcSession>()
 
 const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
@@ -433,10 +457,10 @@ api.post(`/${apiRoute.dm}/:userId`, async (ctx) => {
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
 	const sender = connectionByUUID.get(uuid)
-	if (!sender){
+	if (!sender) {
 		ctx.response.status = 401 //unauthenticated
 		return
-	} 
+	}
 
 	const message = await ctx.request.body.text()
 	if (!message) {
@@ -445,7 +469,7 @@ api.post(`/${apiRoute.dm}/:userId`, async (ctx) => {
 	}
 
 	const recipientUUID = getUUID(ctx.params.userId)
-	if(!recipientUUID) {
+	if (!recipientUUID) {
 		ctx.response.status = 404
 		return
 	}
@@ -466,10 +490,10 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
 	const con = connectionByUUID.get(uuid)
-	if (!con){
+	if (!con) {
 		ctx.response.status = 401 //unauthenticated)
 		return
-	} 
+	}
 
 	const room = rooms.find(room => room.id === roomId)
 	if (!room) {
@@ -557,7 +581,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 		//delete the room
 		rooms.splice(rooms.indexOf(room), 1)
 		updateAllConnections_deleteRoom(room)
-		ctx.response.body = room 
+		ctx.response.body = room
 		ctx.response.status = 200
 	}
 })
