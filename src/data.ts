@@ -159,13 +159,17 @@ async function exitRoom(roomId: string) {
 
 function parseEventStream(value: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-	return value.split('\r\n\r\n')
+	const result = value.split('\r\n\r\n')
 		.filter(e => e)
 		.map(s => s.split('\r\n'))
 		.map((event): SSEventPayload => ({
 			[payload.event]: event[0]?.split(`${payload.event}: `)[1] as SSEvent,
 			[payload.data]: event[1]?.split(`${payload.data}: `)[1]
 		}))
+
+	result.forEach(output => console.assert(!!output.event, {value, result, e: output}))
+
+	return result
 }
 
 class SSEventEmitter extends EventTarget {
@@ -331,7 +335,10 @@ function handleSseEvent(event: SSEventPayload) {
 			updateConnectionStatus()
 			break;
 		default:
-			console.warn(`Unknown SSE field "${event.event}"`, event.data)
+			console.warn(`Unknown SSE field "${event?.event}"`, event?.data)
+			if (event?.event === undefined) {
+				return
+			}
 			debugger
 			const nope = (_: never): never => { throw new Error() }
 			nope(event.event) //this will prevent unhandled cases
