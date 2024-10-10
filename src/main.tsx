@@ -35,6 +35,12 @@ const App = () => {
 
 function User(props: { con: Connection }) {
 
+	const exitRoom = async () => {
+		console.log('exit room...')
+		const response = await server.exitRoom(props.con.roomId)
+		console.log('...exit room', response.ok)
+	}
+
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
@@ -43,7 +49,7 @@ function User(props: { con: Connection }) {
 
 			<Switch>
 				<Match when={!props.con.roomId}>
-					<ConnectionsGraph connections={server.connections}/>
+					<ConnectionsGraph connections={server.connections} />
 					{/* NOT IN A ROOM */}
 					<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
 					{/* <Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} /> */}
@@ -61,7 +67,6 @@ function User(props: { con: Connection }) {
 		{/* style={{ "background-color": props.con.color }} */}
 		<div class="toolbar">
 			<div class="public-info">
-				<span class="short-id">{props.con.id.substring(props.con.id.length - 4)}</span>
 				<RoomLabel con={props.con} />
 				<input
 					type="text"
@@ -83,12 +88,12 @@ function User(props: { con: Connection }) {
 				</div>
 
 				{props.con.roomId &&
-					<button class="room-button" onclick={() => server.exitRoom(props.con.roomId)}>
-						{isRoomOwner(props.con) ? "Close" : "Leave"} room
+					<button class="room-button" onclick={exitRoom}>
+						{isRoomOwner(props.con) ? "End" : "Leave"} call
 					</button>
 				}
 				{!props.con.roomId &&
-					<button class="room-button" onclick={() => server.createRoom()}>open room</button>
+					<button class="room-button" onclick={() => server.createRoom()}>start call</button>
 				}
 			</div>
 		</div>
@@ -101,7 +106,7 @@ function isRoomOwner(con: Connection) {
 
 function RoomLabel(props: { con: Connection }) {
 	return <Show when={server.rooms.find(room => room.id === props.con.roomId)}>
-		<div>room {roomShortId(server.rooms.find(room => room.id === props.con.roomId))}</div>
+		<div>call {roomShortId(server.rooms.find(room => room.id === props.con.roomId))}</div>
 		<div>{server.connections.reduce((count, c) => count += (c.roomId === props.con.roomId ? 1 : 0), 0)} people</div>
 	</Show>
 }
@@ -123,7 +128,7 @@ const Rooms = (props: { rooms: Room[] }) => {
 					return <div class="room-button"
 						style={{ "background-color": ownerColor(room) }}
 						onclick={() => server.joinRoom(room.id)}>
-						room {roomShortId(room)}
+						join call {roomShortId(room)}
 						<div class="userCount">{countUsers(room)} inside</div>
 					</div>
 				}}
@@ -140,7 +145,6 @@ const Connections = (props: { connections: Connection[] }) => {
 				style={{ "background-color": con.color }}>
 				<h2 textContent={con.text || ""}></h2>
 				<h2>{con.status === "online" ? "👀" : "😴"}</h2>
-				<span>{con.id.substring(con.id.length - 4)}</span>
 				<Show when={server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id}>
 					OWNER
 				</Show>
