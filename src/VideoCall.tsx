@@ -1,27 +1,25 @@
 
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { trackStore } from "@solid-primitives/deep"
+// import { trackStore } from "@solid-primitives/deep"
 import "./VideoCall.css"
 import server from "./data"
 import { Connection, Room } from "../server/api";
 
-export default function VideoCall(props: { owner: Connection, connections: Connection[] }) {
+export default function VideoCall(props: { room: Room, user: Connection, connections: Connection[] }) {
 
-	if (!props.owner) {
+	if (!props.user) {
 		return "no user"
 	}
 
-	const [room, setRoom] = createSignal<Room>()
-	const [isRoomOwner, setIsRoomOwner] = createSignal<boolean>()
 
-	createEffect(() => {
-		trackStore(server.rooms);
-		const room = server.rooms.find(room => room.id === props.owner.roomId)
-		setRoom(room)
-		setIsRoomOwner(room && room.ownerId === props.owner.id)
+	// createEffect(() => {
+	// 	trackStore(server.rooms);
+	// 	const r = server.rooms.find(rr => rr.id === props.owner.roomId)
+	// 	setRoom(r)
+	// 	setIsRoomOwner(r && r.ownerId === props.owner.id)
 
-		console.log('trackStore(rooms)', room, isRoomOwner ? 'owner' : 'guest')
-	});
+	// 	console.log('trackStore(rooms)', r, isRoomOwner ? 'owner' : 'guest')
+	// });
 
 	const servers: RTCConfiguration = {
 		iceServers: [
@@ -96,7 +94,7 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 			console.error(err)
 		}
 
-		const roomId = room()?.id
+		const roomId = props.user.roomId
 		if (roomId)
 			server.exitRoom(roomId)
 
@@ -133,12 +131,15 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 	pc.ontrack = (event) => {
 		const track = event.track
 		console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
-		remoteStream.addTrack(track);
+		track.addEventListener('end', () => remoteStream.addTrack(track))
+		track.addEventListener('mute', () => remoteStream.removeTrack(track))
+		track.addEventListener('unmute', () => remoteStream.addTrack(track))
+		//remoteStream.addTrack(track);
 		logTrackEvents(track, 'remote');
 	};
 
-	const otherUser = () => server.connections.find(con => con.id !== props.owner.id && con.roomId === props.owner.roomId)
-	const polite = !isRoomOwner()
+	const [userOwnsRoom, setUserOwnsRoom] = createSignal(false)
+	const [polite, setPolite] = createSignal(false)
 
 	let makingOffer = false;
 	pc.onnegotiationneeded = async () => {
@@ -161,6 +162,8 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 
 	pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
 
+	pc.onsignalingstatechange = () => console.log(`RTCPeerConnection's signalingState changed: ${pc.signalingState}`)
+
 	let ignoreOffer = false;
 	server.onDM(async dm => {
 		try {
@@ -171,11 +174,15 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 				const offerCollision = description.type === "offer"
 					&& (makingOffer || pc.signalingState !== "stable");
 
-				ignoreOffer = !polite && offerCollision;
+				ignoreOffer = !polite() && offerCollision;
 				if (ignoreOffer) {
 					return;
 				}
 
+				if (pc.signalingState === "closed") {
+					console.warn(`Ignoring offer description because The RTCPeerConnection's signalingState is 'closed'`, candidate)
+					return
+				}
 				await pc.setRemoteDescription(description);
 				if (description.type === "offer") {
 					await pc.setLocalDescription();
@@ -183,6 +190,10 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 				}
 			} else if (candidate) {
 				try {
+					if (pc.signalingState === "closed") {
+						console.warn(`Ignoring ice candidate because The RTCPeerConnection's signalingState is 'closed'`, candidate)
+						return
+					}
 					await pc.addIceCandidate(candidate);
 				} catch (err) {
 					if (!ignoreOffer) {
@@ -191,9 +202,11 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 				}
 			}
 		} catch (err) {
-			console.error(err);
+			console.warn(err);
 		}
 	})
+
+	const otherUser = () => props.connections[0]
 
 	onCleanup(() => {
 		console.log('video call cleanup ... other side ended call!')
@@ -210,10 +223,21 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 
 	createEffect(() => {
 		console.log("EFFECT", props.connections)
+		const isOwner = props.user?.id === props.room?.ownerId
+		setUserOwnsRoom(isOwner)
+		setPolite(!isOwner)
+
+		console.log({user: props.user, room: props.room})
+		console.log('set userOwnsRoom', userOwnsRoom())
+		console.log('set polite', polite())
+
 		if (props.connections.length > 0) {
 			console.log('someone joined!!!')
+			
+
 			startCall()
 		}
+
 	})
 
 	return <div class="video-call">
@@ -223,18 +247,20 @@ export default function VideoCall(props: { owner: Connection, connections: Conne
 		<div class="video-container">
 			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
 		</div>
+		<div>Owner: {userOwnsRoom() ? "owner" : "guest"}</div>
+		<div>Polite: {polite() ? "yes" : "no"}</div>
 		<div class="connections">
-			<Participant roomOwnerId={room()?.ownerId} con={props.owner} />
+			<Participant con={props.user} ownsRoom={true} />
 			<For each={props.connections}>
-				{con => <Participant roomOwnerId={room()?.ownerId} con={con} />}
+				{con => <Participant con={con} ownsRoom={false} />}
 			</For>
 		</div>
 	</div>
 }
 
-function Participant(props: { con: Connection, roomOwnerId: string }) {
+function Participant(props: { con: Connection, ownsRoom: boolean }) {
 	return <div>
-		{props.roomOwnerId === props.con.id ? "owner" : "guest"}
+		{props.ownsRoom ? "owner" : "guest"}
 		<span style={{ "background-color": props.con.color }}>{props.con.id.substring(props.con.id.length - 4)}</span>
 		{props.con.status}
 		{props.con.text}

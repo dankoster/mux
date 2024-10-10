@@ -27,10 +27,19 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 				.attr('r', 10)
 				.attr('cx', (d) => d.x)
 				.attr('cy', (d) => d.y)
-				.attr("fill", d => d.color)
-				// .on('click', (d, i: Connection) => {
-				// 	server.sendDM(i.id, JSON.stringify(i))
-				// })
+				.attr("fill", d => d.color ?? "#fff")
+			// .on('click', (d, i: Connection) => {
+			// 	server.sendDM(i.id, JSON.stringify(i))
+			// })
+
+			d3.select('svg')
+				.selectAll('text')
+				.data(nodes)
+				.join('text')
+				.attr("fill", "#fff")
+				.attr('x', (d) => d.x + 15)
+				.attr('y', (d) => d.y)
+				.text((d) => `${d.id} ${d.status}`)
 		}
 	}
 

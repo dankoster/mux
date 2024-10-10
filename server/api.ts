@@ -180,7 +180,7 @@ function updateAllConnections_newRoom(room: Room) {
 
 function updateAllConnections_deleteRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
-	console.log(sseEvent.delete_room, room)
+	console.log("SSE updateAllConnections_deleteRoom", sseEvent.delete_room, room)
 	updateFunctionByUUID.forEach(fn =>
 		fn(sseEvent.delete_room, JSON.stringify(room)))
 }
@@ -557,7 +557,8 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 		//delete the room
 		rooms.splice(rooms.indexOf(room), 1)
 		updateAllConnections_deleteRoom(room)
-		ctx.response.body = room //200 success
+		ctx.response.body = room 
+		ctx.response.status = 200
 	}
 })
 

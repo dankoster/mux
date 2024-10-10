@@ -44,7 +44,10 @@ function User(props: { con: Connection }) {
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
-				<VideoCall owner={props.con} connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
+				<VideoCall 
+				user={props.con} 
+				room={server.rooms.find(r => r.id === props.con.roomId)} 
+				connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
 			</Show>
 
 			<Switch>
