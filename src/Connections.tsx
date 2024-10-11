@@ -27,7 +27,8 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 				.attr('r', 10)
 				.attr('cx', (d) => d.x)
 				.attr('cy', (d) => d.y)
-				.attr("fill", d => d.color ?? "#fff")
+				.attr('stroke', '#fff')
+				.attr("fill", d => d.color ?? "transparent")
 			// .on('click', (d, i: Connection) => {
 			// 	server.sendDM(i.id, JSON.stringify(i))
 			// })
@@ -38,8 +39,8 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 				.join('text')
 				.attr("fill", "#fff")
 				.attr('x', (d) => d.x + 15)
-				.attr('y', (d) => d.y)
-				.text((d) => `${d.id} ${d.status}`)
+				.attr('y', (d) => d.y + 5)
+				.text((d:Connection) => `${d.text ? d.text:''} ${d.status ? d.status : 'offline'} ${d.roomId ? 'in room ' + d.roomId?.substring(d.roomId?.length - 4):''}`)
 		}
 	}
 

@@ -263,8 +263,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 function Participant(props: { con: Connection, ownsRoom: boolean }) {
 	return <div>
 		{props.ownsRoom ? "owner" : "guest"}
-		<span style={{ "background-color": props.con.color }}>{props.con.id.substring(props.con.id.length - 4)}</span>
-		{props.con.status}
-		{props.con.text}
+		<span style={{ "background-color": props.con.color, "margin-inline": "1rem" }}>{props.con.id.substring(props.con.id.length - 4)}</span>
+		{props.con.status || 'offline'}
 	</div>
 }
