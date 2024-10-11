@@ -77,9 +77,11 @@ async function initSSE(route: string, token: string) {
 				const { value: chunk, done } = await reader.read()
 				if (done) break
 
+				let partialReadRecovered = false
 				if (buffer) {
 					//continuing from a partial read
-					console.log('...PARTIAL READ', buffer, chunk)
+					console.log('...PARTIAL READ ', buffer, chunk)
+					partialReadRecovered = true
 				}
 
 				buffer += chunk
@@ -92,8 +94,7 @@ async function initSSE(route: string, token: string) {
 
 				if (buffer) {
 					//partial read, so keep everything since the last terminator
-					console.log('PARTIAL READ...', buffer)
-					debugger
+					console.log('PARTIAL READ... ', buffer)
 				}
 
 				//parse the messages into event objects
@@ -111,7 +112,9 @@ async function initSSE(route: string, token: string) {
 					events.push(event)
 				}
 
-				//const events = parseEventStream(value)
+				if(partialReadRecovered) 
+					console.log('PARTIAL READ RECOVERED', events[0])
+
 				events.forEach(event => handleSseEvent(event))
 			}
 		} catch (error) {
