@@ -63,31 +63,43 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	let webcamVideo: HTMLVideoElement
 	let remoteVideo: HTMLVideoElement
 
-	const constraints = { audio: true, video: true };
+	const constraints = { audio: true, video: true }
 
 	const pc = new RTCPeerConnection(servers);
 	console.log("------------------- Created Peer Connectin! -------------------")
 	//TODO: create peer connection for each other user in the room!!!!
 
+
 	function logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
-		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`));
-		track.addEventListener('mute', () => console.log(`MUTE: ${label} ${track.kind}: ${track.label}`));
-		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`));
+		const ac = new AbortController()
+		loggingAbortControllers.push(ac)
+		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
+		track.addEventListener('mute', () => console.log(`MUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
+		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
 	}
+
+	const loggingAbortControllers: AbortController[] = []
+	const localRTCRtpSenders: RTCRtpSender[] = []
 
 	function endCall() {
 		console.groupCollapsed('end call...')
-		localStream?.getTracks().forEach((track) => {
-			console.log(`stopping ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
-			track.stop()
-		});
-		remoteStream?.getTracks().forEach((track) => {
-			console.log(`stopping ${track.muted ? "muted" : "un-muted"} remote ${track.kind} track:`, track.label)
-			track.stop()
-		});
 
-		if (webcamVideo) webcamVideo.srcObject = null
-		if (remoteVideo) remoteVideo.srcObject = null
+		loggingAbortControllers.forEach(ac => {
+			console.log('aborting track logging event listeners!')
+			ac.abort()
+		})
+
+		localRTCRtpSenders.forEach(t => {
+			pc.removeTrack(t)
+			console.log('removed local RTCRtpSender', t)
+		})
+
+		localStream?.getTracks().forEach((track) => {
+			track.stop()
+			localStream.removeTrack(track)
+			console.log(`stopped ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
+		})
+
 
 		try {
 			//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
@@ -104,6 +116,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	}
 
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
+	//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#adding_tracks_to_multiple_streams
 	async function startCall() {
 		try {
 			localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -111,7 +124,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 				// Push tracks from local stream to peer connection
 				localStream?.getTracks().forEach((track) => {
 					console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
-					pc?.addTrack(track, localStream);
+					localRTCRtpSenders.push(pc?.addTrack(track, localStream))
 					logTrackEvents(track, 'local');
 				});
 
@@ -157,20 +170,33 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	};
 
 	pc.oniceconnectionstatechange = () => {
+		console.log('oniceconnectionstatechange', pc.iceConnectionState, pc.signalingState)
 		if (pc.iceConnectionState === "failed") {
 			pc.restartIce();
+		}
+
+		if (pc.iceConnectionState === 'disconnected') {
+			remoteVideo.srcObject = null
+			console.log(remoteStream)
 		}
 	};
 
 	pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
 
-	pc.onsignalingstatechange = () => console.log(`RTCPeerConnection's signalingState changed: ${pc.signalingState}`)
+	pc.onsignalingstatechange = () => {
+		console.log(`RTCPeerConnection's signalingState changed: ${pc.signalingState}`)
+	}
 
 	let ignoreOffer = false;
 	server.onDM(async dm => {
 		try {
 			const { description, candidate } = JSON.parse(dm.message)
 			console.log(`DM from: ${dm.senderId}`, { description, candidate })
+
+			if (pc.signalingState === "closed") {
+				console.warn(`RTCPeerConnection's signalingState is 'closed'... retrying...`)
+				await new Promise((resolve) => setTimeout(() => resolve(''), 1)) //just give it a tick then try again...
+			}
 
 			if (description) {
 				const offerCollision = description.type === "offer"
@@ -182,9 +208,10 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 				}
 
 				if (pc.signalingState === "closed") {
-					console.warn(`Ignoring offer description because The RTCPeerConnection's signalingState is 'closed'`, candidate)
+					console.error(`Ignoring offer description because The RTCPeerConnection's signalingState is 'closed'`, description)
 					return
 				}
+
 				await pc.setRemoteDescription(description);
 				if (description.type === "offer") {
 					await pc.setLocalDescription();
@@ -193,7 +220,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 			} else if (candidate) {
 				try {
 					if (pc.signalingState === "closed") {
-						console.warn(`Ignoring ice candidate because The RTCPeerConnection's signalingState is 'closed'`, candidate)
+						console.error(`Ignoring ice candidate because The RTCPeerConnection's signalingState is 'closed'`, candidate)
 						return
 					}
 					await pc.addIceCandidate(candidate);
@@ -229,13 +256,13 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		setUserOwnsRoom(isOwner)
 		setPolite(!isOwner)
 
-		console.log({user: props.user, room: props.room})
+		console.log({ user: props.user, room: props.room })
 		console.log('set userOwnsRoom', userOwnsRoom())
 		console.log('set polite', polite())
 
 		if (props.connections.length > 0) {
 			console.log('someone joined!!!')
-			
+
 
 			startCall()
 		}
