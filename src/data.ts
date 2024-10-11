@@ -12,11 +12,6 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	discardKey: "discardKey",
 	room: "room",
 	"room/join": "room/join",
-	"room/addOfferCandidate": "room/addOfferCandidate",
-	"room/addAnswerCandidate": "room/addAnswerCandidate",
-	"room/answerCall": "room/answerCall",
-	"room/offerSessionDescription": "room/offerSessionDescription",
-	"room/answerSessionDescription": "room/answerSessionDescription",
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -31,10 +26,6 @@ const sse: { [Property in SSEvent]: Property } = {
 	rooms: "rooms",
 	new_room: "new_room",
 	delete_room: "delete_room",
-	room_offerCandidateAdded: "room_offerCandidateAdded",
-	room_sessionDescriptionAdded: "room_sessionDescriptionAdded",
-	room_answerCandidateAdded: "room_answerCandidateAdded",
-	room_remoteAnswered: "room_remoteAnswered",
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -57,8 +48,7 @@ export default {
 	id, pk, connections, rooms, stats, serverOnline,
 	setColor, setText, createRoom, exitRoom, joinRoom,
 	setRoomSessionDescription, getRoomSessionDescription, addOfferCandidate, sendAnswer,
-	onRemoteAnswered, onAnswerCandidateAdded, onOfferCandidateAdded, addAnswerCandidate,
-	onSessionDescriptionAdded, sendDM, onDM
+	addAnswerCandidate, sendDM, onDM
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -184,69 +174,6 @@ function onDM(callback: (dm: { senderId: string, message: string }) => void) {
 		callback(e.detail)
 	})
 }
-function onRemoteAnswered(callback: (answer: RTCSessionDescription) => void) {
-	SSEvents.addEventListener(sse.room_remoteAnswered, async (e: CustomEvent) => {
-		try {
-			const answerDescription = new RTCSessionDescription(JSON.parse(e.detail))
-			callback(answerDescription)
-		} catch (err) {
-			if (err.message?.startsWith("Unterminated string in JSON")) {
-				console.warn(err.message)
-				//The session description was too long for sse, I guess?
-				console.log('making an explicit request for truncated session description...')
-				const init = await getAnswerSessionDescription()
-				const session = new RTCSessionDescription(init)
-				callback(session)
-			} else {
-				console.log(err.message, e.detail)
-				debugger
-			}
-		}
-	})
-}
-function onAnswerCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
-	SSEvents.addEventListener(sse.room_answerCandidateAdded, (e: CustomEvent) => {
-		try {
-			const candidate = new RTCIceCandidate(JSON.parse(e.detail))
-			callback(candidate)
-		} catch (err) {
-			console.log(err.message, e.detail)
-			debugger
-		}
-	})
-}
-function onOfferCandidateAdded(callback: (candidate: RTCIceCandidate) => void) {
-	SSEvents.addEventListener(sse.room_offerCandidateAdded, (e: CustomEvent) => {
-		try {
-			const candidate = new RTCIceCandidate(JSON.parse(e.detail))
-			callback(candidate)
-		} catch (err) {
-			console.log(err.message, e.detail)
-			debugger
-		}
-	})
-}
-
-function onSessionDescriptionAdded(callback: (session: RTCSessionDescription) => void) {
-	SSEvents.addEventListener(sse.room_sessionDescriptionAdded, async (e: CustomEvent) => {
-		try {
-			const session = new RTCSessionDescription(JSON.parse(e.detail))
-			callback(session)
-		} catch (err) {
-			if (err.message?.startsWith("Unterminated string in JSON")) {
-				console.warn(err.message)
-				//The session description was too long for sse, I guess?
-				console.log('making an explicit request for truncated session description...')
-				const init = await getRoomSessionDescription()
-				const session = new RTCSessionDescription(init)
-				callback(session)
-			} else {
-				console.log(err.message, e.detail)
-				debugger
-			}
-		}
-	})
-}
 
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
@@ -308,10 +235,6 @@ function handleSseEvent(event: SSEventPayload) {
 			console.log('SSE', event.event, newRoom)
 			setRooms(rooms.length, newRoom)
 			break;
-		case sse.room_sessionDescriptionAdded:
-		case sse.room_offerCandidateAdded:
-		case sse.room_answerCandidateAdded:
-		case sse.room_remoteAnswered:
 		case sse.dm:
 			// console.log('SSE', event.event, event.data)
 			try {
