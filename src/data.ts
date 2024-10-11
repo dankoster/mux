@@ -77,25 +77,16 @@ async function initSSE(route: string, token: string) {
 				const { value: chunk, done } = await reader.read()
 				if (done) break
 
-				let partialReadRecovered = false
-				if (buffer) {
-					//continuing from a partial read
-					console.log('...PARTIAL READ ', buffer, chunk)
-					partialReadRecovered = true
-				}
-
 				buffer += chunk
 
 				//split up the incoming message stream and account for partial reads
 				const messages = buffer.split('\r\n\r\n')
 
+				//keep everything since the last terminator
 				//we expect the last item in messages to be '' if we got a final terminator
+				//otherwise the last message will contain everything between the last terminator
+				//and the end of the string
 				buffer = messages.pop()
-
-				if (buffer) {
-					//partial read, so keep everything since the last terminator
-					console.log('PARTIAL READ... ', buffer)
-				}
 
 				//parse the messages into event objects
 				const events = []
@@ -104,7 +95,7 @@ async function initSSE(route: string, token: string) {
 					const event = message
 						.split("\r\n") //split the lines apart
 						.map(s => [s.slice(0, s.indexOf(': ')), s.slice(s.indexOf(': ') + 2)]) //split each line by the first ": "
-						.reduce((out, cur) => { //convert those sub-arrays into an object
+						.reduce((out, cur) => { //convert those sub-arrays into an object like {[key:string]:string}
 							out[cur[0]] = cur[1]
 							return out
 						}, {})
@@ -112,10 +103,7 @@ async function initSSE(route: string, token: string) {
 					events.push(event)
 				}
 
-				if(partialReadRecovered) 
-					console.log('PARTIAL READ RECOVERED', events[0])
-
-				events.forEach(event => handleSseEvent(event))
+				events.forEach(event => handleSseEvent(event as SSEventPayload))
 			}
 		} catch (error) {
 			setServerOnline(false)
