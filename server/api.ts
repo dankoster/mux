@@ -261,6 +261,8 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 		return
 	}
 
+	cleanupRooms()
+
 	const room = rooms.find(room => room.id === roomId)
 	if (!room) {
 		ctx.response.status = 404
