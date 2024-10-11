@@ -133,8 +133,8 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	pc.ontrack = (event) => {
 		const track = event.track
 		console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
-		track.addEventListener('end', () => remoteStream.addTrack(track))
-		track.addEventListener('mute', () => remoteStream.removeTrack(track))
+		track.addEventListener('end', () => remoteStream.removeTrack(track))
+		// track.addEventListener('mute', () => remoteStream.removeTrack(track))
 		track.addEventListener('unmute', () => remoteStream.addTrack(track))
 		//remoteStream.addTrack(track);
 		logTrackEvents(track, 'remote');
