@@ -67,11 +67,47 @@ async function initSSE(route: string, token: string) {
 			setServerOnline(true)
 			retries = 0
 
+			//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+			//PARTIAL READS HAPPEN!!!!!!! We could do a fancy iterator if there was a lot of data: 
+			// https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/read#example_2_-_handling_text_line_by_line
+			// ...but this is small data, and HULK SMASH is easier to reason about. 
+			
+			let buffer = ""
 			while (true) {
-				const { value, done } = await reader.read()
+				const { value: chunk, done } = await reader.read()
 				if (done) break
 
-				const events = parseEventStream(value)
+				buffer += chunk
+
+				//split up the incoming message stream and account for partial reads
+				const messages = buffer.split('\r\n\r\n')
+				if(messages[messages.length - 1] === '') {
+					//ended on a message terminator
+					buffer = ""
+				} else {
+					debugger
+					//partial read, so keep everything since the last terminator
+					buffer = messages[messages.length - 1]
+				}
+
+				//parse the messages into event objects
+				const events = []
+				while (messages.length) {
+					const message = messages.shift()
+					if (message.length > 0) {
+						const event = message
+						.split("\r\n") //split the lines apart
+						.map(s => [s.slice(0, s.indexOf(': ')), s.slice(s.indexOf(': ') + 2)]) //split each line by the first ": "
+						.reduce((out, cur) => { //convert those sub-arrays into an object
+							out[cur[0]] = cur[1]
+							return out
+						}, {})
+
+						events.push(event)
+					}
+				}
+
+				//const events = parseEventStream(value)
 				events.forEach(event => handleSseEvent(event))
 			}
 		} catch (error) {
@@ -145,21 +181,6 @@ async function joinRoom(roomId: string) {
 }
 async function exitRoom(roomId: string) {
 	return await DELETE(apiRoute.room, roomId)
-}
-
-function parseEventStream(value: string) {
-	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-	const result = value.split('\r\n\r\n')
-		.filter(e => e)
-		.map(s => s.split('\r\n'))
-		.map((event): SSEventPayload => ({
-			[payload.event]: event[0]?.split(`${payload.event}: `)[1] as SSEvent,
-			[payload.data]: event[1]?.split(`${payload.data}: `)[1]
-		}))
-
-	result.forEach(output => console.assert(!!output.event, { value, result, e: output }))
-
-	return result
 }
 
 class SSEventEmitter extends EventTarget {
