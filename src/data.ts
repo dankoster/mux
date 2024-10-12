@@ -186,9 +186,11 @@ class SSEventEmitter extends EventTarget {
 const SSEvents = new SSEventEmitter()
 
 function onDM(callback: (dm: { senderId: string, message: string }) => void) {
+	const ac = new AbortController()
 	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
 		callback(e.detail)
-	})
+	}, { signal: ac.signal })
+	return ac
 }
 
 function handleSseEvent(event: SSEventPayload) {

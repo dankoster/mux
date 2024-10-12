@@ -1,6 +1,5 @@
 
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-// import { trackStore } from "@solid-primitives/deep"
+import { createEffect, createSignal, For, onCleanup, onMount, Setter, Show } from "solid-js";
 import "./VideoCall.css"
 import server from "./data"
 import { Connection, Room } from "../server/api";
@@ -50,7 +49,7 @@ type pcInit = {
 class PeerConnection extends EventTarget {
 	localStream: MediaStream | undefined
 	remoteStream = new MediaStream();
-	loggingAbortControllers: AbortController[] = []
+	abortControllers: AbortController[] = []
 	localRTCRtpSenders: RTCRtpSender[] = []
 
 	constraints = { audio: true, video: true }
@@ -120,6 +119,10 @@ class PeerConnection extends EventTarget {
 		console.log('PeerConnection: constructor finised!', this)
 	}
 
+	addAbortController(ac: AbortController) {
+		this.abortControllers.push(ac)
+	}
+
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 	//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#adding_tracks_to_multiple_streams
 	async startCall() {
@@ -143,7 +146,7 @@ class PeerConnection extends EventTarget {
 	endCall() {
 		console.groupCollapsed('end call...')
 
-		this.loggingAbortControllers.forEach(ac => {
+		this.abortControllers.forEach(ac => {
 			console.log('aborting track logging event listeners!')
 			ac.abort()
 		})
@@ -173,7 +176,7 @@ class PeerConnection extends EventTarget {
 
 	logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
 		const ac = new AbortController()
-		this.loggingAbortControllers.push(ac)
+		this.abortControllers.push(ac)
 		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
 		track.addEventListener('mute', () => console.log(`MUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal })
@@ -232,86 +235,93 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		return "no user"
 	}
 
+	let localVideo: HTMLVideoElement
 
-	// createEffect(() => {
-	// 	trackStore(server.rooms);
-	// 	const r = server.rooms.find(rr => rr.id === props.owner.roomId)
-	// 	setRoom(r)
-	// 	setIsRoomOwner(r && r.ownerId === props.owner.id)
+	const peersById = new Map<string, PeerConnection>()
+	const videosById = new Map<string, HTMLVideoElement>()
 
-	// 	console.log('trackStore(rooms)', r, isRoomOwner ? 'owner' : 'guest')
-	// });
+	function createPeer(polite: boolean, con: Connection, remoteVideo: HTMLVideoElement) {
+		const pc = new PeerConnection({
+			polite,
+			sendMessage: (message: {}) => {
+				return server.sendDM(con.id, JSON.stringify(message))
+			},
+			onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
+				if (localVideo) {
+					localVideo.srcObject = localStream;
+					localVideo.muted = true;
+				}
 
-
-	let webcamVideo: HTMLVideoElement
-	let remoteVideo: HTMLVideoElement
-
-	const pm = new PeerConnection({
-		polite: props.user?.id === props.room?.ownerId,
-		sendMessage: (message: {}) => {
-			return server.sendDM(otherUser()?.id, JSON.stringify(message))
-		},
-		onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
-			if (webcamVideo) {
-				webcamVideo.srcObject = localStream;
-				webcamVideo.muted = true;
+				if (remoteVideo) {
+					remoteVideo.srcObject = remoteStream;
+				}
+			},
+			onDisconnect: () => {
+				remoteVideo.srcObject = null
 			}
+		})
+		const ac = server.onDM((dm) => {
+			const { description, candidate } = JSON.parse(dm.message);
+			console.log(`DM from: ${dm.senderId}`, { description, candidate });
 
-			if (remoteVideo) {
-				remoteVideo.srcObject = remoteStream;
+			//only handle messages from this peer
+			if (dm.senderId === con.id)
+				pc.handleMessage({ description, candidate })
+		})
+
+		//cleanup the onDM evnet handler when we're done
+		pc.addAbortController(ac)
+
+		return pc
+	}
+
+	createEffect(() => {
+		console.log("EFFECT", props.connections.length)
+
+		//create new peer connections as necessary
+		const polite = props.user?.id === props.room?.ownerId
+		props.connections.forEach(con => {
+			if (!peersById.has(con.id)) {
+				console.log("CREATE PEER", con.id)
+				// <video class="remote" ref={remoteVideo} autoplay playsinline></video>
+				const video = document.createElement('video')
+				video.className = "remote"
+				video.setAttribute('autoplay', '')
+				video.setAttribute('playsinline', '')
+				video.setAttribute('id', con.id)
+				videosById.set(con.id, video)
+				document.getElementById('remote-videos')?.appendChild(video)
+				const peer = createPeer(polite, con, video)
+				peersById.set(con.id, peer)
+				peer.startCall()
 			}
-		},
-		onDisconnect: () => {
-			remoteVideo.srcObject = null
+		})
 
-			// const roomId = props.user.roomId
-			// if (roomId)
-			// 	server.exitRoom(roomId)
-		}
+		//remove old peer connections
+		const conIds = props.connections.map(con => con.id)
+		peersById.forEach((value, key) => {
+			if (!conIds.includes(key)) {
+				console.log(`REMOVE PEER`, key)
+				peersById.get(key)?.endCall()
+				peersById.delete(key)
+
+				const video = videosById.get(key)
+				document.getElementById('remote-videos')?.removeChild(video)
+				videosById.delete(key)
+			}
+		})
 	})
-	server.onDM((dm) => {
-		const { description, candidate } = JSON.parse(dm.message);
-		console.log(`DM from: ${dm.senderId}`, { description, candidate });
-
-		//TODO: route this message to the correct peer connection for the sender
-
-		pm.handleMessage({ description, candidate })
-	})
-
-	console.log("------------------- Created Peer Connection! -------------------")
-	//TODO: create peer connection for each other user in the room!!!!
-
-
-	const otherUser = () => props.connections[0]
 
 	onCleanup(() => {
 		console.log('video call cleanup ... other side ended call!')
-		pm.endCall()
-	})
-
-	onMount(() => {
-		if (otherUser()) {
-			console.log('OTHER USER exists! Start the call!')
-			pm.startCall()
-		} else {
-			console.log(`it's quiet... waiting for someone else to join...`)
-		}
-	})
-
-	createEffect(() => {
-		console.log("EFFECT", props.connections)
-		if (props.connections.length > 0) {
-			console.log('someone joined!!!')
-			pm.startCall()
-		}
+		peersById.forEach(peer => peer.endCall())
 	})
 
 	return <div class="video-call">
-		<div class="video-container">
-			<video class="local" ref={webcamVideo} autoplay playsinline></video>
+		<div class="local-video-container">
+			<video class="local" ref={localVideo} autoplay playsinline></video>
 		</div>
-		<div class="video-container">
-			<video class="remote" ref={remoteVideo} autoplay playsinline></video>
+		<div id="remote-videos" class="remote-video-container">
 		</div>
 		<div class="connections">
 			<Participant con={props.user} ownsRoom={true} />

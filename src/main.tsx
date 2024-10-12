@@ -18,7 +18,7 @@ const App = () => {
 		</Show>
 		<Show when={server.serverOnline()}>
 			<div class="header">
-				<h1 class="logo">⨳ MUX</h1>
+				<h1 class="logo">⨳ chatMUX</h1>
 				<div class="stats">
 					<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
 					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
