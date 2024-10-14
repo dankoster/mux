@@ -4,133 +4,146 @@ import "./Connections.css"
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 import { trackStore } from "@solid-primitives/deep"
-import { createEffect, onMount } from "solid-js";
+import { createEffect, onCleanup, onMount } from "solid-js";
 import { Connection } from "../server/api";
 import server from "./data"
 
+//TODO: update the force directed graph to reflect changes to the connections
+// ✓ online/offline status
+// ✓ joining/leaving rooms
+// ✓ rooms forming
+// - draw a continer around rooms and label with room id
+// - zoom in on the user's room! https://observablehq.com/@d3/scatterplot-tour?collection=@d3/d3-zoom
+//
+// instead of drag, let each user move around!
+// - shift the view to follow the user
+// - proximity chat!
+// - some kind of synthwave terrain for location awareness?
+
+//https://observablehq.com/@d3/modifying-a-force-directed-graph
+
 export default function ConnectionsGraph(props: { connections: Connection[] }) {
-
-	//get raw connection objects out of the SolidJS Signal where they are proxies
-	const data = props.connections.map(node => Object.assign({}, node))
-
-	let conSvg: SVGSVGElement
-
-	//TODO: update the force directed graph to reflect changes to the connections
-	// - online/offline status
-	// - rooms forming
-	// - joining/leaving rooms
-	// - zoom in on the user's room! https://observablehq.com/@d3/scatterplot-tour?collection=@d3/d3-zoom
-	//
-	// instead of drag, let each user move around!
-	// - shift the view to follow the user
-	// - proximity chat!
-	// - some kind of synthwave terrain for location awareness?
 
 	createEffect(() => {
 		trackStore(server.connections);
-		console.log('trackStore(connections)', server.connections)
+
+
+		// get raw connection objects out of the SolidJS Signal where they are proxies
+		const connections = props.connections.map(node => Object.assign({}, node))
+		console.log('trackStore(connections)', connections)
+
+		const rooms = new Map<string, Connection[]>()
+		connections.forEach(con => {
+			if (con.roomId) {
+				if (!rooms.has(con.roomId))
+					rooms.set(con.roomId, [con])
+				else
+					rooms.get(con.roomId).push(con)
+			}
+		})
+		const links = []
+		rooms.forEach(users => users.forEach(u1 => users.forEach(u2 => {
+			if (u1 != u2) links.push({ source: u1.id, target: u2.id })
+		})))
+
+		console.log(rooms, links)
+
+		graph = {
+			nodes: connections,
+			links
+		}
+
+		// graph = {
+		// 	nodes: [
+		// 		{ id: "a" },
+		// 		{ id: "b" },
+		// 		{ id: "c" }
+		// 	],
+		// 	links: [
+		// 		{ source: "a", target: "b" },
+		// 		{ source: "b", target: "c" },
+		// 		{ source: "c", target: "a" }
+		// 	]
+		// }
+
+		update(graph)
 	});
 
+
+	let svgRef: SVGSVGElement
+	let simulation, node, link
+	let graph
+
+	onCleanup(() => {
+		simulation?.stop()
+	})
+
 	onMount(() => {
+		const svg = d3.select(svgRef)
 
-		//https://observablehq.com/@d3/disjoint-force-directed-graph/2
-
-		// // Specify the dimensions of the chart.
-		// const width = 928;
-		// const height = 680;
-
-		// The force simulation mutates links and nodes, so create a copy
-		// so that re-evaluating this cell produces the same result.
-		const links = [] //data.links.map(d => ({ ...d }));
-		const nodes = data.map(d => ({ ...d }));
-
-		// Create a simulation with several forces.
-		const simulation = d3.forceSimulation(nodes)
-			.force("link", d3.forceLink(links).id(d => d.id))
-			//.force("charge", d3.forceManyBody())
-			.force('center', d3.forceCenter(conSvg.clientWidth / 2, conSvg.clientHeight / 2))
+		simulation = d3.forceSimulation()
+			.force('center', d3.forceCenter(svgRef.clientWidth / 2, svgRef.clientHeight / 2))
+			.force("charge", d3.forceManyBody().strength(-1000))
+			.force("link", d3.forceLink().id(d => d.id).distance(200))
 			.force("x", d3.forceX())
 			.force("y", d3.forceY())
-			.force("collide", d3.forceCollide(30).iterations(1))
+			.on("tick", ticked);
 
-		// Get the SVG container.
-		const svg = d3.select('svg')
-			// .attr("width", width)
-			// .attr("height", height)
-			// .attr("viewBox", [-width / 2, -height / 2, width, height])
-			//.attr("style", "max-width: 100%; height: auto;");
+		link = svg.append("g")
+			.attr("stroke", "#fff")
+			.attr("stroke-width", 1.5)
+			.selectAll("line");
 
-		// Add a line for each link, and a circle for each node.
-		const link = svg.append("g")
-			.attr("stroke", "#999")
-			.attr("stroke-opacity", 0.6)
-			.selectAll("line")
-			.data(links)
-			.join("line")
-			.attr("stroke-width", d => Math.sqrt(d.value));
-
-		const node = svg.append("g")
+		node = svg.append("g")
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("circle")
-			.data(nodes)
-			.join("circle")
-			.attr("r", 20)
-			.attr('stroke', '#fff')
-			.attr("fill", d => d.color ?? "transparent")
+			.attr("r", d => d.status === "online" ? 20 : 10)
 
-		node.append("title")
-			// .text(d => d.id)
-			.text((d: Connection) => `${d.text ? d.text : ''} ${d.status ? d.status : 'offline'} ${d.roomId ? 'in room ' + d.roomId?.substring(d.roomId?.length - 4) : ''}`)
+		function ticked() {
+			node.attr("cx", d => d.x)
+				.attr("cy", d => d.y)
 
-		// Add a drag behavior.
-		node.call(d3.drag()
-			.on("start", dragstarted)
-			.on("drag", dragged)
-			.on("end", dragended));
-
-		// Set the position attributes of links and nodes each time the simulation ticks.
-		simulation.on("tick", () => {
-			link
-				.attr("x1", d => d.source.x)
+			link.attr("x1", d => d.source.x)
 				.attr("y1", d => d.source.y)
 				.attr("x2", d => d.target.x)
 				.attr("y2", d => d.target.y);
-
-			node
-				.attr("cx", d => d.x)
-				.attr("cy", d => d.y);
-		});
-
-		// Reheat the simulation when drag starts, and fix the subject position.
-		function dragstarted(event) {
-			if (!event.active) simulation.alphaTarget(0.3).restart();
-			event.subject.fx = event.subject.x;
-			event.subject.fy = event.subject.y;
 		}
 
-		// Update the subject (dragged node) position during drag.
-		function dragged(event) {
-			event.subject.fx = event.x;
-			event.subject.fy = event.y;
-		}
-
-		// Restore the target alpha so the simulation cools after dragging ends.
-		// Unfix the subject position now that it’s no longer being dragged.
-		function dragended(event) {
-			if (!event.active) simulation.alphaTarget(0);
-			event.subject.fx = null;
-			event.subject.fy = null;
-		}
-
-		// When this cell is re-run, stop the previous simulation. (This doesn’t
-		// really matter since the target alpha is zero and the simulation will
-		// stop naturally, but it’s a good practice.)
-		//invalidation.then(() => simulation.stop());
-
+		if (graph)
+			update(graph)
 	})
 
+	const color = d3.scaleOrdinal(d3.schemeTableau10)
+	function update(u) {
+
+		if (!u) return
+
+		let { nodes, links } = u
+		// Make a shallow copy to protect against mutation, while
+		// recycling old nodes to preserve position and velocity.
+		const old = new Map(node?.data().map(d => [d.id, d]));
+		nodes = nodes?.map(d => Object.assign(old.get(d.id) || {}, d));
+		links = links?.map(d => Object.assign({}, d));
+
+		simulation?.nodes(nodes);
+		simulation?.force("link").links(links);
+		simulation?.alpha(1).restart();
+
+		node = node?.data(nodes, d => d.id)
+			.join(enter => enter
+				.append("circle")
+				.attr("r", d => d.status === "online" ? 20 : 10)
+				.attr("fill", d => d.color ?? "transparent"),
+				update => update
+					.attr("r", d => d.status === "online" ? 20 : 10)
+					.attr("fill", d => d.color ?? "transparent"));
+
+		link = link?.data(links, d => `${d.source.id}\t${d.target.id}`)
+			.join("line");
+	}
+
 	return <div class="congraph">
-		<svg ref={conSvg}></svg>
+		<svg ref={svgRef}></svg>
 	</div>
 }
