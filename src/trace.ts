@@ -8,7 +8,7 @@ export function trace(...message: any[]) {
 	//console.log(stackTrace.stack, stack)
 
 	const caller = stack[1]
-	const callee = stack[0].substring(0, stack[0].indexOf(' '))
+	const callee = stack[0]?.substring(0, stack[0].indexOf(' '))
 	console.groupCollapsed(...message || `${caller} --> ${callee}`)
 	stack.forEach(s => console.log(s))
 	console.groupEnd()
