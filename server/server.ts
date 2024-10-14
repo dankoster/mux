@@ -34,7 +34,8 @@ app.use(async (context, next) => {
 			index: "index.html",
 		});
 	} catch (error) {
-		console.error("[STATIC]", context.request.method, context.request.url.toString(), error)
+		// console.error("[STATIC]", context.request.method, context.request.url.toString(), error)
+		context.response.status = 404
 	}
 });
 
