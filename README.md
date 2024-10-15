@@ -1,18 +1,16 @@
-# MUX 
+# ⨳ chatMUX
 
-Set a color and a text message.
+Peer to peer video chat. 
 
-Your online/offline status and any changes will will be [instantly shared](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) to anyone else on the site.
+Chat with people, not AI.
 
-Taste the rainbow (with friends) 🌈 https://muxgg.deno.dev/
+https://chatmux.com/
 
-## Running the code locally
+------
 
-Install Deno v1.46.3 or later
 
-Use two separate terminals!
+This started out as a quick exploration of [server sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Then I got super curious about [webRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API). All the connections flying around needed a fun visualization, so let's learn [D3](https://d3js.org/)! Oh, I also wanted to try [SolidJS](https://www.solidjs.com/). And [Deno](https://deno.com/). Then I was having enough fun that I put it on [deno deploy](https://deno.com/deploy) and got a [domain](https://chatmux.com/). 
 
-```
-$ deno task serve
-$ deno task vite
-```
+Not bad for a couple weeks of excited but fairly aimless tinkering.
+
+More to come... I'm having a blast.
