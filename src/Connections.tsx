@@ -72,7 +72,7 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 	}
 
 	let svgRef: SVGSVGElement
-	let simulation, nodeCircles, linkLines, roomCircles
+	let simulation, nodeCircles, linkLines, roomCircles, roomLabels
 	let graph: GraphData
 
 	let svgObserver: ResizeObserver
@@ -83,63 +83,89 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 	})
 
 	onMount(() => {
-		svgObserver = new ResizeObserver(() => {
-			simulation?.force('center', d3.forceCenter(svgRef.clientWidth / 2, svgRef.clientHeight / 2))
-		})
-		svgObserver.observe(svgRef)
 
 		const svg = d3.select(svgRef)
 
-		simulation = d3.forceSimulation()
-			.force('center', d3.forceCenter(svgRef.clientWidth / 2, svgRef.clientHeight / 2))
-			.force("charge", d3.forceManyBody().strength(-800))
-			.force("link", d3.forceLink().id(d => d.id).distance(200))
-			.force("x", d3.forceX())
-			.force("y", d3.forceY())
-			.on("tick", ticked);
-
 		linkLines = svg.append("g")
+			.attr('class', 'link-lines')
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("line");
 
 		nodeCircles = svg.append("g")
+			.attr('class', 'node-circles')
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("circle")
 			.attr("r", d => d.status === "online" ? 20 : 10)
 
 		roomCircles = svg.append('g')
+			.attr('class', 'room-circles')
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 2)
 			.attr("fill", 'transparent')
 			.selectAll("circle")
 
-		function ticked() {
-			nodeCircles?.attr("cx", d => d.x)
-				.attr("cy", d => d.y)
+		roomLabels = svg.append('g')
+			.attr('class', 'room-labels')
+			.selectAll("text")
 
-			linkLines?.attr("x1", d => d.source.x)
-				.attr("y1", d => d.source.y)
-				.attr("x2", d => d.target.x)
-				.attr("y2", d => d.target.y)
 
-			const enclosingCircle = d3.local()
-			roomCircles?.each(function (d) {
-				const circles = nodeCircles?._groups[0]
-					.filter(c => c.__data__.roomId === d.id)
-					.map(c => ({
-						x: c.cx.animVal.value,
-						y: c.cy.animVal.value,
-						r: c.r.animVal.value
-					}))
-				const circle = d3.packEnclose(circles)
-				enclosingCircle.set(this, circle)
-			})
-				.attr("cx", function (d) { return enclosingCircle.get(this)?.x })
-				.attr("cy", function (d) { return enclosingCircle.get(this)?.y })
-				.attr('r', function (d) { return enclosingCircle.get(this)?.r + 20 })
-		}
+		svgObserver = new ResizeObserver(() => {
+			simulation?.force("x", d3.forceX(svgRef.clientWidth / 2))
+				.force("y", d3.forceY(svgRef.clientHeight / 2))
+				.alpha(1).restart();
+		})
+		svgObserver.observe(svgRef)
+
+		simulation = d3.forceSimulation()
+			.force("charge", d3.forceManyBody().strength(-500))
+			.force("link", d3.forceLink().id(d => d.id).distance(100))
+			.force("x", d3.forceX(svgRef.clientWidth / 2))
+			.force("y", d3.forceY(svgRef.clientHeight / 2))
+			.on("tick", function ticked() {
+				nodeCircles?.attr("cx", d => d.x)
+					.attr("cy", d => d.y)
+
+				linkLines?.attr("x1", d => d.source.x)
+					.attr("y1", d => d.source.y)
+					.attr("x2", d => d.target.x)
+					.attr("y2", d => d.target.y)
+
+				const enclosingCircleByRoomId = {}
+				roomCircles?.each(function (d) {
+					const circles = nodeCircles?._groups[0]
+						.filter(c => c.__data__.roomId === d.id) //find other nodes in the same room
+						.map(c => ({
+							x: c.cx.animVal.value,
+							y: c.cy.animVal.value,
+							r: c.r.animVal.value
+						}))
+					const circle = d3.packEnclose(circles)
+					enclosingCircleByRoomId[d.id] = circle
+				})
+					.attr("cx", d => enclosingCircleByRoomId[d?.id]?.x)
+					.attr("cy", d => enclosingCircleByRoomId[d?.id]?.y)
+					.attr('r', d => enclosingCircleByRoomId[d?.id]?.r + 20)
+
+				roomLabels?.each(function (d) {
+					const circle = enclosingCircleByRoomId[d.id]
+					const startAngle = -180 * Math.PI / 180
+					const endAngle = -180 * Math.PI / 180 + 2 * Math.PI
+					const anticlockwise = false
+					const path = d3.path()
+					path.arc(circle?.x, circle?.y, circle?.r + 30, startAngle, endAngle, anticlockwise)
+					circle.path = path?.toString()
+				})
+
+				roomLabels?.selectAll("path")
+					.attr("d", d => enclosingCircleByRoomId[d?.id]?.path)
+
+				//HACK: the textPath doesn't re-draw when it's linked path changes
+				// so we reset the link to the path on every tick
+				roomLabels?.selectAll("textPath")
+					.attr("xlink:href", function (d) { return `#${this.previousElementSibling?.id}` })
+			});
 
 		if (graph)
 			update(graph)
@@ -175,19 +201,38 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 		linkLines = linkLines?.data(links, d => `${d.source.id}\t${d.target.id}`)
 			.join("line");
 
-		console.log('rooms', rooms)
+
 		roomCircles = roomCircles?.data(rooms)
 			.join(
 				enter => enter
 					.append("circle")
 					.attr("r", 100)
 					.attr('id', d => d.id)
-				, update => {
-					console.log('update rooms', update)
-					return update
+					.on('click', (event, d) => server.joinRoom(d.id))
+			)
+
+		roomLabels = roomLabels?.data(rooms)
+			.join(
+				enter => {
+					const text = enter
+						.append("text")
+						.attr("fill", "#fff")
+						.attr('id', d => d.id)
+						.on('click', (event, d) => server.joinRoom(d.id))
+
+					const prefix = "roomLabelPath"
+					text.append("path")
+						.attr("id", (d, i) => `${prefix}${i}`)
+
+					text.append("textPath")
+						.attr("xlink:href", (d, i) => `#${prefix}${i}`)
+						.text(d => "tap to join ⨳ " + d.id?.substring(d.id.length - 4))
+
+					return enter
 				}
 			)
 
+			//TODO: WHY IS EXIT NOT WORKING FOR LABELS!?!?!
 	}
 
 	return <div class="congraph">

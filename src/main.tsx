@@ -44,17 +44,17 @@ function User(props: { con: Connection }) {
 	return <div class="user-view">
 		<div class="them">
 			<Show when={props.con.roomId}>
-				<VideoCall 
-				user={props.con} 
-				room={server.rooms.find(r => r.id === props.con.roomId)} 
-				connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
+				<VideoCall
+					user={props.con}
+					room={server.rooms.find(r => r.id === props.con.roomId)}
+					connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
 			</Show>
 
 			<Switch>
 				{/* NOT IN A ROOM */}
 				<Match when={!props.con.roomId}>
 					<ConnectionsGraph connections={server.connections} />
-					<Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} />
+					{/* <Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} /> */}
 					{/* <Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} /> */}
 				</Match>
 				{/* CREATED A ROOM */}
@@ -69,7 +69,7 @@ function User(props: { con: Connection }) {
 		</div>
 		{/* style={{ "background-color": props.con.color }} */}
 		<div class="toolbar">
-			<div class="public-info">
+			{/* <div class="public-info">
 				<RoomLabel con={props.con} />
 				<input
 					type="text"
@@ -78,7 +78,7 @@ function User(props: { con: Connection }) {
 					onchange={(e) => server.setText(e.target.value)}
 					onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
 					value={props.con.text ?? ''} />
-			</div>
+			</div> */}
 			<div class="buttons">
 				<div class="color-button">
 					<span>color</span>
@@ -86,7 +86,7 @@ function User(props: { con: Connection }) {
 						type="color"
 						oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
 						onchange={(e) => server.setColor(e.target.value)}
-						value={props.con.color} />
+						value={props.con.color ?? 'transparent'} />
 
 				</div>
 
