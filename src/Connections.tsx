@@ -12,7 +12,10 @@ import server from "./data"
 // ✓ online/offline status
 // ✓ joining/leaving rooms
 // ✓ rooms forming
-// - draw a continer around rooms and label with room id
+// ✓ draw a continer around rooms 
+// - ...and label with room id
+// - ...and a "tap to join"
+// - constrain points to viewport (for now)
 // - zoom in on the user's room! https://observablehq.com/@d3/scatterplot-tour?collection=@d3/d3-zoom
 //
 // instead of drag, let each user move around!
@@ -27,120 +30,164 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 	createEffect(() => {
 		trackStore(server.connections);
 
-
 		// get raw connection objects out of the SolidJS Signal where they are proxies
-		const connections = props.connections.map(node => Object.assign({}, node))
-		console.log('trackStore(connections)', connections)
+		const nodes = props.connections.map(node => Object.assign({}, node))
+		console.log('trackStore(connections)', nodes)
 
-		const rooms = new Map<string, Connection[]>()
-		connections.forEach(con => {
+		const connectionsByRoomId = new Map<string, string[]>()
+		nodes.forEach(con => {
 			if (con.roomId) {
-				if (!rooms.has(con.roomId))
-					rooms.set(con.roomId, [con])
+				if (!connectionsByRoomId.has(con.roomId))
+					connectionsByRoomId.set(con.roomId, [con.id])
 				else
-					rooms.get(con.roomId).push(con)
+					connectionsByRoomId.get(con.roomId).push(con.id)
 			}
 		})
+
 		const links = []
-		rooms.forEach(users => users.forEach(u1 => users.forEach(u2 => {
-			if (u1 != u2) links.push({ source: u1.id, target: u2.id })
-		})))
+		const rooms: Room[] = []
 
-		console.log(rooms, links)
+		connectionsByRoomId.forEach((users, roomId) => {
+			rooms.push({
+				id: roomId,
+				nodeIds: users
+			})
+			users.forEach(id1 => users.forEach(id2 => {
+				if (id1 != id2) links.push({ source: id1, target: id2 })
+			}))
+		})
 
-		graph = {
-			nodes: connections,
-			links
-		}
-
-		// graph = {
-		// 	nodes: [
-		// 		{ id: "a" },
-		// 		{ id: "b" },
-		// 		{ id: "c" }
-		// 	],
-		// 	links: [
-		// 		{ source: "a", target: "b" },
-		// 		{ source: "b", target: "c" },
-		// 		{ source: "c", target: "a" }
-		// 	]
-		// }
-
+		graph = { nodes, links, rooms }
 		update(graph)
 	});
 
+	type Room = {
+		id: string,
+		nodeIds: string[]
+	}
+	type GraphData = {
+		nodes: { id: string }[],
+		links: { source: string, target: string }[],
+		rooms: Room[]
+	}
 
 	let svgRef: SVGSVGElement
-	let simulation, node, link
-	let graph
+	let simulation, nodeCircles, linkLines, roomCircles
+	let graph: GraphData
+
+	let svgObserver: ResizeObserver
 
 	onCleanup(() => {
 		simulation?.stop()
+		svgObserver?.unobserve(svgRef)
 	})
 
 	onMount(() => {
+		svgObserver = new ResizeObserver(() => {
+			simulation?.force('center', d3.forceCenter(svgRef.clientWidth / 2, svgRef.clientHeight / 2))
+		})
+		svgObserver.observe(svgRef)
+
 		const svg = d3.select(svgRef)
 
 		simulation = d3.forceSimulation()
 			.force('center', d3.forceCenter(svgRef.clientWidth / 2, svgRef.clientHeight / 2))
-			.force("charge", d3.forceManyBody().strength(-1000))
+			.force("charge", d3.forceManyBody().strength(-800))
 			.force("link", d3.forceLink().id(d => d.id).distance(200))
 			.force("x", d3.forceX())
 			.force("y", d3.forceY())
 			.on("tick", ticked);
 
-		link = svg.append("g")
+		linkLines = svg.append("g")
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("line");
 
-		node = svg.append("g")
+		nodeCircles = svg.append("g")
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("circle")
 			.attr("r", d => d.status === "online" ? 20 : 10)
 
+		roomCircles = svg.append('g')
+			.attr("stroke", "#fff")
+			.attr("stroke-width", 2)
+			.attr("fill", 'transparent')
+			.selectAll("circle")
+
 		function ticked() {
-			node.attr("cx", d => d.x)
+			nodeCircles?.attr("cx", d => d.x)
 				.attr("cy", d => d.y)
 
-			link.attr("x1", d => d.source.x)
+			linkLines?.attr("x1", d => d.source.x)
 				.attr("y1", d => d.source.y)
 				.attr("x2", d => d.target.x)
-				.attr("y2", d => d.target.y);
+				.attr("y2", d => d.target.y)
+
+			const enclosingCircle = d3.local()
+			roomCircles?.each(function (d) {
+				const circles = nodeCircles?._groups[0]
+					.filter(c => c.__data__.roomId === d.id)
+					.map(c => ({
+						x: c.cx.animVal.value,
+						y: c.cy.animVal.value,
+						r: c.r.animVal.value
+					}))
+				const circle = d3.packEnclose(circles)
+				enclosingCircle.set(this, circle)
+			})
+				.attr("cx", function (d) { return enclosingCircle.get(this)?.x })
+				.attr("cy", function (d) { return enclosingCircle.get(this)?.y })
+				.attr('r', function (d) { return enclosingCircle.get(this)?.r + 20 })
 		}
 
 		if (graph)
 			update(graph)
 	})
 
-	const color = d3.scaleOrdinal(d3.schemeTableau10)
-	function update(u) {
+	function update(graphData: GraphData) {
 
-		if (!u) return
+		if (!graphData) return
 
-		let { nodes, links } = u
+		let { nodes, links, rooms } = graphData
+
 		// Make a shallow copy to protect against mutation, while
 		// recycling old nodes to preserve position and velocity.
-		const old = new Map(node?.data().map(d => [d.id, d]));
+		const old = new Map(nodeCircles?.data().map(d => [d.id, d]));
 		nodes = nodes?.map(d => Object.assign(old.get(d.id) || {}, d));
 		links = links?.map(d => Object.assign({}, d));
+		rooms = [...rooms]
 
 		simulation?.nodes(nodes);
-		simulation?.force("link").links(links);
+		simulation?.force("link").links(links).distance(50); //https://d3js.org/d3-force/link
 		simulation?.alpha(1).restart();
 
-		node = node?.data(nodes, d => d.id)
-			.join(enter => enter
-				.append("circle")
-				.attr("r", d => d.status === "online" ? 20 : 10)
-				.attr("fill", d => d.color ?? "transparent"),
+		nodeCircles = nodeCircles?.data(nodes, d => d.id)
+			.join(
+				enter => enter
+					.append("circle")
+					.attr("r", d => d.status === "online" ? 20 : 10)
+					.attr("fill", d => d.color ?? "transparent"),
 				update => update
 					.attr("r", d => d.status === "online" ? 20 : 10)
 					.attr("fill", d => d.color ?? "transparent"));
 
-		link = link?.data(links, d => `${d.source.id}\t${d.target.id}`)
+		linkLines = linkLines?.data(links, d => `${d.source.id}\t${d.target.id}`)
 			.join("line");
+
+		console.log('rooms', rooms)
+		roomCircles = roomCircles?.data(rooms)
+			.join(
+				enter => enter
+					.append("circle")
+					.attr("r", 100)
+					.attr('id', d => d.id)
+				, update => {
+					console.log('update rooms', update)
+					return update
+				}
+			)
+
 	}
 
 	return <div class="congraph">
