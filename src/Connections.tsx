@@ -98,6 +98,8 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 			.attr("stroke-width", 1.5)
 			.selectAll("circle")
 			.attr("r", d => d.status === "online" ? 20 : 10)
+			.attr("cx", svgRef.clientWidth / 2)
+			.attr("cy", svgRef.clientHeight / 2)
 
 		roomCircles = svg.append('g')
 			.attr('class', 'room-circles')
@@ -211,28 +213,29 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 					.on('click', (event, d) => server.joinRoom(d.id))
 			)
 
-		roomLabels = roomLabels?.data(rooms)
-			.join(
-				enter => {
-					const text = enter
-						.append("text")
-						.attr("fill", "#fff")
-						.attr('id', d => d.id)
-						.on('click', (event, d) => server.joinRoom(d.id))
+		const prefix = "roomLabelPath"
+		roomLabels = roomLabels?.data(rooms, function (d) {
+			console.log("enter roomLabels", this.id, d.id)
+			return d ? d.id : this.id
+		})
+			.join(enter => {
+				const text = enter
+					.append("text")
+					.attr("fill", "#fff")
+					.attr('id', d => d.id)
+					.on('click', (event, d) => server.joinRoom(d.id))
 
-					const prefix = "roomLabelPath"
-					text.append("path")
-						.attr("id", (d, i) => `${prefix}${i}`)
+				text
+					.append("path")
+					.attr("id", (d, i) => `${prefix}${i}`)
 
-					text.append("textPath")
-						.attr("xlink:href", (d, i) => `#${prefix}${i}`)
-						.text(d => "tap to join ⨳ " + d.id?.substring(d.id.length - 4))
+				text
+					.append("textPath")
+					.attr("xlink:href", (d, i) => `#${prefix}${i}`)
+					.text(d => "tap to join ⤵︎ ") // + d.id?.substring(d.id.length - 4))
 
-					return enter
-				}
-			)
-
-			//TODO: WHY IS EXIT NOT WORKING FOR LABELS!?!?!
+				return text
+			})
 	}
 
 	return <div class="congraph">
