@@ -107,12 +107,13 @@ div#root {
 		}
 
 		.buttons {
-			display: grid;
+			display: flex;
+			/* display: grid; */
 			gap: 0.5rem;
 
-			@container toolbar (width < 400px) {
+			/* @container toolbar (width < 400px) {
 				display: flex;
-			}
+			} */
 		}
 
 	}

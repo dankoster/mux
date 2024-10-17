@@ -68,9 +68,9 @@ function User(props: { con: Connection }) {
 			</Switch>
 		</div>
 		{/* style={{ "background-color": props.con.color }} */}
+		{/* <RoomLabel con={props.con} /> */}
 		<div class="toolbar">
 			{/* <div class="public-info">
-				<RoomLabel con={props.con} />
 				<input
 					type="text"
 					maxlength="123"

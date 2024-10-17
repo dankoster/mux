@@ -323,12 +323,15 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		</div>
 		<div id="remote-videos" class="remote-video-container">
 		</div>
-		<div class="connections">
+		<Show when={props.connections?.length === 0}>
+			waiting for connections...
+		</Show>
+		{/* <div class="connections">
 			<Participant con={props.user} ownsRoom={true} />
 			<For each={props.connections}>
 				{con => <Participant con={con} ownsRoom={false} />}
 			</For>
-		</div>
+		</div> */}
 	</div>
 }
 
