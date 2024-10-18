@@ -46,9 +46,7 @@ const [stats, setStats] = createSignal<Stats>()
 
 export default {
 	id, pk, connections, rooms, stats, serverOnline,
-	setColor, setText, createRoom, exitRoom, joinRoom,
-	setRoomSessionDescription, getRoomSessionDescription, addOfferCandidate, sendAnswer,
-	addAnswerCandidate, sendDM, onDM
+	setColor, setText, createRoom, exitRoom, joinRoom, sendDM, onDM
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -131,45 +129,9 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 }
 
 async function createRoom() {
+	//TODO: optimistically create the room locally
+	// so we can update the UI while we wait for the server
 	return await POST(apiRoute.room)
-}
-async function setRoomSessionDescription(sessionDesc: RTCSessionDescriptionInit) {
-	return await POST(apiRoute["room/offerSessionDescription"], { body: JSON.stringify(sessionDesc) })
-}
-async function getRoomSessionDescription(): Promise<RTCSessionDescriptionInit> {
-	const response = await GET(apiRoute["room/offerSessionDescription"])
-	try {
-		const result = await response.json()
-		return result as RTCSessionDescriptionInit
-	} catch (error) {
-		if (error?.message === 'Unexpected end of JSON input') {
-			console.warn(error)
-			return
-		}
-		else throw error
-	}
-}
-async function getAnswerSessionDescription(): Promise<RTCSessionDescriptionInit> {
-	const response = await GET(apiRoute["room/answerSessionDescription"])
-	try {
-		const result = await response.json()
-		return result as RTCSessionDescriptionInit
-	} catch (error) {
-		if (error?.message === 'Unexpected end of JSON input') {
-			console.warn(error)
-			return
-		}
-		else throw error
-	}
-}
-async function sendAnswer(answer: RTCSessionDescriptionInit) {
-	return await POST(apiRoute["room/answerCall"], { body: JSON.stringify(answer) })
-}
-async function addOfferCandidate(offer: RTCIceCandidate) {
-	return await POST(apiRoute["room/addOfferCandidate"], { body: JSON.stringify(offer.toJSON()) })
-}
-async function addAnswerCandidate(answer: RTCIceCandidate) {
-	return await POST(apiRoute["room/addAnswerCandidate"], { body: JSON.stringify(answer.toJSON()) })
 }
 async function joinRoom(roomId: string) {
 	return await POST(apiRoute["room/join"], { subRoute: roomId })
