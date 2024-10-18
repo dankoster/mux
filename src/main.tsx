@@ -1,7 +1,7 @@
 import "./index.css"
 import "./main.css"
 
-import { For, Match, onMount, Show, Switch } from "solid-js";
+import { createMemo, For, Match, onMount, Show, Switch } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
 import type { Connection, Room } from "../server/api";
@@ -41,36 +41,22 @@ function User(props: { con: Connection }) {
 		console.log('...exit room', response.ok)
 	}
 
-	return <div class="user-view">
-		<div class="them">
-			<Show when={props.con.roomId}>
-				<VideoCall
-					user={props.con}
-					room={server.rooms.find(r => r.id === props.con.roomId)}
-					connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-			</Show>
+	const room = createMemo(() => server.rooms.find(r => r.id === props.con.roomId))
 
-			<Switch>
-				{/* NOT IN A ROOM */}
-				<Match when={!props.con.roomId}>
-					<ConnectionsGraph connections={server.connections} />
-					{/* <Rooms rooms={server.rooms.filter(room => room.ownerId !== props.con.id)} /> */}
-					{/* <Connections connections={server.connections.filter(con => con.id !== server.id() && !con.roomId)} /> */}
-				</Match>
-				{/* CREATED A ROOM */}
-				{/* <Match when={server.rooms.some(room => room.ownerId === props.con.id)}>
-					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-				</Match> */}
-				{/* JOINED A ROOM */}
-				{/* <Match when={server.rooms.some(room => room.ownerId !== props.con.id)}>
-					<Connections connections={server.connections.filter(sc => sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-				</Match> */}
-			</Switch>
+	return <div class="user-view">
+		<div class="middle" classList={{ "room" : !!room() }}>
+			<ConnectionsGraph self={props.con} connections={server.connections} />
+			<VideoCall
+				user={props.con}
+				room={room()}
+				connections={server.connections.filter(sc => props.con.roomId && sc.id != props.con.id && sc.roomId === props.con.roomId)} />
+			{/* <Show when={props.con.roomId}>
+			</Show> */}
+
 		</div>
 		{/* style={{ "background-color": props.con.color }} */}
 		{/* <RoomLabel con={props.con} /> */}
-		<div class="toolbar">
-			{/* <div class="public-info">
+		{/* <div class="public-info">
 				<input
 					type="text"
 					maxlength="123"
@@ -79,6 +65,7 @@ function User(props: { con: Connection }) {
 					onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
 					value={props.con.text ?? ''} />
 			</div> */}
+		<div class="toolbar">
 			<div class="buttons">
 				<div class="color-button">
 					<span>color</span>

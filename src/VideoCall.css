@@ -4,11 +4,9 @@
 
 	.local-video-container {
 		position: relative;
-		padding: 1rem;
 	}
 	.remote-video-container {
 		position: relative;
-		padding: 1rem;
 	}
 
 	video {

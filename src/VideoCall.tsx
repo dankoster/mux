@@ -318,12 +318,13 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	})
 
 	return <div class="video-call">
-		<div class="local-video-container">
-			<video class="local" ref={localVideo} autoplay playsinline></video>
-		</div>
-		<div id="remote-videos" class="remote-video-container">
-		</div>
-		<Show when={props.connections?.length === 0}>
+		<Show when={props.connections?.length > 0}>
+			<div class="local-video-container">
+				<video class="local" ref={localVideo} autoplay playsinline></video>
+			</div>
+			<div id="remote-videos" class="remote-video-container" />
+		</Show>
+		<Show when={props.room && props.connections?.length === 0}>
 			waiting for connections...
 		</Show>
 		{/* <div class="connections">

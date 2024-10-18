@@ -13,19 +13,20 @@ import server from "./data"
 // ✓ joining/leaving rooms
 // ✓ rooms forming
 // ✓ draw a continer around rooms 
-// - ...and label with room id
-// - ...and a "tap to join"
-// - constrain points to viewport (for now)
+// ✓ ...and label with room id
+// ✓ ...and a "tap to join"
+// ✓ constrain points to viewport (for now)
+// ✓ always show avatars (just dots for now)
 // - zoom in on the user's room! https://observablehq.com/@d3/scatterplot-tour?collection=@d3/d3-zoom
 //
-// instead of drag, let each user move around!
+// let each user move around?
 // - shift the view to follow the user
 // - proximity chat!
 // - some kind of synthwave terrain for location awareness?
 
 //https://observablehq.com/@d3/modifying-a-force-directed-graph
 
-export default function ConnectionsGraph(props: { connections: Connection[] }) {
+export default function ConnectionsGraph(props: { self: Connection, connections: Connection[] }) {
 
 	createEffect(() => {
 		trackStore(server.connections);
@@ -66,7 +67,7 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 		nodeIds: string[]
 	}
 	type GraphData = {
-		nodes: { id: string }[],
+		nodes: Connection[],
 		links: { source: string, target: string }[],
 		rooms: Room[]
 	}
@@ -114,64 +115,96 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 
 
 		svgObserver = new ResizeObserver(() => {
-			simulation?.force("x", d3.forceX(svgRef.clientWidth / 2))
-				.force("y", d3.forceY(svgRef.clientHeight / 2))
-				.alpha(1).restart();
+			updateForceLayout(simulation, null, !!props.self.roomId)
 		})
 		svgObserver.observe(svgRef)
-
 		simulation = d3.forceSimulation()
-			.force("charge", d3.forceManyBody().strength(-500))
-			.force("link", d3.forceLink().id(d => d.id).distance(100))
-			.force("x", d3.forceX(svgRef.clientWidth / 2))
-			.force("y", d3.forceY(svgRef.clientHeight / 2))
-			.on("tick", function ticked() {
-				nodeCircles?.attr("cx", d => d.x)
-					.attr("cy", d => d.y)
+		updateForceLayout(simulation, [], !!props.self.roomId)
 
-				linkLines?.attr("x1", d => d.source.x)
-					.attr("y1", d => d.source.y)
-					.attr("x2", d => d.target.x)
-					.attr("y2", d => d.target.y)
+		simulation.on("tick", function ticked() {
+			nodeCircles?.attr("cx", d => d.x)
+				.attr("cy", d => d.y)
 
-				const enclosingCircleByRoomId = {}
-				roomCircles?.each(function (d) {
-					const circles = nodeCircles?._groups[0]
-						.filter(c => c.__data__.roomId === d.id) //find other nodes in the same room
-						.map(c => ({
-							x: c.cx.animVal.value,
-							y: c.cy.animVal.value,
-							r: c.r.animVal.value
-						}))
-					const circle = d3.packEnclose(circles)
-					enclosingCircleByRoomId[d.id] = circle
-				})
-					.attr("cx", d => enclosingCircleByRoomId[d?.id]?.x)
-					.attr("cy", d => enclosingCircleByRoomId[d?.id]?.y)
-					.attr('r', d => enclosingCircleByRoomId[d?.id]?.r + 20)
+			linkLines?.attr("x1", d => d.source.x)
+				.attr("y1", d => d.source.y)
+				.attr("x2", d => d.target.x)
+				.attr("y2", d => d.target.y)
 
-				roomLabels?.each(function (d) {
-					const circle = enclosingCircleByRoomId[d.id]
-					const startAngle = -180 * Math.PI / 180
-					const endAngle = -180 * Math.PI / 180 + 2 * Math.PI
-					const anticlockwise = false
-					const path = d3.path()
-					path.arc(circle?.x, circle?.y, circle?.r + 30, startAngle, endAngle, anticlockwise)
-					circle.path = path?.toString()
-				})
+			const enclosingCircleByRoomId = {}
+			roomCircles?.each(function (d) {
+				const circles = nodeCircles?._groups[0]
+					.filter(c => c.__data__.roomId === d.id) //find other nodes in the same room
+					.map(c => ({
+						x: c.cx.animVal.value,
+						y: c.cy.animVal.value,
+						r: c.r.animVal.value
+					}))
+				const circle = d3.packEnclose(circles)
+				enclosingCircleByRoomId[d.id] = circle
+			})
+				.attr("cx", d => enclosingCircleByRoomId[d?.id]?.x)
+				.attr("cy", d => enclosingCircleByRoomId[d?.id]?.y)
+				.attr('r', d => enclosingCircleByRoomId[d?.id]?.r + 20)
 
-				roomLabels?.selectAll("path")
-					.attr("d", d => enclosingCircleByRoomId[d?.id]?.path)
+			roomLabels?.each(function (d) {
+				const circle = enclosingCircleByRoomId[d.id]
+				const startAngle = -180 * Math.PI / 180
+				const endAngle = -180 * Math.PI / 180 + 2 * Math.PI
+				const anticlockwise = false
+				const path = d3.path()
+				path.arc(circle?.x, circle?.y, circle?.r + 30, startAngle, endAngle, anticlockwise)
+				circle.path = path?.toString()
+			})
 
-				//HACK: the textPath doesn't re-draw when it's linked path changes
-				// so we reset the link to the path on every tick
-				roomLabels?.selectAll("textPath")
-					.attr("xlink:href", function (d) { return `#${this.previousElementSibling?.id}` })
-			});
+			roomLabels?.selectAll("path")
+				.attr("d", d => enclosingCircleByRoomId[d?.id]?.path)
+
+			//HACK: the textPath doesn't re-draw when it's linked path changes
+			// so we reset the link to the path on every tick
+			roomLabels?.selectAll("textPath")
+				.attr("xlink:href", function (d) { return `#${this.previousElementSibling?.id}` })
+		});
 
 		if (graph)
 			update(graph)
 	})
+
+	function updateForceLayout(sim, links, inRoom: boolean) {
+		try {
+			sim?.force("boundingBox", () => {
+				nodeCircles?.each(node => {
+					if (node.x < 30) node.x = 30
+					if (node.y < 30) node.y = 30
+					if (node.x > svgRef.clientWidth - 30) node.x = svgRef.clientWidth - 30
+					if (node.y > svgRef.clientHeight - 30) node.y = svgRef.clientHeight - 30
+				})
+			})
+
+			if (inRoom) {
+				sim?.force("x", d3.forceX(svgRef.clientWidth / 2))
+					.force("y", d3.forceY(svgRef.clientHeight / 2))
+					.force("charge", d3.forceManyBody().strength(500))
+					.force("link", null)
+					.force("collide", d3.forceCollide((d) => d.r || 50))
+			} else {
+				sim?.force("x", d3.forceX(svgRef.clientWidth / 2))
+					.force("y", d3.forceY(svgRef.clientHeight / 2))
+					.force("charge", d3.forceManyBody().strength(-500))
+					.force("link", d3.forceLink().id(d => d.id).distance(50))
+					.force("collide", d3.forceCollide((d) => d.r))
+			}
+
+			const linkForce = simulation?.force("link")
+			if (linkForce && Array.isArray(links) && links.length)
+				linkForce.links(links).distance(50); //https://d3js.org/d3-force/link
+
+			sim?.alpha(0.6).restart();
+		} catch (error) {
+			console.error(error)
+		}
+	}
+
+
 
 	function update(graphData: GraphData) {
 
@@ -186,9 +219,16 @@ export default function ConnectionsGraph(props: { connections: Connection[] }) {
 		links = links?.map(d => Object.assign({}, d));
 		rooms = [...rooms]
 
+		//if we're in a call, only show ourself and the others in the call
+		if (props.self.roomId) {
+			nodes = nodes.filter(n => n.roomId === props.self.roomId)
+			links = []
+			rooms = []
+		}
+
+		updateForceLayout(simulation, links, !!props.self.roomId)
+
 		simulation?.nodes(nodes);
-		simulation?.force("link").links(links).distance(50); //https://d3js.org/d3-force/link
-		simulation?.alpha(1).restart();
 
 		nodeCircles = nodeCircles?.data(nodes, d => d.id)
 			.join(
