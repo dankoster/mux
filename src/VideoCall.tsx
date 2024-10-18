@@ -4,6 +4,7 @@ import "./VideoCall.css"
 import server from "./data"
 import { Connection, Room } from "../server/api";
 
+//TODO: get this from the TURN server for each client, obviously
 const servers: RTCConfiguration = {
 	iceServers: [
 		// {
@@ -76,7 +77,7 @@ class PeerConnection extends EventTarget {
 		// Pull tracks from remote stream, add to video stream
 		this.pc.ontrack = (event) => {
 			const track = event.track
-			console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
+			// console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
 			track.addEventListener('end', () => this.remoteStream.removeTrack(track))
 			// track.addEventListener('mute', () => this.remoteStream.removeTrack(track))
 			track.addEventListener('unmute', () => this.remoteStream.addTrack(track))
@@ -98,25 +99,25 @@ class PeerConnection extends EventTarget {
 		};
 
 		this.pc.oniceconnectionstatechange = () => {
-			console.log('oniceconnectionstatechange', this.pc.iceConnectionState, this.pc.signalingState)
+			// console.log('oniceconnectionstatechange', this.pc.iceConnectionState, this.pc.signalingState)
 			if (this.pc.iceConnectionState === "failed") {
 				this.pc.restartIce();
 			}
 
 			if (this.pc.iceConnectionState === 'disconnected') {
 				onDisconnect()
-				console.log(this.remoteStream)
+				// console.log(this.remoteStream)
 			}
 		};
 
 		// this.pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
 		this.pc.onicecandidate = ({ candidate }) => sendMessage({ candidate })
 
-		this.pc.onsignalingstatechange = () => {
-			console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
-		}
+		// this.pc.onsignalingstatechange = () => {
+		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
+		// }
 
-		console.log('PeerConnection: constructor finised!', this)
+		// console.log('PeerConnection: constructor finised!', this)
 	}
 
 	addAbortController(ac: AbortController) {
@@ -131,7 +132,7 @@ class PeerConnection extends EventTarget {
 			if (this.localStream) {
 				// Push tracks from local stream to peer connection
 				this.localStream?.getTracks().forEach((track) => {
-					console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
+					// console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
 					this.localRTCRtpSenders.push(this.pc?.addTrack(track, this.localStream))
 					this.logTrackEvents(track, 'local');
 				});
@@ -147,19 +148,19 @@ class PeerConnection extends EventTarget {
 		console.groupCollapsed('end call...')
 
 		this.abortControllers.forEach(ac => {
-			console.log('aborting track logging event listeners!')
+			// console.log('aborting track logging event listeners!')
 			ac.abort()
 		})
 
 		this.localRTCRtpSenders.forEach(t => {
 			this.pc.removeTrack(t)
-			console.log('removed local RTCRtpSender', t)
+			// console.log('removed local RTCRtpSender', t)
 		})
 
 		this.localStream?.getTracks().forEach((track) => {
 			track.stop()
 			this.localStream.removeTrack(track)
-			console.log(`stopped ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
+			// console.log(`stopped ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
 		})
 
 		try {
@@ -262,7 +263,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		})
 		const ac = server.onDM((dm) => {
 			const { description, candidate } = JSON.parse(dm.message);
-			console.log(`DM from: ${dm.senderId}`, { description, candidate });
+			// console.log(`DM from: ${dm.senderId}`, { description, candidate });
 
 			//only handle messages from this peer
 			if (dm.senderId === con.id)
@@ -276,13 +277,13 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	}
 
 	createEffect(() => {
-		console.log("EFFECT", props.connections.length)
+		// console.log("EFFECT", props.connections.length)
 
 		//create new peer connections as necessary
 		const polite = props.user?.id === props.room?.ownerId
 		props.connections.forEach(con => {
 			if (!peersById.has(con.id)) {
-				console.log("CREATE PEER", con.id)
+				// console.log("CREATE PEER", con.id)
 				// <video class="remote" ref={remoteVideo} autoplay playsinline></video>
 				const video = document.createElement('video')
 				video.className = "remote"
@@ -301,7 +302,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		const conIds = props.connections.map(con => con.id)
 		peersById.forEach((value, key) => {
 			if (!conIds.includes(key)) {
-				console.log(`REMOVE PEER`, key)
+				// console.log(`REMOVE PEER`, key)
 				peersById.get(key)?.endCall()
 				peersById.delete(key)
 
@@ -313,7 +314,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	})
 
 	onCleanup(() => {
-		console.log('video call cleanup ... other side ended call!')
+		// console.log('video call cleanup ... other side ended call!')
 		peersById.forEach(peer => peer.endCall())
 	})
 
@@ -324,22 +325,8 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 			</div>
 			<div id="remote-videos" class="remote-video-container" />
 		</Show>
-		<Show when={props.room && props.connections?.length === 0}>
-			waiting for connections...
+		<Show when={props.user.roomId && props.connections?.length === 0}>
+			waiting for someone else to join...
 		</Show>
-		{/* <div class="connections">
-			<Participant con={props.user} ownsRoom={true} />
-			<For each={props.connections}>
-				{con => <Participant con={con} ownsRoom={false} />}
-			</For>
-		</div> */}
-	</div>
-}
-
-function Participant(props: { con: Connection, ownsRoom: boolean }) {
-	return <div>
-		{props.ownsRoom ? "owner" : "guest"}
-		<span style={{ "background-color": props.con.color, "margin-inline": "1rem" }}>{props.con.id.substring(props.con.id.length - 4)}</span>
-		{props.con.status || 'offline'}
 	</div>
 }

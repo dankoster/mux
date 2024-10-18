@@ -29,11 +29,11 @@ import server from "./data"
 export default function ConnectionsGraph(props: { self: Connection, connections: Connection[] }) {
 
 	createEffect(() => {
-		trackStore(server.connections);
+		trackStore(props.connections);
 
 		// get raw connection objects out of the SolidJS Signal where they are proxies
 		const nodes = props.connections.map(node => Object.assign({}, node))
-		console.log('trackStore(connections)', nodes)
+		// console.log('trackStore(connections)', nodes)
 
 		const connectionsByRoomId = new Map<string, string[]>()
 		nodes.forEach(con => {
@@ -62,6 +62,7 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		update(graph)
 	});
 
+	//TODO: unify types? On the server, the room type has ID, OwnerID, but no nodeIds
 	type Room = {
 		id: string,
 		nodeIds: string[]
@@ -234,28 +235,37 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			.join(
 				enter => enter
 					.append("circle")
+					.transition().duration(1000)
+					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("r", d => d.status === "online" ? 20 : 10)
-					.attr("fill", d => d.color ?? "transparent"),
-				update => update
+					.attr("fill", d => d.color ?? "transparent")
+				, update => update
+					.transition().duration(1000)
+					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("r", d => d.status === "online" ? 20 : 10)
-					.attr("fill", d => d.color ?? "transparent"));
+					.attr("fill", d => d.color ?? "transparent")
+				, exit => exit
+					.transition().duration(1000)
+					.style('opacity', 0)
+					.attr("r", 0)
+					.remove()
+			)
 
 		linkLines = linkLines?.data(links, d => `${d.source.id}\t${d.target.id}`)
 			.join("line");
 
 
-		roomCircles = roomCircles?.data(rooms)
+		roomCircles = roomCircles?.data(rooms, d => d.id)
 			.join(
 				enter => enter
 					.append("circle")
-					.attr("r", 100)
 					.attr('id', d => d.id)
 					.on('click', (event, d) => server.joinRoom(d.id))
 			)
 
 		const prefix = "roomLabelPath"
 		roomLabels = roomLabels?.data(rooms, function (d) {
-			console.log("enter roomLabels", this.id, d.id)
+			// console.log("enter roomLabels", this.id, d.id)
 			return d ? d.id : this.id
 		})
 			.join(enter => {

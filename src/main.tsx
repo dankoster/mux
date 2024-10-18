@@ -1,14 +1,15 @@
 import "./index.css"
 import "./main.css"
 
-import { createMemo, For, Match, onMount, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 import server from "./data";
-import type { Connection, Room } from "../server/api";
+import type { Connection } from "../server/api";
 import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";
+import { trackStore } from "@solid-primitives/deep";
 
-const roomShortId = (room: Room) => room?.id.substring(room.id.length - 4)
+type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
 
 const App = () => {
 
@@ -39,32 +40,71 @@ function User(props: { con: Connection }) {
 		console.log('exit room...')
 		const response = await server.exitRoom(props.con.roomId)
 		console.log('...exit room', response.ok)
+
+		setCallState("no_call")
 	}
 
 	const room = createMemo(() => server.rooms.find(r => r.id === props.con.roomId))
 
+	const [callState, setCallState] = createSignal<CallState>("no_call")
+	const startCall = async () => {
+		//TODO: optimiztically create the room, don't wait for the server?
+		//TODO: wait until someone connects to the room and then animate away everyone else
+		//  THEN: animate the grid to the in-call layout
+
+		console.log('starting call...')
+		setCallState("server_wait")
+		const result = await server.createRoom()
+
+		if (!result.ok) {
+			console.error("error creating room!", result)
+			setCallState("server_error")
+			return
+		}
+
+		const newRoom = await result.json()
+
+		setCallState("call_ready")
+
+		console.log('... call started!', newRoom)
+	}
+
+
+	createEffect(() => {
+		trackStore(server.connections)
+
+		// get raw connection objects out of the SolidJS Signal where they are proxies
+		const connections = props.con.roomId && server.connections
+			.map(node => Object.assign({}, node))
+			.filter(node => node.roomId === props.con.roomId)
+
+		//console.log("MAIN CALL STATE", connections)
+
+		//figure out how many connections are in the user's room
+		if (!connections) {
+			setCallState("no_call")
+		} else if (connections?.length === 1) {
+			setCallState("call_ready")
+		} else if (connections?.length > 1) {
+			setCallState("call_connected")
+		}
+	})
+
+
 	return <div class="user-view">
-		<div class="middle" classList={{ "room" : !!room() }}>
+		<div class={`middle ${callState()}`}>
 			<ConnectionsGraph self={props.con} connections={server.connections} />
+			<Show when={callState() === "server_wait"}>
+				<div class="call_state_message">talking to the server... hit [start call] again to retry...</div>
+			</Show>
+			<Show when={callState() === "server_error"}>
+				<div class="call_state_message">the server is unhappy... please refresh!</div>
+			</Show>
 			<VideoCall
 				user={props.con}
 				room={room()}
 				connections={server.connections.filter(sc => props.con.roomId && sc.id != props.con.id && sc.roomId === props.con.roomId)} />
-			{/* <Show when={props.con.roomId}>
-			</Show> */}
-
 		</div>
-		{/* style={{ "background-color": props.con.color }} */}
-		{/* <RoomLabel con={props.con} /> */}
-		{/* <div class="public-info">
-				<input
-					type="text"
-					maxlength="123"
-					placeholder="status message"
-					onchange={(e) => server.setText(e.target.value)}
-					onfocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
-					value={props.con.text ?? ''} />
-			</div> */}
 		<div class="toolbar">
 			<div class="buttons">
 				<div class="color-button">
@@ -83,7 +123,7 @@ function User(props: { con: Connection }) {
 					</button>
 				}
 				{!props.con.roomId &&
-					<button class="room-button" onclick={() => server.createRoom()}>start call</button>
+					<button class="room-button" onclick={startCall}>start call</button>
 				}
 			</div>
 		</div>
@@ -92,55 +132,6 @@ function User(props: { con: Connection }) {
 
 function isRoomOwner(con: Connection) {
 	return server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id;
-}
-
-function RoomLabel(props: { con: Connection }) {
-	return <Show when={server.rooms.find(room => room.id === props.con.roomId)}>
-		<div>call {roomShortId(server.rooms.find(room => room.id === props.con.roomId))}</div>
-		<div>{server.connections.reduce((count, c) => count += (c.roomId === props.con.roomId ? 1 : 0), 0)} people</div>
-	</Show>
-}
-
-function countUsers(room: Room) {
-	return server.connections.reduce((count, c) => count += (c.roomId === room.id ? 1 : 0), 0);
-}
-
-function ownerColor(room: Room) {
-	const owner = server.connections.find(con => room.ownerId === con.id)
-	return owner?.color
-}
-
-const Rooms = (props: { rooms: Room[] }) => {
-	return <Show when={props.rooms.length > 0}>
-		<div class="rooms">
-			<For each={props.rooms}>
-				{room => {
-					return <div class="room-button"
-						style={{ "background-color": ownerColor(room) }}
-						onclick={() => server.joinRoom(room.id)}>
-						join call {roomShortId(room)}
-						<div class="userCount">{countUsers(room)} inside</div>
-					</div>
-				}}
-			</For>
-		</div>
-	</Show>
-}
-
-const Connections = (props: { connections: Connection[] }) => {
-	return <div class="connections">
-		<For each={props.connections}>
-			{(con) => <div
-				class="connection"
-				style={{ "background-color": con.color }}>
-				<h2 textContent={con.text || ""}></h2>
-				<h2>{con.status === "online" ? "👀" : "😴"}</h2>
-				<Show when={server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id}>
-					OWNER
-				</Show>
-			</div>}
-		</For>
-	</div>
 }
 
 render(() => <App />, document.getElementById("root"));

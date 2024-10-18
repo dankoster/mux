@@ -77,8 +77,29 @@ div#root {
 		grid-template-rows: 1fr 0fr;
 		transition: 500ms;
 
-		&.room {
+		/* &.no_call {
 			grid-template-rows: 60px 1fr;
+		} */
+
+		&.server_wait {
+			grid-template-rows: 1fr 1fr;
+		}
+
+		&.server_error {
+			grid-template-rows: 1fr 1fr;
+		}	
+
+		&.call_ready {
+			grid-template-rows: 1fr 1fr;
+		}
+
+		&.call_connected {
+			grid-template-rows: 60px 1fr;
+		}
+
+		.call_state_message {
+			align-self: center;
+			justify-self: center;		
 		}
 	}
 
