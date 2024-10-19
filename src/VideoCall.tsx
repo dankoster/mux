@@ -309,8 +309,5 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 			</div>
 			<div id="remote-videos" class="remote-video-container" />
 		</Show>
-		<Show when={props.user.roomId && props.connections?.length === 0}>
-			waiting for someone else to join...
-		</Show>
 	</div>
 }

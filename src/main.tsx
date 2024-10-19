@@ -48,11 +48,6 @@ function User(props: { con: Connection }) {
 
 	const [callState, setCallState] = createSignal<CallState>("no_call")
 	const startCall = async () => {
-		//TODO: optimiztically create the room, don't wait for the server?
-		//TODO: wait until someone connects to the room and then animate away everyone else
-		//  THEN: animate the grid to the in-call layout
-
-		console.log('starting call...')
 		setCallState("server_wait")
 		const result = await server.createRoom()
 
@@ -63,10 +58,9 @@ function User(props: { con: Connection }) {
 		}
 
 		const newRoom = await result.json()
+		console.log('Call started!', newRoom)
 
 		setCallState("call_ready")
-
-		console.log('... call started!', newRoom)
 	}
 
 
@@ -77,8 +71,6 @@ function User(props: { con: Connection }) {
 		const connections = props.con.roomId && server.connections
 			.map(node => Object.assign({}, node))
 			.filter(node => node.roomId === props.con.roomId)
-
-		//console.log("MAIN CALL STATE", connections)
 
 		//figure out how many connections are in the user's room
 		if (!connections) {
@@ -95,10 +87,13 @@ function User(props: { con: Connection }) {
 		<div class={`middle ${callState()}`}>
 			<ConnectionsGraph self={props.con} connections={server.connections} />
 			<Show when={callState() === "server_wait"}>
-				<div class="call_state_message">talking to the server... hit [start call] again to retry...</div>
+				<div class="call_state_message">waiting for server... hit [start call] to retry.</div>
 			</Show>
 			<Show when={callState() === "server_error"}>
 				<div class="call_state_message">the server is unhappy... please refresh!</div>
+			</Show>
+			<Show when={callState() === "call_ready"}>
+				<div class="call_state_message">waiting for someone else to join...</div>
 			</Show>
 			<VideoCall
 				user={props.con}
