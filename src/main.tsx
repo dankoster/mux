@@ -3,7 +3,7 @@ import "./main.css"
 
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
-import server from "./data";
+import * as server from "./data";
 import type { Connection } from "../server/api";
 import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";

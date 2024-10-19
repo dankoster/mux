@@ -42,11 +42,8 @@ const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
-
-
-export default {
-	id, pk, connections, rooms, stats, serverOnline,
-	setColor, setText, createRoom, exitRoom, joinRoom, sendWebRtcMessage, onWebRtcMessage
+export {
+	id, pk, connections, rooms, stats, serverOnline
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -128,15 +125,15 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 	event: "event"
 }
 
-async function createRoom() {
+export async function createRoom() {
 	//TODO: optimistically create the room locally
 	// so we can update the UI while we wait for the server
 	return await POST(apiRoute.room)
 }
-async function joinRoom(roomId: string) {
+export async function joinRoom(roomId: string) {
 	return await POST(apiRoute["room/join"], { subRoute: roomId })
 }
-async function exitRoom(roomId: string) {
+export async function exitRoom(roomId: string) {
 	return await DELETE(apiRoute.room, roomId)
 }
 
@@ -147,7 +144,7 @@ class SSEventEmitter extends EventTarget {
 }
 const SSEvents = new SSEventEmitter()
 
-function onWebRtcMessage(callback: (message: { senderId: string, message: string }) => void) {
+export function onWebRtcMessage(callback: (message: { senderId: string, message: string }) => void) {
 	const ac = new AbortController()
 	SSEvents.addEventListener(sse.webRTC, async (e: CustomEvent) => {
 		callback(e.detail)
@@ -254,7 +251,7 @@ function handleSseEvent(event: SSEventPayload) {
 	}
 }
 
-function sendWebRtcMessage(userId: string, message: string) {
+export function sendWebRtcMessage(userId: string, message: string) {
 	if (!userId) throw new Error(`${userId} is not a valid userId`)
 	if (!message) throw new Error(`${message} is not a valid message`)
 	return POST(apiRoute.webRTC, { subRoute: userId, body: message })
@@ -267,10 +264,10 @@ function updateConnectionStatus() {
 	});
 }
 
-async function setColor(color: string, key?: string) {
+export async function setColor(color: string, key?: string) {
 	return await POST(apiRoute.setColor, { body: color, authToken: key })
 }
-async function setText(text: string, key?: string) {
+export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key });
 }
 

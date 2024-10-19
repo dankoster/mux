@@ -1,7 +1,7 @@
 
 import { createEffect, createSignal, For, onCleanup, onMount, Setter, Show } from "solid-js";
 import "./VideoCall.css"
-import server from "./data"
+import * as server from "./data"
 import { Connection, Room } from "../server/api";
 
 //TODO: get this from the TURN server for each client, obviously
