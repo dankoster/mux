@@ -99,14 +99,12 @@ class PeerConnection extends EventTarget {
 		};
 
 		this.pc.oniceconnectionstatechange = () => {
-			// console.log('oniceconnectionstatechange', this.pc.iceConnectionState, this.pc.signalingState)
 			if (this.pc.iceConnectionState === "failed") {
 				this.pc.restartIce();
 			}
 
 			if (this.pc.iceConnectionState === 'disconnected') {
 				onDisconnect()
-				// console.log(this.remoteStream)
 			}
 		};
 
@@ -116,8 +114,6 @@ class PeerConnection extends EventTarget {
 		// this.pc.onsignalingstatechange = () => {
 		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
 		// }
-
-		// console.log('PeerConnection: constructor finised!', this)
 	}
 
 	addAbortController(ac: AbortController) {
@@ -148,19 +144,16 @@ class PeerConnection extends EventTarget {
 		console.groupCollapsed('end call...')
 
 		this.abortControllers.forEach(ac => {
-			// console.log('aborting track logging event listeners!')
 			ac.abort()
 		})
 
 		this.localRTCRtpSenders.forEach(t => {
 			this.pc.removeTrack(t)
-			// console.log('removed local RTCRtpSender', t)
 		})
 
 		this.localStream?.getTracks().forEach((track) => {
 			track.stop()
 			this.localStream.removeTrack(track)
-			// console.log(`stopped ${track.muted ? "muted" : "un-muted"} local ${track.kind} track:`, track.label)
 		})
 
 		try {
@@ -263,7 +256,6 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		})
 		const ac = server.onDM((dm) => {
 			const { description, candidate } = JSON.parse(dm.message);
-			// console.log(`DM from: ${dm.senderId}`, { description, candidate });
 
 			//only handle messages from this peer
 			if (dm.senderId === con.id)
@@ -277,14 +269,10 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	}
 
 	createEffect(() => {
-		// console.log("EFFECT", props.connections.length)
-
 		//create new peer connections as necessary
 		const polite = props.user?.id === props.room?.ownerId
 		props.connections.forEach(con => {
 			if (!peersById.has(con.id)) {
-				// console.log("CREATE PEER", con.id)
-				// <video class="remote" ref={remoteVideo} autoplay playsinline></video>
 				const video = document.createElement('video')
 				video.className = "remote"
 				video.setAttribute('autoplay', '')
@@ -302,7 +290,6 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		const conIds = props.connections.map(con => con.id)
 		peersById.forEach((value, key) => {
 			if (!conIds.includes(key)) {
-				// console.log(`REMOVE PEER`, key)
 				peersById.get(key)?.endCall()
 				peersById.delete(key)
 
@@ -314,7 +301,6 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	})
 
 	onCleanup(() => {
-		// console.log('video call cleanup ... other side ended call!')
 		peersById.forEach(peer => peer.endCall())
 	})
 
