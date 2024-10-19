@@ -304,7 +304,7 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 	ctx.response.body = JSON.stringify(room)
 })
 
-//Delete room
+//exit room (the room is deleted if the owner leaves)
 api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	console.log("DELETE", apiRoute.room.toUpperCase(), ctx.params)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
@@ -328,22 +328,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	//are we the owner? Nuke it!
 	const room = rooms.find(room => room.id === ctx.params.id)
 	if (room && room.ownerId == con.id) {
-
-		//kick all users from the room
-		connectionByUUID.forEach(c => {
-			if (c.roomId === room.id) {
-				delete c.roomId
-				updateAllConnections({
-					connectionId: c.id,
-					field: "roomId",
-					value: ""
-				})
-			}
-		})
-
-		//delete the room
-		rooms.splice(rooms.indexOf(room), 1)
-		updateAllConnections_deleteRoom(room)
+		deleteRoom(room);
 		ctx.response.body = room
 		ctx.response.status = 200
 	}
@@ -469,17 +454,43 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(rooms)))
 		},
+		//https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/cancel
 		cancel() {
+			//SSE connection has closed...
+			updateFunctionByUUID.delete(uuid)
+
 			const connection = connectionByUUID.get(uuid)
 			if (!connection)
 				throw new Error(`orphan disconnected! ${uuid}}`)
 
+			//are we disconnecting while we have a room open?
+			if (connection.roomId) {
+				const room = rooms.find(room => room.id === connection.roomId)
+
+				//do we own the room? Nuke it!
+				if (room && room.ownerId === connection.id){
+					console.log('owner disconnected from room', room.id)
+					deleteRoom(room)
+				}
+
+				//we're also leaving the room
+				delete connection.roomId
+				updateAllConnections({
+					connectionId: connection.id,
+					field: "roomId",
+					value: ""
+				})
+			}
+
 			console.log("SSE Disconnect   ", uuid, connection)
 			connection.status = ""
-			updateFunctionByUUID.delete(uuid)
 
-			const update = updateConnectionProperty(context.request, "status", "")
-			updateAllConnections(update)
+			//const update = updateConnectionProperty(context.request, "status", "")
+			updateAllConnections({
+				connectionId: connection.id,
+				field: "status",
+				value: ""
+			})
 
 			// //TEST DELETE!
 			// console.log("DELETE", uuid, connection)
@@ -492,3 +503,22 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
+
+function deleteRoom(room: Room) {
+	//kick all users from the room
+	console.log("deleteRoom: kick all users!")
+	connectionByUUID.forEach(c => {
+		if (c.roomId === room.id) {
+			delete c.roomId;
+			updateAllConnections({
+				connectionId: c.id,
+				field: "roomId",
+				value: ""
+			});
+		}
+	});
+
+	//delete the room
+	rooms.splice(rooms.indexOf(room), 1);
+	updateAllConnections_deleteRoom(room);
+}
