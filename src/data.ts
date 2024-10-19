@@ -125,6 +125,24 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 	event: "event"
 }
 
+export function githubAuthUrl() {
+	//https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
+	
+	//@ts-ignore 
+	const client_id = import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID
+	//@ts-ignore
+	const redirect_uri = import.meta.env.VITE_GITHUB_OAUTH_REDIRECT_URI
+
+	const url = new URL("https://github.com/login/oauth/authorize")
+	url.searchParams.append('client_id', client_id)
+	url.searchParams.append('redirect_uri', redirect_uri)
+	url.searchParams.append('scope', 'read:user')
+	url.searchParams.append('state', pk())
+	url.searchParams.append('allow_signup', 'true')
+
+	return url
+}
+
 export async function createRoom() {
 	//TODO: optimistically create the room locally
 	// so we can update the UI while we wait for the server

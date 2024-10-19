@@ -120,6 +120,15 @@ function User(props: { con: Connection }) {
 				{!props.con.roomId &&
 					<button class="room-button" onclick={startCall}>start call</button>
 				}
+				<Show when={props.con.github}>
+					<div class="avatar">
+						<img src={props.con.github.avatar_url} />
+						<div>{props.con.github.name}</div>
+					</div>
+				</Show>
+				<Show when={!props.con.github}>
+					<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
+				</Show>
 			</div>
 		</div>
 	</div>

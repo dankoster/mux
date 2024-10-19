@@ -50,11 +50,11 @@ div#root {
 
 	.logo::after {
 		content: "chat with people, not ai";
-        position: absolute;
-        font-size: x-small;
-        bottom: -0.5rem;
-        right: 0;
-        color: #ffffff99;
+		position: absolute;
+		font-size: x-small;
+		bottom: -0.5rem;
+		right: 0;
+		color: #ffffff99;
 	}
 
 	.stats {
@@ -87,7 +87,7 @@ div#root {
 
 		&.server_error {
 			grid-template-rows: 1fr 1fr;
-		}	
+		}
 
 		&.call_ready {
 			grid-template-rows: 1fr 1fr;
@@ -99,7 +99,7 @@ div#root {
 
 		.call_state_message {
 			align-self: center;
-			justify-self: center;		
+			justify-self: center;
 		}
 	}
 
@@ -156,6 +156,21 @@ div#root {
 	}
 }
 
+.avatar {
+
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	border: 1px solid;
+	border-radius: 50px;
+	padding-inline-end: 2rem;
+
+	img {
+		max-width: 39px;
+		border-radius: 50%;
+	}
+}
+
 .rooms {
 	display: flex;
 	gap: 1rem;
@@ -197,6 +212,7 @@ div#root {
 	background: transparent;
 	text-wrap: nowrap;
 	touch-action: none;
+	text-decoration: none;
 }
 
 .color-button {

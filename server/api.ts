@@ -43,6 +43,11 @@ export type Connection = {
 	text?: string,
 	status?: string,
 	roomId?: string,
+	github?: {
+		id?: string,
+		name?: string,
+		avatar_url?: string
+	}
 }
 
 export type Update = {
@@ -91,7 +96,7 @@ const kv = await Deno.openKv();
 
 
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
-const connectionByUUID = result.value ?? new Map<string, Connection>()
+export const connectionByUUID = result.value ?? new Map<string, Connection>()
 connectionByUUID.forEach(con => {
 	if (con.status === 'online')
 		con.status = 'suspect'
