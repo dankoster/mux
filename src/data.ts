@@ -12,6 +12,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	discardKey: "discardKey",
 	room: "room",
 	"room/join": "room/join",
+	becomeAnonymous: "becomeAnonymous"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -139,8 +140,21 @@ export function githubAuthUrl() {
 	url.searchParams.append('scope', 'read:user')
 	url.searchParams.append('state', pk())
 	url.searchParams.append('allow_signup', 'true')
+	// url.searchParams.append('prompt', 'select_account')
 
 	return url
+}
+
+//dump my github identity and require login to get it back
+export async function becomeAnonymous() {
+	const response = await POST(apiRoute.becomeAnonymous)
+	if(response.ok) {
+		const myId = id()
+		
+		const index = connections.findIndex(con => con.id === myId)
+		if (!(index >= 0)) throw new Error('ID not found!')
+		setConnections({ from: index, to: index }, "github", undefined)
+	}
 }
 
 export async function createRoom() {

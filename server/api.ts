@@ -5,6 +5,7 @@ export { api }
 
 export type AuthTokenName = "Authorization"
 export type ApiRoute = "sse"
+	| "becomeAnonymous"
 	| "setColor"
 	| "setText"
 	| "clear"
@@ -80,7 +81,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	discardKey: "discardKey",
 	webRTC: "webRTC",
 	room: "room",
-	"room/join": "room/join"
+	"room/join": "room/join",
+	becomeAnonymous: "becomeAnonymous"
 }
 
 const KV_KEYS = {
@@ -194,13 +196,14 @@ function getUUID(connectionId: string) {
 	}
 }
 
-function updateConnectionProperty(req: Request, field: keyof Connection, value: string): Update {
+function updateConnectionProperty(req: Request, field: keyof Connection, value?: string): Update {
 	const uuid = req.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 	const con = connectionByUUID.get(uuid);
 	if (!con) throw new Error(`No connection found for key ${uuid}`);
-	con[field] = value;
-	return { connectionId: con.id, field, value }
+	if(value) con[field] = value
+	else delete con[field]
+	return { connectionId: con.id, field, value: value ?? "" }
 }
 
 function objectFrom<V>(map: Map<string, V>) {
@@ -397,7 +400,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	//delete all data
 	await kv.delete(KV_KEYS.connections)
 	await kv.delete(KV_KEYS.rooms)
-	
+
 	//reinit with empty everything
 	connectionByUUID.clear()
 	rooms.length = 0
@@ -411,6 +414,18 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	//tell all clients to reconnect
 	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
+})
+
+api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
+	console.log(context.request.method.toUpperCase())
+	try {
+		const update = updateConnectionProperty(context.request, "github")
+		updateAllConnections(update)
+		context.response.status = 200
+	} catch (err) {
+		console.error(err, context.request)
+		context.response.status = 400
+	}
 })
 
 api.post(`/${apiRoute.setText}`, async (context) => {
@@ -501,7 +516,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				const room = rooms.find(room => room.id === connection.roomId)
 
 				//do we own the room? Nuke it!
-				if (room && room.ownerId === connection.id){
+				if (room && room.ownerId === connection.id) {
 					console.log('owner disconnected from room', room.id)
 					deleteRoom(room)
 				}
