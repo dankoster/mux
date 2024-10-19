@@ -7,14 +7,12 @@ import { Connection, Room } from "../server/api";
 //TODO: get this from the TURN server for each client, obviously
 const servers: RTCConfiguration = {
 	iceServers: [
-		// {
-		// 	urls: [
-		// 		'stun:stun1.l.google.com:19302',
-		// 		'stun:stun2.l.google.com:19302'
-		// 	],
-		// },
 		{
-			urls: "stun:stun.relay.metered.ca:80",
+			urls: [
+				'stun:stun.relay.metered.ca:80',
+				'stun:stun1.l.google.com:19302',
+				'stun:stun2.l.google.com:19302'
+			],
 		},
 		{
 			urls: "turn:global.relay.metered.ca:80",
