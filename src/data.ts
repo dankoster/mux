@@ -5,7 +5,7 @@ import { createStore } from "solid-js/store"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
-	dm: "dm",
+	webRTC: "webRTC",
 	setColor: "setColor",
 	setText: "setText",
 	clear: "clear",
@@ -17,7 +17,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
-	dm: "dm",
+	webRTC: "webRTC",
 	connections: "connections",
 	reconnect: "reconnect",
 	update: "update",
@@ -46,7 +46,7 @@ const [stats, setStats] = createSignal<Stats>()
 
 export default {
 	id, pk, connections, rooms, stats, serverOnline,
-	setColor, setText, createRoom, exitRoom, joinRoom, sendDM, onDM
+	setColor, setText, createRoom, exitRoom, joinRoom, sendWebRtcMessage, onWebRtcMessage
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -147,9 +147,9 @@ class SSEventEmitter extends EventTarget {
 }
 const SSEvents = new SSEventEmitter()
 
-function onDM(callback: (dm: { senderId: string, message: string }) => void) {
+function onWebRtcMessage(callback: (message: { senderId: string, message: string }) => void) {
 	const ac = new AbortController()
-	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
+	SSEvents.addEventListener(sse.webRTC, async (e: CustomEvent) => {
 		callback(e.detail)
 	}, { signal: ac.signal })
 	return ac
@@ -215,13 +215,13 @@ function handleSseEvent(event: SSEventPayload) {
 			console.log('SSE', event.event, newRoom)
 			setRooms(rooms.length, newRoom)
 			break;
-		case sse.dm:
+		case sse.webRTC:
 			// console.log('SSE', event.event, event.data)
 			try {
-				const dm = JSON.parse(event.data)
-				SSEvents.onSseEvent(event.event, dm)
+				const data = JSON.parse(event.data)
+				SSEvents.onSseEvent(event.event, data)
 			} catch (error) {
-				console.error("Failed to parse DM", event)
+				console.error("Failed to parse webRTC event", event)
 			}
 			break;
 		case sse.delete_room:
@@ -254,10 +254,10 @@ function handleSseEvent(event: SSEventPayload) {
 	}
 }
 
-function sendDM(userId: string, message: string) {
+function sendWebRtcMessage(userId: string, message: string) {
 	if (!userId) throw new Error(`${userId} is not a valid userId`)
 	if (!message) throw new Error(`${message} is not a valid message`)
-	return POST(apiRoute.dm, { subRoute: userId, body: message })
+	return POST(apiRoute.webRTC, { subRoute: userId, body: message })
 }
 
 function updateConnectionStatus() {

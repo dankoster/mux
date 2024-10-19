@@ -9,7 +9,7 @@ export type ApiRoute = "sse"
 	| "setText"
 	| "clear"
 	| "discardKey"
-	| "dm"
+	| "webRTC"
 	| "room"
 	| "room/join"
 
@@ -22,7 +22,7 @@ export type ApiRoute = "sse"
 
 export type SSEvent = "pk"
 	| "id"
-	| "dm"
+	| "webRTC"
 	| "connections"
 	| "new_connection"
 	| "rooms"
@@ -54,7 +54,7 @@ export type Update = {
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
-	dm: "dm",
+	webRTC: "webRTC",
 	rooms: "rooms",
 	connections: "connections",
 	reconnect: "reconnect",
@@ -73,8 +73,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
-	dm: "dm",
-
+	webRTC: "webRTC",
 	room: "room",
 	"room/join": "room/join"
 }
@@ -217,8 +216,7 @@ function objectFrom<V>(map: Map<string, V>) {
 
 const api = new Router();
 
-//send DM to user
-api.post(`/${apiRoute.dm}/:userId`, async (ctx) => {
+api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
@@ -241,7 +239,7 @@ api.post(`/${apiRoute.dm}/:userId`, async (ctx) => {
 		return
 	}
 
-	updateFunctionByUUID.get(recipientUUID)?.call(this, sseEvent.dm, JSON.stringify({
+	updateFunctionByUUID.get(recipientUUID)?.call(this, sseEvent.webRTC, JSON.stringify({
 		senderId: sender.id,
 		message
 	}))

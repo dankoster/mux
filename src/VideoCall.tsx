@@ -236,7 +236,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		const pc = new PeerConnection({
 			polite,
 			sendMessage: (message: {}) => {
-				return server.sendDM(con.id, JSON.stringify(message))
+				return server.sendWebRtcMessage(con.id, JSON.stringify(message))
 			},
 			onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
 				if (localVideo) {
@@ -252,11 +252,11 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 				remoteVideo.srcObject = null
 			}
 		})
-		const ac = server.onDM((dm) => {
-			const { description, candidate } = JSON.parse(dm.message);
+		const ac = server.onWebRtcMessage((message) => {
+			const { description, candidate } = JSON.parse(message.message);
 
 			//only handle messages from this peer
-			if (dm.senderId === con.id)
+			if (message.senderId === con.id)
 				pc.handleMessage({ description, candidate })
 		})
 
