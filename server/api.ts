@@ -138,13 +138,6 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 	return new TextEncoder().encode(msg);
 }
 
-function notifyAllConnections() {
-	kv.set(KV_KEYS.connections, connectionByUUID)
-	const connections = Array.from(connectionByUUID.values())
-	const value = JSON.stringify(connections)
-	updateFunctionByUUID.forEach(update => update(sseEvent.connections, value))
-}
-
 function updateAllConnections(update: Update) {
 	console.log(sseEvent.update.toUpperCase(), update)
 	kv.set(KV_KEYS.connections, connectionByUUID)
@@ -213,9 +206,31 @@ function objectFrom<V>(map: Map<string, V>) {
 	return obj;
 }
 
+function deleteRoom(room: Room) {
+	//kick all users from the room
+	console.log("deleteRoom: kick all users!")
+	connectionByUUID.forEach(c => {
+		if (c.roomId === room.id) {
+			delete c.roomId;
+			updateAllConnections({
+				connectionId: c.id,
+				field: "roomId",
+				value: ""
+			});
+		}
+	});
+
+	//delete the room
+	rooms.splice(rooms.indexOf(room), 1);
+	updateAllConnections_deleteRoom(room);
+}
 
 const api = new Router();
 
+//we just need to relay webRTC signaling messages between users so they can
+//negotiate their own peer-to-peer connection. We don't care about
+//the actual conent of the messages, only that they are properly routed.
+//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
@@ -235,7 +250,7 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 
 	const recipientUUID = getUUID(ctx.params.userId)
 	if (!recipientUUID) {
-		ctx.response.status = 404
+		ctx.response.status = 404 //can't find the target connection
 		return
 	}
 
@@ -243,7 +258,7 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 		senderId: sender.id,
 		message
 	}))
-	ctx.response.status = 200
+	ctx.response.status = 200 //success!
 })
 
 //Join room by id
@@ -363,20 +378,33 @@ api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 
 //nuke it from orbit
 api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
+	//do we have the correct bearer token for this?
 	if (ctx.params.key !== Deno.env.get("KV_CLEAR_KEY")) {
 		ctx.response.status = 401 //unauthorized
 		return
 	}
 
+	//here's what we're deleting...
 	const oldData = objectFrom(connectionByUUID);
 	console.log("CLEAR", oldData, rooms)
 	ctx.response.body = oldData
 
+	//delete all data
 	await kv.delete(KV_KEYS.connections)
 	await kv.delete(KV_KEYS.rooms)
+	
+	//reinit with empty everything
 	connectionByUUID.clear()
 	rooms.length = 0
-	notifyAllConnections()
+	kv.set(KV_KEYS.connections, connectionByUUID)
+	kv.set(KV_KEYS.rooms, [])
+
+	//tell all cliens we burned it all down (this will cause any active calls to disconnect)
+	const connections = Array.from(connectionByUUID.values())
+	updateFunctionByUUID.forEach(update => update(sseEvent.connections, JSON.stringify(connections)))
+	updateFunctionByUUID.forEach(update => update(sseEvent.rooms, JSON.stringify(rooms)))
+
+	//tell all clients to reconnect
 	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
 })
 
@@ -503,22 +531,3 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
-
-function deleteRoom(room: Room) {
-	//kick all users from the room
-	console.log("deleteRoom: kick all users!")
-	connectionByUUID.forEach(c => {
-		if (c.roomId === room.id) {
-			delete c.roomId;
-			updateAllConnections({
-				connectionId: c.id,
-				field: "roomId",
-				value: ""
-			});
-		}
-	});
-
-	//delete the room
-	rooms.splice(rooms.indexOf(room), 1);
-	updateAllConnections_deleteRoom(room);
-}
