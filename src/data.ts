@@ -145,7 +145,7 @@ export function githubAuthUrl() {
 	return url
 }
 
-//dump my github identity and require login to get it back
+//dump my identity and require login to get it back
 export async function becomeAnonymous() {
 	const response = await POST(apiRoute.becomeAnonymous)
 	if(response.ok) {
@@ -153,7 +153,7 @@ export async function becomeAnonymous() {
 		
 		const index = connections.findIndex(con => con.id === myId)
 		if (!(index >= 0)) throw new Error('ID not found!')
-		setConnections({ from: index, to: index }, "github", undefined)
+		setConnections({ from: index, to: index }, "identity", undefined)
 	}
 }
 

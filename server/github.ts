@@ -73,7 +73,7 @@ github.get(`/oauth`, async (context) => {
 
 	const { id, name, avatar_url } = json
 
-	connection.github = { id, name, avatar_url }
+	connection.identity = { source: 'github', id, name, avatar_url }
 	console.log('GITHUB AUTH SUCCESS', connection)
 
 	context.response.redirect('/')

@@ -125,13 +125,13 @@ function User(props: { con: Connection }) {
 					<button class="room-button" onclick={startCall}>start call</button>
 				}
 			</div>
-				<Show when={props.con.github}>
+				<Show when={props.con.identity}>
 					<div class="avatar" onclick={becomeAnonymous}>
-						<img src={props.con.github.avatar_url} />
-						<div>{props.con.github.name}</div>
+						<img src={props.con.identity.avatar_url} />
+						<div>{props.con.identity.name}</div>
 					</div>
 				</Show>
-				<Show when={!props.con.github}>
+				<Show when={!props.con.identity}>
 					<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
 				</Show>
 		</div>

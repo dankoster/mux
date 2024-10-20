@@ -44,7 +44,8 @@ export type Connection = {
 	text?: string,
 	status?: string,
 	roomId?: string,
-	github?: {
+	identity?: {
+		source?: string,
 		id?: string,
 		name?: string,
 		avatar_url?: string
@@ -419,7 +420,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
 	console.log(context.request.method.toUpperCase())
 	try {
-		const update = updateConnectionProperty(context.request, "github")
+		const update = updateConnectionProperty(context.request, "identity")
 		updateAllConnections(update)
 		context.response.status = 200
 	} catch (err) {
