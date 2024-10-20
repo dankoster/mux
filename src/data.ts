@@ -12,7 +12,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	discardKey: "discardKey",
 	room: "room",
 	"room/join": "room/join",
-	becomeAnonymous: "becomeAnonymous"
+	becomeAnonymous: "becomeAnonymous",
+	log: "log"
 };
 
 const sse: { [Property in SSEvent]: Property } = {

@@ -1,6 +1,7 @@
 import { Request } from "https://jsr.io/@oak/oak/17.0.0/request.ts";
 import { Router } from "jsr:@oak/oak@17/router";
 import { decodeTime, monotonicUlid } from "jsr:@std/ulid";
+import { context } from "../../../Library/Caches/deno/npm/registry.npmjs.org/esbuild/0.21.5/lib/main.d.ts";
 
 export { api }
 
@@ -10,6 +11,7 @@ export type ApiRoute = "sse"
 	| "setColor"
 	| "setText"
 	| "clear"
+	| "log"
 	| "discardKey"
 	| "webRTC"
 	| "room"
@@ -92,7 +94,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	webRTC: "webRTC",
 	room: "room",
 	"room/join": "room/join",
-	becomeAnonymous: "becomeAnonymous"
+	becomeAnonymous: "becomeAnonymous",
+	log: "log"
 }
 
 const KV_KEYS = {
@@ -431,6 +434,37 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	//tell all clients to reconnect
 	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
 })
+
+api.get(`/${apiRoute.log}/:key`, async (ctx) => {
+
+	//do we have the correct bearer token for this?
+	const KV_LOG_KEY = Deno.env.get("KV_LOG_KEY")
+	if (!KV_LOG_KEY || ctx.params.key !== KV_LOG_KEY) {
+		ctx.response.status = 401 //unauthorized
+		return
+	}
+
+	const result: string[] = []
+	const entries = kv.list<ConnectionLog>({ prefix: ["log", "connection"] }, {
+		reverse: true,
+		limit: 100,
+	});
+	for await (const entry of entries) {
+		const timestamp = new Date(decodeTime(entry.key[2].toString()));
+		const data = entry.value;
+		result.push([
+			timestamp.toISOString(),
+			data.ip,
+			data.connectionId?.substring(data.connectionId.length - 11),
+			data.kind,
+			data.os,
+			(data.name && `[${data.name}]`) || "Anonymous",
+		].join(' '))
+	}
+
+	ctx.response.body = result.join('\r\n')
+})
+
 
 api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
 	console.log(context.request.method.toUpperCase())
