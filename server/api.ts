@@ -1,5 +1,6 @@
 import { Request } from "https://jsr.io/@oak/oak/17.0.0/request.ts";
 import { Router } from "jsr:@oak/oak@17/router";
+import { decodeTime, monotonicUlid } from "jsr:@std/ulid";
 
 export { api }
 
@@ -52,6 +53,14 @@ export type Connection = {
 	}
 }
 
+type ConnectionLog = {
+	kind: 'returning' | 'new',
+	connectionId: string,
+	os?: string,
+	ip?: string,
+	name?: string,
+}
+
 export type Update = {
 	connectionId: string,
 	field: keyof Connection,
@@ -96,6 +105,12 @@ const kv = await Deno.openKv();
 
 // await kv.delete(KV_KEYS.connections)
 // await kv.delete(KV_KEYS.rooms)
+
+////DELETE LOGS
+// const entries = kv.list<string>({ prefix: ["log"] })
+// for await (const entry of entries) {
+// 	await kv.delete(entry.key)
+// }
 
 
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
@@ -202,7 +217,7 @@ function updateConnectionProperty(req: Request, field: keyof Connection, value?:
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 	const con = connectionByUUID.get(uuid);
 	if (!con) throw new Error(`No connection found for key ${uuid}`);
-	if(value) con[field] = value
+	if (value) con[field] = value
 	else delete con[field]
 	return { connectionId: con.id, field, value: value ?? "" }
 }
@@ -468,10 +483,23 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 	const old = connectionByUUID.has(uuid)
 	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
 
+	let connection = connectionByUUID.get(uuid)
+	//retain a log of some connection details (don't wait for it to complete)
+	try {
+		kv.set(['log', 'connection', monotonicUlid()], {
+			kind: old ? "returning" : "new",
+			connectionId: uuid,
+			os: context.request.userAgent.os.name,
+			ip: context.request.ip,
+			name: connection?.identity?.name
+		} as ConnectionLog)
+	} catch (error) {
+		console.warn('FAILED TO LOG', error)
+	}
+
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		start(controller) {
-			let connection = connectionByUUID.get(uuid)
 			if (!connection) {
 				connection = {
 					id: Date.now().toString(),
@@ -552,3 +580,21 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
+
+async function printLog(limit?: number) {
+	const entries = kv.list<ConnectionLog>({ prefix: ["log", "connection"] }, {
+		reverse: true,
+		limit,
+	});
+	for await (const entry of entries) {
+		const timestamp = new Date(decodeTime(entry.key[2].toString()));
+		const data = entry.value;
+		console.log("LOG", timestamp.toISOString(),
+			data.ip,
+			data.connectionId?.substring(data.connectionId.length - 11),
+			data.kind,
+			data.os,
+			(data.name && `[${data.name}]`) || "Anonymous",
+		)
+	}
+}
