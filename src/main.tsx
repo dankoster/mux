@@ -106,15 +106,23 @@ function User(props: { con: Connection }) {
 		</div>
 		<div class="toolbar">
 			<div class="buttons">
-				<div class="color-button">
-					<span>color</span>
-					<input
-						type="color"
-						oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
-						onchange={(e) => server.setColor(e.target.value)}
-						value={props.con.color ?? 'transparent'} />
+				<Show when={!props.con.identity}>
+					<div class="color-button">
+						<span>color</span>
+						<input
+							type="color"
+							oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
+							onchange={(e) => server.setColor(e.target.value)}
+							value={props.con.color ?? 'transparent'} />
 
-				</div>
+					</div>
+				</Show>
+				<Show when={props.con.identity}>
+					<div class="avatar" onclick={becomeAnonymous}>
+						<img src={props.con.identity.avatar_url} />
+						<div>{props.con.identity.name}</div>
+					</div>
+				</Show>
 
 				{props.con.roomId &&
 					<button class="room-button" onclick={exitRoom}>
@@ -125,15 +133,9 @@ function User(props: { con: Connection }) {
 					<button class="room-button" onclick={startCall}>start call</button>
 				}
 			</div>
-				<Show when={props.con.identity}>
-					<div class="avatar" onclick={becomeAnonymous}>
-						<img src={props.con.identity.avatar_url} />
-						<div>{props.con.identity.name}</div>
-					</div>
-				</Show>
-				<Show when={!props.con.identity}>
-					<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
-				</Show>
+			<Show when={!props.con.identity}>
+				<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
+			</Show>
 		</div>
 	</div>
 }

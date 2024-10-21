@@ -153,6 +153,14 @@ function cleanupRooms() {
 	if (modified) kv.set(KV_KEYS.rooms, rooms)
 }
 
+export function addedConnectionIdentity(con: Connection) {
+	updateAllConnections({
+    connectionId: con.id,
+    field: "identity",
+    value: JSON.stringify(con.identity)
+  })
+}
+
 function sseMessage(event: SSEvent, data?: string, id?: string) {
 	//https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
 	const lines = [];

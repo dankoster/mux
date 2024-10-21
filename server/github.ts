@@ -1,5 +1,5 @@
 import { Router } from "jsr:@oak/oak@17/router";
-import { connectionByUUID } from "./api.ts";
+import { addedConnectionIdentity, connectionByUUID } from "./api.ts";
 
 export { github }
 
@@ -74,6 +74,7 @@ github.get(`/oauth`, async (context) => {
 	const { id, name, avatar_url } = json
 
 	connection.identity = { source: 'github', id, name, avatar_url }
+	addedConnectionIdentity(connection)
 	console.log('GITHUB AUTH SUCCESS', connection)
 
 	context.response.redirect('/')

@@ -32,11 +32,10 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		trackStore(props.connections);
 
 		// get raw connection objects out of the SolidJS Signal where they are proxies
-		const nodes = props.connections.map(node => Object.assign({}, node))
-		// console.log('trackStore(connections)', nodes)
+		const allConnections = props.connections.map(node => Object.assign({}, node))
 
 		const connectionsByRoomId = new Map<string, string[]>()
-		nodes.forEach(con => {
+		allConnections.forEach(con => {
 			if (con.roomId) {
 				if (!connectionsByRoomId.has(con.roomId))
 					connectionsByRoomId.set(con.roomId, [con.id])
@@ -58,7 +57,12 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			}))
 		})
 
-		graph = { nodes, links, rooms }
+		graph = {
+			anonymous: allConnections.filter(con => !con.identity),
+			identified: allConnections.filter(con => con.identity),
+			links,
+			rooms
+		}
 		update(graph)
 	});
 
@@ -68,13 +72,14 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		nodeIds: string[]
 	}
 	type GraphData = {
-		nodes: Connection[],
+		anonymous: Connection[],
+		identified: Connection[],
 		links: { source: string, target: string }[],
 		rooms: Room[]
 	}
 
 	let svgRef: SVGSVGElement
-	let simulation, nodeCircles, linkLines, roomCircles, roomLabels
+	let simulation, avatarCircles, avatarImages, linkLines, roomCircles, roomLabels
 	let graph: GraphData
 
 	let svgObserver: ResizeObserver
@@ -94,14 +99,17 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			.attr("stroke-width", 1.5)
 			.selectAll("line");
 
-		nodeCircles = svg.append("g")
-			.attr('class', 'node-circles')
+		avatarCircles = svg.append("g")
+			.attr('class', 'avatar-circles')
 			.attr("stroke", "#fff")
 			.attr("stroke-width", 1.5)
 			.selectAll("circle")
-			.attr("r", d => d.status === "online" ? 20 : 10)
-			.attr("cx", svgRef.clientWidth / 2)
-			.attr("cy", svgRef.clientHeight / 2)
+
+		avatarImages = svg.append("g")
+			.attr('class', 'avatar-images')
+			.attr("stroke", "#fff")
+			.attr("stroke-width", 1.5)
+			.selectAll("image")
 
 		roomCircles = svg.append('g')
 			.attr('class', 'room-circles')
@@ -123,8 +131,11 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		updateForceLayout(simulation, [], !!props.self.roomId)
 
 		simulation.on("tick", function ticked() {
-			nodeCircles?.attr("cx", d => d.x)
+			avatarCircles?.attr("cx", d => d.x)
 				.attr("cy", d => d.y)
+
+			avatarImages?.attr("x", d => d.x - (avatarImages.attr('width') / 2))
+				.attr("y", d => d.y - (avatarImages.attr('width') / 2))
 
 			linkLines?.attr("x1", d => d.source.x)
 				.attr("y1", d => d.source.y)
@@ -133,14 +144,21 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 
 			const enclosingCircleByRoomId = {}
 			roomCircles?.each(function (d) {
-				const circles = nodeCircles?._groups[0]
+				const circles = avatarCircles?._groups[0]
 					.filter(c => c.__data__.roomId === d.id) //find other nodes in the same room
 					.map(c => ({
 						x: c.cx.animVal.value,
 						y: c.cy.animVal.value,
 						r: c.r.animVal.value
 					}))
-				const circle = d3.packEnclose(circles)
+				const images = avatarImages._groups[0]
+					.filter(i => i.__data__.roomId === d.id)
+					.map(c => ({
+						x: c.x.animVal.value + c.width.animVal.value / 2,
+						y: c.y.animVal.value + c.width.animVal.value / 2,
+						r: c.width.animVal.value / 2
+					}))
+				const circle = d3.packEnclose([...circles, ...images])
 				enclosingCircleByRoomId[d.id] = circle
 			})
 				.attr("cx", d => enclosingCircleByRoomId[d?.id]?.x)
@@ -173,7 +191,13 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 	function updateForceLayout(sim, links, inRoom: boolean) {
 		try {
 			sim?.force("boundingBox", () => {
-				nodeCircles?.each(node => {
+				avatarCircles?.each(node => {
+					if (node.x < 30) node.x = 30
+					if (node.y < 30) node.y = 30
+					if (node.x > svgRef.clientWidth - 30) node.x = svgRef.clientWidth - 30
+					if (node.y > svgRef.clientHeight - 30) node.y = svgRef.clientHeight - 30
+				})
+				avatarImages?.each(node => {
 					if (node.x < 30) node.x = 30
 					if (node.y < 30) node.y = 30
 					if (node.x > svgRef.clientWidth - 30) node.x = svgRef.clientWidth - 30
@@ -211,27 +235,32 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 
 		if (!graphData) return
 
-		let { nodes, links, rooms } = graphData
+		let { anonymous, identified, links, rooms } = graphData
 
 		// Make a shallow copy to protect against mutation, while
 		// recycling old nodes to preserve position and velocity.
-		const old = new Map(nodeCircles?.data().map(d => [d.id, d]));
-		nodes = nodes?.map(d => Object.assign(old.get(d.id) || {}, d));
+		const oldAnonymous = new Map(avatarCircles?.data().map(d => [d.id, d]));
+		anonymous = anonymous?.map(d => Object.assign(oldAnonymous.get(d.id) || {}, d));
+
+		const oldIdentified = new Map(avatarImages?.data().map(d => [d.id, d]));
+		identified = identified?.map(d => Object.assign(oldIdentified.get(d.id) || {}, d));
+
 		links = links?.map(d => Object.assign({}, d));
 		rooms = [...rooms]
 
 		//if we're in a call, only show ourself and the others in the call
 		if (props.self.roomId) {
-			nodes = nodes.filter(n => n.roomId === props.self.roomId)
+			anonymous = anonymous.filter(n => n.roomId === props.self.roomId)
+			identified = identified.filter(n => n.roomId === props.self.roomId)
 			links = []
 			rooms = []
 		}
 
 		updateForceLayout(simulation, links, !!props.self.roomId)
 
-		simulation?.nodes(nodes);
+		simulation?.nodes([...anonymous, ...identified]) //yay more copying of the data!
 
-		nodeCircles = nodeCircles?.data(nodes, d => d.id)
+		avatarCircles = avatarCircles?.data(anonymous, d => d.id)
 			.join(
 				enter => enter
 					.append("circle")
@@ -248,6 +277,33 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 					.transition().duration(1000)
 					.style('opacity', 0)
 					.attr("r", 0)
+					.remove()
+			)
+
+		avatarImages = avatarImages?.data(identified, d => d.id)
+			.join(
+				enter => enter
+					.append("image")
+					.attr('xlink:href', (d: Connection) => d.identity?.avatar_url ?? "")
+					.attr("x", svgRef.clientWidth / 2)
+					.attr("y", svgRef.clientHeight / 2)
+					.attr('width', 0)
+					.attr('height', 0)
+					.transition().duration(1000)
+					.style('opacity', d => d.status === "online" ? 1 : 0.2)
+					.attr("width", d => d.status === "online" ? 50 : 30)
+					.attr("height", d => d.status === "online" ? 50 : 30)
+					.attr('clip-path', 'circle()')
+				, update => update
+					.transition().duration(1000)
+					.style('opacity', d => d.status === "online" ? 1 : 0.2)
+					.attr("width", d => d.status === "online" ? 50 : 30)
+					.attr("height", d => d.status === "online" ? 50 : 30)
+				, exit => exit
+					.transition().duration(1000)
+					.style('opacity', 0)
+					.attr("width", 0)
+					.attr("height", 0)
 					.remove()
 			)
 

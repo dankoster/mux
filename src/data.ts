@@ -129,7 +129,7 @@ const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
 
 export function githubAuthUrl() {
 	//https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
-	
+
 	//@ts-ignore 
 	const client_id = import.meta.env.VITE_GITHUB_OAUTH_CLIENT_ID
 	//@ts-ignore
@@ -149,9 +149,9 @@ export function githubAuthUrl() {
 //dump my identity and require login to get it back
 export async function becomeAnonymous() {
 	const response = await POST(apiRoute.becomeAnonymous)
-	if(response.ok) {
+	if (response.ok) {
 		const myId = id()
-		
+
 		const index = connections.findIndex(con => con.id === myId)
 		if (!(index >= 0)) throw new Error('ID not found!')
 		setConnections({ from: index, to: index }, "identity", undefined)
@@ -233,6 +233,10 @@ function handleSseEvent(event: SSEventPayload) {
 			throw "reconnect requested by server"
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
+			if(update.field === 'identity') {
+				console.log('parsing identity...')
+				update.value = update.value && JSON.parse(update.value)
+			}
 			console.log('SSE', event.event, update)
 			const index = connections.findIndex(con => con.id === update.connectionId)
 			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
