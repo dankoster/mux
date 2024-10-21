@@ -10,10 +10,10 @@
     ]
   },
   "tasks": {
-    "watch": "deno task build --watch",
+    "watch": "deno run -A --allow-env --env --node-modules-dir npm:vite build --watch",
     "serve": "deno task build && deno run --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/mux-local.crt,$HOME/Lab/certs/out/mux-local.key --allow-env --env --unstable-kv --allow-net --watch ./server/server.ts",
     "vite": "deno run -A  --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/mux-local.crt,$HOME/Lab/certs/out/mux-local.key --node-modules-dir npm:vite --host",
-    "build": "deno run -A --allow-env --env --node-modules-dir npm:vite build",
+    "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --unstable --node-modules-dir npm:vite preview"
   }
 }
