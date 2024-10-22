@@ -100,6 +100,9 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 const KV_KEYS = {
 	rooms: ['rooms'],
 	connections: ['connections'],
+	logPrefix: ["log", "connection"],
+	connectionUUIDs: ['connection', 'uuids'],
+	message: (uuid: string) => ['message', uuid],
 }
 
 const kv = await Deno.openKv();
@@ -114,21 +117,70 @@ const kv = await Deno.openKv();
 // 	await kv.delete(entry.key)
 // }
 
+const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
 
+watchForConnectionChanges()
+async function watchForConnectionChanges() {
+	console.log('KV watching for connections list changes...')
+	for await (const stream of kv.watch([KV_KEYS.connections])) {
+		for (const change of stream) {
+			const conList = change.value as Map<string, Connection>
+			for (const uuid of conList.keys()) {
+				console.log(uuid, conList.get(uuid)?.status || 'offline', updateFunctionByUUID.get(uuid))
+
+				if (conList.get(uuid)?.status === 'online' && !updateFunctionByUUID.has(uuid)) {
+					//the connection is online, but not connected to this server
+					// so create an update function that will be able to talk to that connection
+					// through a KV message. This message should come out the other side and be enqueued
+					// as a server-sent-event (SSE) message.
+					updateFunctionByUUID.set(uuid, async (event, value) => {
+						try {
+							kv.set(KV_KEYS.message(uuid), { event, value })
+						} catch (error) {
+							console.error(uuid, error)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+async function watchForMessages(uuid: string) {
+	console.log(`KV watching messages for ${uuid}...`)
+	for await (const stream of kv.watch([KV_KEYS.message(uuid)])) {
+		for (const change of stream) {
+			const message = change.value as { event: SSEvent, value: string } //this needs to go out via SSE 
+
+			if (message) {
+				console.log(`KV message ${change.key}`, message)
+				updateFunctionByUUID.forEach((fn, updateUuid) => {
+					if (uuid !== updateUuid)
+						fn(message.event, message.value)
+				})
+			}
+		}
+	}
+}
+
+//server is starting up... get connections list
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
 export const connectionByUUID = result.value ?? new Map<string, Connection>()
+console.log("INIT Got connections from KV:", connectionByUUID)
+
+//the server is starting up, so nobody can be connected yet 
+// but it is possible that old connections weren't shut down correctly 
 connectionByUUID.forEach(con => {
 	if (con.status === 'online')
 		con.status = 'suspect'
 })
 
+//server is starting up... get rooms list
 const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
-
-const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
-console.log("INIT Got connections from KV:", connectionByUUID)
 console.log("INIT Got rooms from KV:", rooms)
-
 cleanupRooms()
+
+
 function cleanupRooms() {
 	let modified = false
 	rooms.forEach(room => {
@@ -154,10 +206,10 @@ function cleanupRooms() {
 
 export function addedConnectionIdentity(con: Connection) {
 	updateAllConnections({
-    connectionId: con.id,
-    field: "identity",
-    value: JSON.stringify(con.identity)
-  })
+		connectionId: con.id,
+		field: "identity",
+		value: JSON.stringify(con.identity)
+	})
 }
 
 function sseMessage(event: SSEvent, data?: string, id?: string) {
@@ -258,6 +310,25 @@ function deleteRoom(room: Room) {
 	rooms.splice(rooms.indexOf(room), 1);
 	updateAllConnections_deleteRoom(room);
 }
+
+async function printLog(limit?: number) {
+	const entries = kv.list<ConnectionLog>({ prefix: ["log", "connection"] }, {
+		reverse: true,
+		limit,
+	});
+	for await (const entry of entries) {
+		const timestamp = new Date(decodeTime(entry.key[2].toString()));
+		const data = entry.value;
+		console.log("LOG", timestamp.toISOString(),
+			data.ip,
+			data.connectionId?.substring(data.connectionId.length - 11),
+			data.kind,
+			data.os,
+			(data.name && `[${data.name}]`) || "Anonymous",
+		)
+	}
+}
+
 
 const api = new Router();
 
@@ -565,6 +636,8 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				}
 			})
 
+			watchForMessages(uuid)
+
 			console.log("SSE connection   ", uuid, connection)
 
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
@@ -621,21 +694,3 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		},
 	});
 });
-
-async function printLog(limit?: number) {
-	const entries = kv.list<ConnectionLog>({ prefix: ["log", "connection"] }, {
-		reverse: true,
-		limit,
-	});
-	for await (const entry of entries) {
-		const timestamp = new Date(decodeTime(entry.key[2].toString()));
-		const data = entry.value;
-		console.log("LOG", timestamp.toISOString(),
-			data.ip,
-			data.connectionId?.substring(data.connectionId.length - 11),
-			data.kind,
-			data.os,
-			(data.name && `[${data.name}]`) || "Anonymous",
-		)
-	}
-}
