@@ -45,6 +45,14 @@ app.use(async (context, next) => {
 
 app.use(router.allowedMethods());
 
+app.addEventListener("close", (e) => {
+	console.log('server stopped by close event', e)
+})
+
+app.addEventListener("error", (e) => {
+	console.log('server stopped by error', e)
+})
+
 app.addEventListener("listen", ({ hostname, port, secure }) => {
 	const origin = `${secure ? "https://" : "http://"}${hostname ?? "localhost"}`
 	console.log(
