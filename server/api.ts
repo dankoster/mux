@@ -126,20 +126,24 @@ async function watchForConnectionChanges() {
 		for (const change of stream) {
 			const conList = change.value as Map<string, Connection>
 			for (const uuid of conList.keys()) {
-				console.log(uuid, conList.get(uuid)?.status || 'offline', updateFunctionByUUID.get(uuid))
+				//console.log(uuid, conList.get(uuid)?.status || 'offline', updateFunctionByUUID.get(uuid))
 
-				if (conList.get(uuid)?.status === 'online' && !updateFunctionByUUID.has(uuid)) {
-					//the connection is online, but not connected to this server
-					// so create an update function that will be able to talk to that connection
-					// through a KV message. This message should come out the other side and be enqueued
-					// as a server-sent-event (SSE) message.
-					updateFunctionByUUID.set(uuid, async (event, value) => {
-						try {
-							kv.set(KV_KEYS.message(uuid), { event, value })
-						} catch (error) {
-							console.error(uuid, error)
-						}
-					})
+				if (conList.get(uuid)?.status === 'online') {
+					if (!updateFunctionByUUID.has(uuid)) {
+						//the connection is online, but not connected to this server
+						// so create an update function that will be able to talk to that connection
+						// through a KV message. This message should come out the other side and be enqueued
+						// as a server-sent-event (SSE) message.
+						updateFunctionByUUID.set(uuid, async (event, value) => {
+							try {
+								kv.set(KV_KEYS.message(uuid), { event, value })
+							} catch (error) {
+								console.error(uuid, error)
+							}
+						})
+						console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
+					}
+					//else console.log('KV DID NOT ADD remote update function for', uuid)
 				}
 			}
 		}
@@ -154,10 +158,8 @@ async function watchForMessages(uuid: string) {
 
 			if (message) {
 				console.log(`KV message ${change.key}`, message)
-				updateFunctionByUUID.forEach((fn, updateUuid) => {
-					if (uuid !== updateUuid)
-						fn(message.event, message.value)
-				})
+				const fn = updateFunctionByUUID.get(uuid)
+				if (fn) fn(message.event, message.value)
 			}
 		}
 	}
@@ -635,6 +637,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 					console.error(uuid, error)
 				}
 			})
+			console.log('SSE set update function for', uuid, updateFunctionByUUID.get(uuid))
 
 			watchForMessages(uuid)
 
