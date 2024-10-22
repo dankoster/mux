@@ -52,5 +52,11 @@ app.addEventListener("listen", ({ hostname, port, secure }) => {
 	);
 });
 
-await app.listen({ port: PORT });
+try {
+	await app.listen({ port: PORT });
+} catch (ex) {
+	console.log(`server stopped by exception`, ex)
+}
+
+console.log(`server shutting down`)
 
