@@ -119,6 +119,8 @@ const kv = await Deno.openKv();
 
 const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
 
+type QueuedSSEEvent = { event: SSEvent, value: string }
+
 watchForConnectionChanges()
 async function watchForConnectionChanges() {
 	console.log('KV watching for connections list changes...')
@@ -135,8 +137,28 @@ async function watchForConnectionChanges() {
 						// through a KV message. This message should come out the other side and be enqueued
 						// as a server-sent-event (SSE) message.
 						updateFunctionByUUID.set(uuid, async (event, value) => {
+							if (!event || !value) return
 							try {
-								kv.set(KV_KEYS.message(uuid), { event, value })
+								//https://docs.deno.com/deploy/kv/manual/transactions/
+								// Retry the transaction until it succeeds.
+								let res = { ok: false };
+								while (!res.ok) {
+									// Read the current messages
+									const unreadMessagesResponse = await kv.get<QueuedSSEEvent[]>(KV_KEYS.message(uuid))
+
+									const unreadMessages = unreadMessagesResponse.value ?? [];
+									unreadMessages.push({ event, value })
+
+									// Attempt to commit the transaction. `res` returns an object with
+									// `ok: false` if the transaction fails to commit due to a check failure
+									// (i.e. the versionstamp for a key has changed)
+									res = await kv.atomic()
+										.check(unreadMessagesResponse) // Ensure the unread messages haven't changed hasn't changed.
+										.set(KV_KEYS.message(uuid), unreadMessages) // Update the stored messages.
+										.commit();
+
+									if (res.ok) console.log(`KV set message for ${uuid}`, unreadMessages)
+								}
 							} catch (error) {
 								console.error(uuid, error)
 							}
@@ -151,15 +173,24 @@ async function watchForConnectionChanges() {
 }
 
 async function watchForMessages(uuid: string) {
-	console.log(`KV watching messages for ${uuid}...`)
-	for await (const stream of kv.watch([KV_KEYS.message(uuid)])) {
+	console.log(`KV watching cross-server messages for ${uuid}...`)
+	kv.delete(KV_KEYS.message(uuid))
+
+	for await (const stream of kv.watch<QueuedSSEEvent[]>([KV_KEYS.message(uuid)])) {
 		for (const change of stream) {
-			const message = change.value as { event: SSEvent, value: string } //this needs to go out via SSE 
+			const message = change.value //this needs to go out via SSE 
+
+			kv.delete(KV_KEYS.message(uuid))
 
 			if (message) {
-				console.log(`KV message ${change.key}`, message)
-				const fn = updateFunctionByUUID.get(uuid)
-				if (fn) fn(message.event, message.value)
+				if (Array.isArray(message)) {
+					message.forEach(m => {
+						console.log(`KV message ${change.key}`, m)
+						const fn = updateFunctionByUUID.get(uuid)
+						if (fn) fn(m.event, m.value)
+						else console.log('no updare function for', uuid)
+					})
+				} else console.log('message is not an array?', message)
 			}
 		}
 	}
