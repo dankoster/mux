@@ -156,6 +156,13 @@ div#root {
 	}
 }
 
+.server {
+	position: absolute;
+	bottom: 0;
+	font-size: xx-small;
+	color: #ffffff50;
+}
+
 .avatar {
 
 	cursor: pointer;

@@ -25,6 +25,7 @@ export type ApiRoute = "sse"
 
 export type SSEvent = "pk"
 	| "id"
+	| "serverId"
 	| "webRTC"
 	| "connections"
 	| "new_connection"
@@ -71,6 +72,7 @@ export type Update = {
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
+	serverId: "serverId",
 	webRTC: "webRTC",
 	rooms: "rooms",
 	connections: "connections",
@@ -683,6 +685,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
+			controller.enqueue(sseMessage(sseEvent.serverId, serverID?.toString()))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(rooms)))
 		},

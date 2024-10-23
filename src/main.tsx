@@ -86,6 +86,11 @@ function User(props: { con: Connection }) {
 		}
 	})
 
+	const serverId = () => {
+		const id = server.serverId()
+		return id.substring(id.length - 4)
+	}
+
 
 	return <div class="user-view">
 		<div class={`middle ${callState()}`}>
@@ -136,6 +141,7 @@ function User(props: { con: Connection }) {
 			<Show when={!props.con.identity}>
 				<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
 			</Show>
+			<div class="server">server: {serverId()}</div>
 		</div>
 	</div>
 }
