@@ -107,6 +107,8 @@ const KV_KEYS = {
 	message: (conUUID: string) => [...KV_KEYS.messagePrefix(conUUID), monotonicUlid()]
 }
 
+
+const serverID = Date.now()
 const kv = await Deno.openKv();
 
 
@@ -128,7 +130,7 @@ type QueuedSSEEvent = { event: SSEvent, value: string }
 
 watchForConnectionChanges()
 async function watchForConnectionChanges() {
-	console.log('KV watching for connections list changes...')
+	console.log(serverID, 'KV watching for connections list changes...')
 	for await (const connectionsListChanges of kv.watch([KV_KEYS.connections])) {
 		for (const change of connectionsListChanges) {
 			const conList = change.value as Map<string, Connection>
@@ -146,12 +148,12 @@ async function watchForConnectionChanges() {
 					//This message should come out the other side and become a server-sent-event (SSE) message.
 					updateFunctionByUUID.set(uuid, {
 						isLocal: false, update: async (event, value) => {
-							console.log('KV sending message')
+							console.log(serverID, 'KV sending message', { event, value })
 							await kv.set(KV_KEYS.message(uuid), { event, value }) //enqueue the message
 							await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()) //signal that there is a new message.
 						}
 					})
-					console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
+					console.log(serverID, 'KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
 				}
 
 				//remove update functions when connections go offline
@@ -160,7 +162,7 @@ async function watchForConnectionChanges() {
 					const updater = updateFunctionByUUID.get(uuid)
 					if (!updater?.isLocal) {
 						updateFunctionByUUID.delete(uuid)
-						console.log('KV remove update function for', uuid)
+						console.log(serverID, 'KV remove update function for', uuid)
 					}
 				}
 			}
@@ -169,25 +171,31 @@ async function watchForConnectionChanges() {
 }
 
 async function watchForMessages(uuid: string) {
-	console.log(`KV watching cross-server messages for ${uuid}...`)
+	console.log(serverID, `KV watching cross-server messages for ${uuid}...`)
+
+	//delete any old messages
+	const entries = kv.list<string>({ prefix: KV_KEYS.messagePrefix(uuid) })
+	for await (const entry of entries) {
+		console.log(serverID, 'cleanup old message', entry)
+		await kv.delete(entry.key)
+	}
 
 	//KV can't watch a key prefix, you have to watch a specific key, so...
 	//Watch for a message flag to change, indicating that there are new messages for this UUID
 	//... we don't care what the actual flag is set to, just that it changed
 	for await (const changes of kv.watch([KV_KEYS.messageFlag(uuid)])) {
-		console.log('KV message flag', changes)
 		//get all of the messages for this UUID (they will have keys like ['message', UUID, ULID])
 		const messageList = kv.list<QueuedSSEEvent>({ prefix: KV_KEYS.messagePrefix(uuid) })
 		for await (const message of messageList) {
-			console.log(`KV message`, message)
+			console.log(serverID, `KV message`, message)
 			const fn = updateFunctionByUUID.get(uuid)?.update
 			if (fn) {
 				const sseMessage = message.value
 				fn(sseMessage.event, sseMessage.value)
 				await kv.delete(message.key) //we processed this message. Remove it from KV
-				console.log('deleted message', message)
+				console.log(serverID, 'KV deleted message', message)
 			}
-			else console.log('no update function for', uuid)
+			else console.log(serverID, 'KV no update function for', uuid)
 		}
 	}
 }
@@ -195,7 +203,7 @@ async function watchForMessages(uuid: string) {
 //server is starting up... get connections list
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
 export const connectionByUUID = result.value ?? new Map<string, Connection>()
-console.log("INIT Got connections from KV:", connectionByUUID)
+console.log(serverID, "INIT Got connections from KV:", connectionByUUID)
 
 //the server is starting up, so nobody can be connected yet 
 // but it is possible that old connections weren't shut down correctly 
@@ -206,7 +214,7 @@ connectionByUUID.forEach(con => {
 
 //server is starting up... get rooms list
 const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
-console.log("INIT Got rooms from KV:", rooms)
+console.log(serverID, "INIT Got rooms from KV:", rooms)
 cleanupRooms()
 
 
@@ -215,7 +223,7 @@ function cleanupRooms() {
 	rooms.forEach(room => {
 		const ownerUUID = getUUID(room.ownerId)
 		if (!ownerUUID) {
-			console.log('cleanupRooms removed room because no owner found!', room)
+			console.log(serverID, 'cleanupRooms removed room because no owner found!', room)
 			updateAllConnections_deleteRoom(room)
 			rooms.splice(rooms.indexOf(room), 1)
 			modified = true
@@ -223,7 +231,7 @@ function cleanupRooms() {
 		}
 		const owner = connectionByUUID.get(ownerUUID)
 		if (owner?.roomId !== room.id) {
-			console.log('cleanupRooms removed room because owner not in room!', room)
+			console.log(serverID, 'cleanupRooms removed room because owner not in room!', room)
 			updateAllConnections_deleteRoom(room)
 			rooms.splice(rooms.indexOf(room), 1)
 			modified = true
@@ -253,7 +261,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function updateAllConnections(update: Update) {
-	console.log(sseEvent.update.toUpperCase(), update)
+	console.log(serverID, sseEvent.update.toUpperCase(), update)
 	kv.set(KV_KEYS.connections, connectionByUUID)
 	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
@@ -263,7 +271,7 @@ function updateAllConnections(update: Update) {
 }
 
 function updateAllConnections_newConnection(connection: Connection) {
-	console.log(sseEvent.update.toUpperCase(), connection)
+	console.log(serverID, sseEvent.update.toUpperCase(), connection)
 	kv.set(KV_KEYS.connections, connectionByUUID)
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
@@ -274,20 +282,20 @@ function updateAllConnections_newConnection(connection: Connection) {
 
 function updateAllConnections_newRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
-	console.log(sseEvent.new_room.toUpperCase(), room)
+	console.log(serverID, sseEvent.new_room.toUpperCase(), room)
 	updateFunctionByUUID.forEach((fn) =>
 		fn.update(sseEvent.new_room, JSON.stringify(room)))
 }
 
 function updateAllConnections_deleteRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
-	console.log("SSE updateAllConnections_deleteRoom", sseEvent.delete_room, room)
+	console.log(serverID, "SSE updateAllConnections_deleteRoom", sseEvent.delete_room, room)
 	updateFunctionByUUID.forEach(fn =>
 		fn.update(sseEvent.delete_room, JSON.stringify(room)))
 }
 
 function updateAllConnections_deleteConnection(connection: Connection) {
-	console.log(sseEvent.update.toUpperCase(), connection)
+	console.log(serverID, sseEvent.update.toUpperCase(), connection)
 	kv.set(KV_KEYS.connections, connectionByUUID)
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
@@ -348,7 +356,7 @@ async function printLog(limit?: number) {
 	for await (const entry of entries) {
 		const timestamp = new Date(decodeTime(entry.key[2].toString()));
 		const data = entry.value;
-		console.log("LOG", timestamp.toISOString(),
+		console.log(serverID, "LOG", timestamp.toISOString(),
 			data.ip,
 			data.connectionId?.substring(data.connectionId.length - 11),
 			data.kind,
@@ -366,7 +374,7 @@ const api = new Router();
 //the actual conent of the messages, only that they are properly routed.
 //https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
-	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
+	console.log(serverID, ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -398,7 +406,7 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 //Join room by id
 api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 	const roomId = ctx.params.id
-	console.log("[JOIN ROOM] POST", apiRoute.room.toUpperCase(), roomId)
+	console.log(serverID, "[JOIN ROOM] POST", apiRoute.room.toUpperCase(), roomId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -428,7 +436,7 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 //Create a room
 api.post(`/${apiRoute.room}`, async (ctx) => {
 
-	console.log("POST", apiRoute.room.toUpperCase())
+	console.log(serverID, "POST", apiRoute.room.toUpperCase())
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -455,7 +463,7 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 
 //exit room (the room is deleted if the owner leaves)
 api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
-	console.log("DELETE", apiRoute.room.toUpperCase(), ctx.params)
+	console.log(serverID, "DELETE", apiRoute.room.toUpperCase(), ctx.params)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -499,7 +507,7 @@ api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 
 	const oldId = ctx.params.key
 	const oldCon = connectionByUUID.get(oldId)
-	console.log(apiRoute.discardKey.toUpperCase(), oldId, oldCon)
+	console.log(serverID, apiRoute.discardKey.toUpperCase(), oldId, oldCon)
 
 	const success = connectionByUUID.delete(oldId)
 	if (success) {
@@ -520,7 +528,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	//here's what we're deleting...
 	const oldData = objectFrom(connectionByUUID);
-	console.log("CLEAR", oldData, rooms)
+	console.log(serverID, "CLEAR", oldData, rooms)
 	ctx.response.body = oldData
 
 	//delete all data
@@ -574,7 +582,7 @@ api.get(`/${apiRoute.log}/:key`, async (ctx) => {
 
 
 api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
-	console.log(context.request.method.toUpperCase())
+	console.log(serverID, context.request.method.toUpperCase())
 	try {
 		const update = updateConnectionProperty(context.request, "identity")
 		updateAllConnections(update)
@@ -622,7 +630,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 	const uuid = oldKey ?? crypto.randomUUID()
 
 	const old = connectionByUUID.has(uuid)
-	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+	console.log(serverID, "SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
 
 	let connection = connectionByUUID.get(uuid)
 	//retain a log of some connection details (don't wait for it to complete)
@@ -632,7 +640,8 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			connectionId: uuid,
 			os: context.request.userAgent.os.name,
 			ip: context.request.ip,
-			name: connection?.identity?.name
+			name: connection?.identity?.name,
+			serverID
 		} as ConnectionLog)
 	} catch (error) {
 		console.warn('FAILED TO LOG', error)
@@ -657,18 +666,20 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				})
 			}
 
-			updateFunctionByUUID.set(uuid, {isLocal: true, update: (event, value) => {
-				try {
-					controller.enqueue(sseMessage(event, value))
-				} catch (error) {
-					console.error(uuid, error)
+			updateFunctionByUUID.set(uuid, {
+				isLocal: true, update: (event, value) => {
+					try {
+						controller.enqueue(sseMessage(event, value))
+					} catch (error) {
+						console.error(uuid, error)
+					}
 				}
-			}})
-			console.log('SSE set update function for', uuid, updateFunctionByUUID.get(uuid))
+			})
+			console.log(serverID, 'SSE set update function for', uuid, updateFunctionByUUID.get(uuid))
 
 			watchForMessages(uuid)
 
-			console.log("SSE connection   ", uuid, connection)
+			console.log(serverID, "SSE connection   ", uuid, connection)
 
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
@@ -679,7 +690,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		cancel() {
 			//SSE connection has closed...
 			updateFunctionByUUID.delete(uuid)
-			console.log('LOCAL remove update function for', uuid)
+			console.log(serverID, 'LOCAL remove update function for', uuid)
 
 			const connection = connectionByUUID.get(uuid)
 			if (!connection)
@@ -691,7 +702,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 				//do we own the room? Nuke it!
 				if (room && room.ownerId === connection.id) {
-					console.log('owner disconnected from room', room.id)
+					console.log(serverID, 'owner disconnected from room', room.id)
 					deleteRoom(room)
 				}
 
@@ -704,7 +715,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				})
 			}
 
-			console.log("SSE Disconnect   ", uuid, connection)
+			console.log(serverID, "SSE Disconnect   ", uuid, connection)
 			connection.status = ""
 
 			//const update = updateConnectionProperty(context.request, "status", "")
