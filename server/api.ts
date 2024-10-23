@@ -149,11 +149,11 @@ async function watchForConnectionChanges() {
 					console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
 				}
 
-				//remove update functions when connections go offline
-				if(conList.get(uuid)?.status !== 'online' && updateFunctionByUUID.has(uuid)) {
-					updateFunctionByUUID.delete(uuid)
-					console.log('KV remove update function for', uuid)
-				}
+				// //remove update functions when connections go offline
+				// if(conList.get(uuid)?.status !== 'online' && updateFunctionByUUID.has(uuid)) {
+				// 	updateFunctionByUUID.delete(uuid)
+				// 	console.log('KV remove update function for', uuid)
+				// }
 			}
 		}
 	}
