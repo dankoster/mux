@@ -119,7 +119,10 @@ const kv = await Deno.openKv();
 // 	await kv.delete(entry.key)
 // }
 
-const updateFunctionByUUID = new Map<string, (event: SSEvent, value?: string) => void>()
+const updateFunctionByUUID = new Map<string, {
+	isLocal: boolean,
+	update: (event: SSEvent, value?: string) => void,
+}>()
 
 type QueuedSSEEvent = { event: SSEvent, value: string }
 
@@ -141,19 +144,25 @@ async function watchForConnectionChanges() {
 
 				if (conList.get(uuid)?.status === 'online' && !updateFunctionByUUID.has(uuid)) {
 					//This message should come out the other side and become a server-sent-event (SSE) message.
-					updateFunctionByUUID.set(uuid, async (event, value) => {
-						console.log('KV sending message')
-						await kv.set(KV_KEYS.message(uuid), { event, value }) //enqueue the message
-						await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()) //signal that there is a new message.
+					updateFunctionByUUID.set(uuid, {
+						isLocal: false, update: async (event, value) => {
+							console.log('KV sending message')
+							await kv.set(KV_KEYS.message(uuid), { event, value }) //enqueue the message
+							await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()) //signal that there is a new message.
+						}
 					})
 					console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
 				}
 
-				// //remove update functions when connections go offline
-				// if(conList.get(uuid)?.status !== 'online' && updateFunctionByUUID.has(uuid)) {
-				// 	updateFunctionByUUID.delete(uuid)
-				// 	console.log('KV remove update function for', uuid)
-				// }
+				//remove update functions when connections go offline
+				if (conList.get(uuid)?.status !== 'online'
+					&& updateFunctionByUUID.has(uuid)) {
+					const updater = updateFunctionByUUID.get(uuid)
+					if (!updater?.isLocal) {
+						updateFunctionByUUID.delete(uuid)
+						console.log('KV remove update function for', uuid)
+					}
+				}
 			}
 		}
 	}
@@ -171,7 +180,7 @@ async function watchForMessages(uuid: string) {
 		const messageList = kv.list<QueuedSSEEvent>({ prefix: KV_KEYS.messagePrefix(uuid) })
 		for await (const message of messageList) {
 			console.log(`KV message`, message)
-			const fn = updateFunctionByUUID.get(uuid)
+			const fn = updateFunctionByUUID.get(uuid)?.update
 			if (fn) {
 				const sseMessage = message.value
 				fn(sseMessage.event, sseMessage.value)
@@ -249,7 +258,7 @@ function updateAllConnections(update: Update) {
 	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		// if (uuid !== updateUuid)
-		fn(sseEvent.update, JSON.stringify(update))
+		fn.update(sseEvent.update, JSON.stringify(update))
 	})
 }
 
@@ -259,7 +268,7 @@ function updateAllConnections_newConnection(connection: Connection) {
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
-			fn(sseEvent.new_connection, JSON.stringify(connection))
+			fn.update(sseEvent.new_connection, JSON.stringify(connection))
 	})
 }
 
@@ -267,14 +276,14 @@ function updateAllConnections_newRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
 	console.log(sseEvent.new_room.toUpperCase(), room)
 	updateFunctionByUUID.forEach((fn) =>
-		fn(sseEvent.new_room, JSON.stringify(room)))
+		fn.update(sseEvent.new_room, JSON.stringify(room)))
 }
 
 function updateAllConnections_deleteRoom(room: Room) {
 	kv.set(KV_KEYS.rooms, rooms)
 	console.log("SSE updateAllConnections_deleteRoom", sseEvent.delete_room, room)
 	updateFunctionByUUID.forEach(fn =>
-		fn(sseEvent.delete_room, JSON.stringify(room)))
+		fn.update(sseEvent.delete_room, JSON.stringify(room)))
 }
 
 function updateAllConnections_deleteConnection(connection: Connection) {
@@ -283,7 +292,7 @@ function updateAllConnections_deleteConnection(connection: Connection) {
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
-			fn(sseEvent.delete_connection, connection.id)
+			fn.update(sseEvent.delete_connection, connection.id)
 	})
 }
 
@@ -379,7 +388,7 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 		return
 	}
 
-	updateFunctionByUUID.get(recipientUUID)?.call(this, sseEvent.webRTC, JSON.stringify({
+	updateFunctionByUUID.get(recipientUUID)?.update.call(this, sseEvent.webRTC, JSON.stringify({
 		senderId: sender.id,
 		message
 	}))
@@ -526,11 +535,11 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	//tell all cliens we burned it all down (this will cause any active calls to disconnect)
 	const connections = Array.from(connectionByUUID.values())
-	updateFunctionByUUID.forEach(update => update(sseEvent.connections, JSON.stringify(connections)))
-	updateFunctionByUUID.forEach(update => update(sseEvent.rooms, JSON.stringify(rooms)))
+	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.connections, JSON.stringify(connections)))
+	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.rooms, JSON.stringify(rooms)))
 
 	//tell all clients to reconnect
-	updateFunctionByUUID.forEach(update => update(sseEvent.reconnect))
+	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.reconnect))
 })
 
 api.get(`/${apiRoute.log}/:key`, async (ctx) => {
@@ -648,13 +657,13 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				})
 			}
 
-			updateFunctionByUUID.set(uuid, (event, value) => {
+			updateFunctionByUUID.set(uuid, {isLocal: true, update: (event, value) => {
 				try {
 					controller.enqueue(sseMessage(event, value))
 				} catch (error) {
 					console.error(uuid, error)
 				}
-			})
+			}})
 			console.log('SSE set update function for', uuid, updateFunctionByUUID.get(uuid))
 
 			watchForMessages(uuid)
