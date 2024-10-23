@@ -135,6 +135,7 @@ async function watchForConnectionChanges() {
 	console.log(serverID, 'KV watching for connections list changes...')
 	for await (const connectionsListChanges of kv.watch([KV_KEYS.connections])) {
 		for (const change of connectionsListChanges) {
+			console.log(serverID, 'KV connections list updated', { versionstamp: change.versionstamp })
 			const conList = change.value as Map<string, Connection>
 
 			//iterate over all the connections by UUID
@@ -202,6 +203,29 @@ async function watchForMessages(uuid: string) {
 	}
 }
 
+async function updateConnectinonsInKV() {
+	// Retry the transaction until it succeeds.
+	let res = { ok: false };
+	while (!res.ok) {
+		// Read the current list of connections.
+		const conResult = await kv.get(KV_KEYS.connections)
+		if (conResult.value === null) {
+			console.error(serverID, `KV connections not found in KV`);
+			break //abandon the while loop
+		}
+
+		// Attempt to commit the transaction. `res` returns an object with
+		// `ok: false` if the transaction fails to commit due to a check failure
+		// (i.e. the versionstamp for a key has changed)
+		res = await kv.atomic()
+			.check(conResult) // Ensure the list hasn't changed while we were getting set up
+			.set(KV_KEYS.connections, connectionByUUID) // Update the list of connections in KV
+			.commit();
+
+		console.log(serverID, 'KV updated connections list', res)
+	}
+}
+
 //server is starting up... get connections list
 const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
 export const connectionByUUID = result.value ?? new Map<string, Connection>()
@@ -264,7 +288,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 
 function updateAllConnections(update: Update) {
 	console.log(serverID, sseEvent.update.toUpperCase(), update)
-	kv.set(KV_KEYS.connections, connectionByUUID)
+	updateConnectinonsInKV()
 	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		// if (uuid !== updateUuid)
@@ -274,7 +298,7 @@ function updateAllConnections(update: Update) {
 
 function updateAllConnections_newConnection(connection: Connection) {
 	console.log(serverID, sseEvent.update.toUpperCase(), connection)
-	kv.set(KV_KEYS.connections, connectionByUUID)
+	updateConnectinonsInKV()
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
@@ -298,7 +322,7 @@ function updateAllConnections_deleteRoom(room: Room) {
 
 function updateAllConnections_deleteConnection(connection: Connection) {
 	console.log(serverID, sseEvent.update.toUpperCase(), connection)
-	kv.set(KV_KEYS.connections, connectionByUUID)
+	updateConnectinonsInKV()
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
@@ -513,7 +537,7 @@ api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 
 	const success = connectionByUUID.delete(oldId)
 	if (success) {
-		kv.set(KV_KEYS.connections, connectionByUUID)
+		updateConnectinonsInKV()
 		if (oldCon) updateAllConnections_deleteConnection(oldCon)
 	}
 
@@ -540,7 +564,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	//reinit with empty everything
 	connectionByUUID.clear()
 	rooms.length = 0
-	kv.set(KV_KEYS.connections, connectionByUUID)
+	updateConnectinonsInKV()
 	kv.set(KV_KEYS.rooms, [])
 
 	//tell all cliens we burned it all down (this will cause any active calls to disconnect)
@@ -732,7 +756,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			// console.log("DELETE", uuid, connection)
 			// const success = connectionByUUID.delete(uuid)
 			// if (success) {
-			// 	kv.set(KV_KEYS.connections, connectionByUUID)
+			// 	updateConnectinonsInKV()
 			// 	updateAllConnections_deleteConnection(connection)
 			// }
 
