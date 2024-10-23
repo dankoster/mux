@@ -102,7 +102,9 @@ const KV_KEYS = {
 	connections: ['connections'],
 	logPrefix: ["log", "connection"],
 	connectionUUIDs: ['connection', 'uuids'],
-	message: (uuid: string) => ['message', uuid],
+	messageFlag: (conUUID: string) => ['messageFlag', conUUID],
+	messagePrefix: (conUUID: string) => ['message', conUUID],
+	message: (conUUID: string) => [...KV_KEYS.messagePrefix(conUUID), monotonicUlid()]
 }
 
 const kv = await Deno.openKv();
@@ -124,48 +126,33 @@ type QueuedSSEEvent = { event: SSEvent, value: string }
 watchForConnectionChanges()
 async function watchForConnectionChanges() {
 	console.log('KV watching for connections list changes...')
-	for await (const stream of kv.watch([KV_KEYS.connections])) {
-		for (const change of stream) {
+	for await (const connectionsListChanges of kv.watch([KV_KEYS.connections])) {
+		for (const change of connectionsListChanges) {
 			const conList = change.value as Map<string, Connection>
+
+			//iterate over all the connections by UUID
 			for (const uuid of conList.keys()) {
-				//console.log(uuid, conList.get(uuid)?.status || 'offline', updateFunctionByUUID.get(uuid))
 
-				if (conList.get(uuid)?.status === 'online') {
-					if (!updateFunctionByUUID.has(uuid)) {
-						//the connection is online, but not connected to this server
-						// so create an update function that will be able to talk to that connection
-						// through a KV message. This message should come out the other side and be enqueued
-						// as a server-sent-event (SSE) message.
-						updateFunctionByUUID.set(uuid, async (event, value) => {
-							if (!event || !value) return
-							try {
-								//https://docs.deno.com/deploy/kv/manual/transactions/
-								// Retry the transaction until it succeeds.
-								let res = { ok: false };
-								while (!res.ok) {
-									// Read the current messages
-									const unreadMessagesResponse = await kv.get<QueuedSSEEvent[]>(KV_KEYS.message(uuid))
+				//if the connection is online but doesn't have an update function then we know 
+				// that it is not connected to this particular server. Therefore, we can set up
+				// an update function that will send messages to the connection via deno kv.
+				// if the connection does connect to this server the update function will be overwritten
+				// by a local update funcion. 
 
-									const unreadMessages = unreadMessagesResponse.value ?? [];
-									unreadMessages.push({ event, value })
+				if (conList.get(uuid)?.status === 'online' && !updateFunctionByUUID.has(uuid)) {
+					//This message should come out the other side and become a server-sent-event (SSE) message.
+					updateFunctionByUUID.set(uuid, async (event, value) => {
+						console.log('KV sending message')
+						await kv.set(KV_KEYS.message(uuid), { event, value }) //enqueue the message
+						await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()) //signal that there is a new message.
+					})
+					console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
+				}
 
-									// Attempt to commit the transaction. `res` returns an object with
-									// `ok: false` if the transaction fails to commit due to a check failure
-									// (i.e. the versionstamp for a key has changed)
-									res = await kv.atomic()
-										.check(unreadMessagesResponse) // Ensure the unread messages haven't changed hasn't changed.
-										.set(KV_KEYS.message(uuid), unreadMessages) // Update the stored messages.
-										.commit();
-
-									if (res.ok) console.log(`KV set message for ${uuid}`, unreadMessages)
-								}
-							} catch (error) {
-								console.error(uuid, error)
-							}
-						})
-						console.log('KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))
-					}
-					//else console.log('KV DID NOT ADD remote update function for', uuid)
+				//remove update functions when connections go offline
+				if(conList.get(uuid)?.status !== 'online' && updateFunctionByUUID.has(uuid)) {
+					updateFunctionByUUID.delete(uuid)
+					console.log('KV remove update function for', uuid)
 				}
 			}
 		}
@@ -174,24 +161,24 @@ async function watchForConnectionChanges() {
 
 async function watchForMessages(uuid: string) {
 	console.log(`KV watching cross-server messages for ${uuid}...`)
-	kv.delete(KV_KEYS.message(uuid))
 
-	for await (const stream of kv.watch<QueuedSSEEvent[]>([KV_KEYS.message(uuid)])) {
-		for (const change of stream) {
-			const message = change.value //this needs to go out via SSE 
-
-			kv.delete(KV_KEYS.message(uuid))
-
-			if (message) {
-				if (Array.isArray(message)) {
-					message.forEach(m => {
-						console.log(`KV message ${change.key}`, m)
-						const fn = updateFunctionByUUID.get(uuid)
-						if (fn) fn(m.event, m.value)
-						else console.log('no updare function for', uuid)
-					})
-				} else console.log('message is not an array?', message)
+	//KV can't watch a key prefix, you have to watch a specific key, so...
+	//Watch for a message flag to change, indicating that there are new messages for this UUID
+	//... we don't care what the actual flag is set to, just that it changed
+	for await (const changes of kv.watch([KV_KEYS.messageFlag(uuid)])) {
+		console.log('KV message flag', changes)
+		//get all of the messages for this UUID (they will have keys like ['message', UUID, ULID])
+		const messageList = kv.list<QueuedSSEEvent>({ prefix: KV_KEYS.messagePrefix(uuid) })
+		for await (const message of messageList) {
+			console.log(`KV message`, message)
+			const fn = updateFunctionByUUID.get(uuid)
+			if (fn) {
+				const sseMessage = message.value
+				fn(sseMessage.event, sseMessage.value)
+				await kv.delete(message.key) //we processed this message. Remove it from KV
+				console.log('deleted message', message)
 			}
+			else console.log('no update function for', uuid)
 		}
 	}
 }
@@ -683,6 +670,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 		cancel() {
 			//SSE connection has closed...
 			updateFunctionByUUID.delete(uuid)
+			console.log('LOCAL remove update function for', uuid)
 
 			const connection = connectionByUUID.get(uuid)
 			if (!connection)
