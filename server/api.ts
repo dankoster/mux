@@ -125,12 +125,31 @@ const kv = await Deno.openKv();
 // 	await kv.delete(entry.key)
 // }
 
+type QueuedSSEEvent = { event: SSEvent, value: string }
+
 const updateFunctionByUUID = new Map<string, {
 	isLocal: boolean,
 	update: (event: SSEvent, value?: string) => void,
 }>()
 
-type QueuedSSEEvent = { event: SSEvent, value: string }
+//server is starting up... get connections list
+const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
+export const connectionByUUID = result.value ?? new Map<string, Connection>()
+console.log(serverID, "INIT Got connections from KV:", connectionByUUID)
+
+//the server is starting up, so nobody can be connected yet 
+// but it is possible that old connections weren't shut down correctly 
+connectionByUUID.forEach(con => {
+	if (con.status === 'online')
+		con.status = 'suspect'
+})
+
+//server is starting up... get rooms list
+const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
+console.log(serverID, "INIT Got rooms from KV:", rooms)
+cleanupRooms()
+
+
 
 watchForConnectionChanges()
 async function watchForConnectionChanges() {
@@ -317,24 +336,6 @@ async function updateInKvTransaction(key: string[], value: any) {
 		console.log(serverID, 'KV updated connections list', res)
 	}
 }
-
-//server is starting up... get connections list
-const result = await kv.get<Map<string, Connection>>(KV_KEYS.connections)
-export const connectionByUUID = result.value ?? new Map<string, Connection>()
-console.log(serverID, "INIT Got connections from KV:", connectionByUUID)
-
-//the server is starting up, so nobody can be connected yet 
-// but it is possible that old connections weren't shut down correctly 
-connectionByUUID.forEach(con => {
-	if (con.status === 'online')
-		con.status = 'suspect'
-})
-
-//server is starting up... get rooms list
-const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
-console.log(serverID, "INIT Got rooms from KV:", rooms)
-cleanupRooms()
-
 
 function cleanupRooms() {
 	let modified = false
