@@ -87,8 +87,9 @@ function User(props: { con: Connection }) {
 	})
 
 	const serverId = () => {
-		const id = server.serverId()
-		return id.substring(id.length - 4)
+		const serverId = server.serverId()
+		const id = server.id()
+		return `${serverId.substring(serverId.length - 4)} ⨳ ${id.substring(id.length - 4)}`
 	}
 
 
@@ -141,7 +142,7 @@ function User(props: { con: Connection }) {
 			<Show when={!props.con.identity}>
 				<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
 			</Show>
-			<div class="server">server: {serverId()}</div>
+			<div class="server">{serverId()}</div>
 		</div>
 	</div>
 }
