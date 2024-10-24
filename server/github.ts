@@ -1,5 +1,5 @@
 import { Router } from "jsr:@oak/oak@17/router";
-import { addedConnectionIdentity, connectionByUUID } from "./api.ts";
+import { addConnectionIdentity, validateConnectionByUUID } from "./api.ts";
 
 export { github }
 
@@ -11,12 +11,12 @@ github.get(`/oauth`, async (context) => {
 	//github has authenticated the user and redirected them here with a code and state
 	const reqURL = context.request.url
 	const code = reqURL.searchParams.get('code')
-	const state = reqURL.searchParams.get('state')
+	const uuid = reqURL.searchParams.get('state')
 
 	//now we need to use the state to verify this user exists on our end
-	const connection = state && connectionByUUID.get(state)
-	console.log('GITHUB OAUTH CALLBACK', { code, state, connection })
-	if (!code || !state || !connection) {
+	const hasValidConnection = uuid && validateConnectionByUUID(uuid)
+	console.log('GITHUB OAUTH CALLBACK', { code, uuid, hasValidConnection })
+	if (!code || !uuid || !hasValidConnection) {
 		context.response.status = 400 //bad request
 		return
 	}
@@ -73,9 +73,8 @@ github.get(`/oauth`, async (context) => {
 
 	const { id, name, avatar_url } = json
 
-	connection.identity = { source: 'github', id, name, avatar_url }
-	addedConnectionIdentity(connection)
-	console.log('GITHUB AUTH SUCCESS', connection)
+	addConnectionIdentity(uuid, { source: 'github', id, name, avatar_url })
+	console.log('GITHUB AUTH SUCCESS', hasValidConnection)
 
 	context.response.redirect('/')
 });
