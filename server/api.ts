@@ -179,31 +179,91 @@ async function watchForConnectionChanges() {
 				if (!localCon && remoteCon) {
 					console.log(serverID, 'KV new remote connection added to local', remoteCon)
 					connectionByUUID.set(uuid, remoteCon)
+
+					//notify everyone except the new connection
+					updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
+						if (uuidToUpdate !== uuid)
+							fn.update(sseEvent.new_connection, JSON.stringify(remoteCon))
+					})
 				}
 				else if (localCon && remoteCon) {
-					merge(remoteCon, localCon);
+					const updates = merge(remoteCon, localCon)
+					for (const update of updates) {
+						//notify everyone except the new connection
+						updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
+							if (uuidToUpdate !== uuid)
+								fn.update(sseEvent.new_connection, JSON.stringify(update))
+						})
+					}
 				}
 			}
 		}
 	}
 }
 
-function merge(remote: { [key: string]: any }, local: { [key: string]: any }) {
+function merge(remote: Connection, local: Connection) {
+	const updates: Update[] = []
 	for (const key in remote) {
-		if (local[key] !== remote[key]) {
-			if (remote[key] === undefined) {
-				console.log(serverID, `KV set local property "${key}" to match remote value`, { local: local[key], remote: remote[key] });
-				delete local[key];
+		const prop = key as keyof Connection
+		if (local[prop] !== remote[prop]) {
+			if (remote[prop] === undefined) {
+				console.log(serverID, `KV set local property "${prop}" to match remote value`, { local: local[prop], remote: remote[prop] });
+				delete local[prop];
+				updates.push({
+					connectionId: "",
+					field: prop,
+					value: ""
+				})
 			}
-			else if (typeof remote[key] === "object") {
-				merge(remote[key], local[key])
+			else if (prop === 'identity') {
+				if (!remote.identity && local.identity) {
+					console.log(serverID, `KV set local property "${prop}" to match remote value`, { local: local[prop], remote: remote[prop] });
+					delete local.identity
+					updates.push({
+						connectionId: "",
+						field: prop,
+						value: ""
+					})
+				}
+				else if (!local.identity && remote.identity) {
+					console.log(serverID, `KV set local property "${prop}" to match remote value`, { local: local[prop], remote: remote[prop] });
+					local.identity = remote.identity
+					updates.push({
+						connectionId: "",
+						field: prop,
+						value: JSON.stringify(local.identity)
+					})
+				}
+				else if (local.identity && remote.identity) {
+					let updatedIdentity = false
+					for (const iKey in remote[prop]) {
+						const iprop = iKey as keyof Identity
+						if (local.identity[iprop] !== remote[prop][iprop]) {
+							local.identity[iprop] = remote[prop][iprop]
+						}
+					}
+					if (updatedIdentity) {
+						updates.push({
+							connectionId: "",
+							field: prop,
+							value: JSON.stringify(local.identity)
+						})
+					}
+				}
 			}
 			else {
-				console.log(serverID, `KV set local property "${key}" to match remote value`, { local: local[key], remote: remote[key] });
-				local[key] = remote[key];
+				console.log(serverID, `KV set local property "${prop}" to match remote value`, { local: local[prop], remote: remote[prop] });
+				local[prop] = remote[prop];
+				updates.push({
+					connectionId: "",
+					field: prop,
+					value: local[prop]
+				})
 			}
 		}
 	}
+
+	return updates
 }
 
 async function watchForMessages(uuid: string) {
