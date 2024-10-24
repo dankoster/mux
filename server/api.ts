@@ -104,7 +104,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 const KV_KEYS = {
 	rooms: ['rooms'],
 
-	connections: ['connections'],
+	newConnectionFlag: ['newConnectionFlag'],
 	connectionPrefix: ['connection'],
 	connection: (uuid: string) => [...KV_KEYS.connectionPrefix, uuid],
 
@@ -136,7 +136,7 @@ const updateFunctionByUUID = new Map<string, {
 }>()
 
 //server is starting up... get connections list
-export const connectionByUUID = await InitConnections()
+const connectionByUUID = await InitConnections()
 async function InitConnections() {
 	const connections = new Map<string, Connection>()
 	const kv_connections = kv.list<Connection>({ prefix: KV_KEYS.connectionPrefix });
@@ -146,22 +146,53 @@ async function InitConnections() {
 		connections.set(uuid, connection)
 
 		if (connection.status === 'online' && !updateFunctionByUUID.has(uuid)) {
-			updateFunctionByUUID.set(uuid, {
-				isLocal: false,
-				update: async (event, value) => {
-					console.log(serverID, 'KV sending message', { event, value })
-					await kv.set(KV_KEYS.message(uuid), { event, value }) //enqueue the message
-					await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()) //signal that there is a new message.
-				}
-			})
-			console.log(serverID, 'KV set remote update function for', uuid, updateFunctionByUUID.get(uuid))	
+			createRemoteUpdateFunction(uuid)
 		}
-		
+
 		watchForUpdates(kv_connection.key, uuid)
 	}
-	
+
 	console.log(serverID, "INIT Got connections from KV:", connections)
+	watchForNewConnections()
 	return connections
+}
+
+async function watchForNewConnections() {
+	console.log(serverID, `KV watching for new connections`)
+
+	//KV can't watch a key prefix, you have to watch a specific key, so...
+	//Watch for a flag to change, indicating that there are new connections
+	//... we don't care what the actual flag is set to, just that it changed
+	for await (const changes of kv.watch([KV_KEYS.newConnectionFlag])) {
+
+		const kv_connections = kv.list<Connection>({ prefix: KV_KEYS.connectionPrefix });
+		for await (const kv_connection of kv_connections) {
+			const uuid = kv_connection.key[1] as string
+			const connection = kv_connection.value as Connection
+
+			if (!connectionByUUID.has(uuid)) {
+				connectionByUUID.set(uuid, connection)
+				if (connection.status === 'online' && !updateFunctionByUUID.has(uuid)) {
+					createRemoteUpdateFunction(uuid);
+				}
+
+				watchForUpdates(kv_connection.key, uuid)
+			}
+		}
+
+	}
+}
+
+function createRemoteUpdateFunction(uuid: string) {
+	updateFunctionByUUID.set(uuid, {
+		isLocal: false,
+		update: async (event, value) => {
+			console.log(serverID, 'KV sending message', { event, value });
+			await kv.set(KV_KEYS.message(uuid), { event, value }); //enqueue the message
+			await kv.set(KV_KEYS.messageFlag(uuid), monotonicUlid()); //signal that there is a new message.
+		}
+	});
+	console.log(serverID, 'KV set remote update function for', uuid, updateFunctionByUUID.get(uuid));
 }
 
 async function watchForUpdates(key: Deno.KvKey, uuid: string) {
@@ -237,7 +268,16 @@ function cleanupRooms() {
 	if (modified) kv.set(KV_KEYS.rooms, rooms)
 }
 
-export function addedConnectionIdentity(con: Connection) {
+export function validateConnectionByUUID(uuid: string) {
+	return connectionByUUID.has(uuid)
+}
+export async function addConnectionIdentity(uuid: string, identity: Identity) {
+	const con = connectionByUUID.get(uuid)
+	if (!con) throw new Error(`connection not found for uuid ${uuid}`)
+	con.identity = identity
+	const result = await kv.set(KV_KEYS.connection(uuid), con)
+	if (!result.ok) throw new Error('error updating connection identity')
+	console.log(serverID, "addConnectionIdentity", con)
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
 		field: "identity",
@@ -257,9 +297,9 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 }
 
 function notifyAllConnections(event: SSEvent, update: Update | Room | Connection, options?: { excludeUUID?: string }) {
-	console.log(serverID, event.toUpperCase(), update)
 	updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
 		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate)
+			console.log(serverID, event.toUpperCase(), uuidToUpdate, update)
 			fn.update(event, JSON.stringify(update))
 	})
 }
@@ -492,7 +532,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 		await kv.delete(entry.key)
 	}
 	await kv.delete(KV_KEYS.rooms)
-	await kv.delete(KV_KEYS.connections)
+	//await kv.delete(KV_KEYS.connections)
 
 	//reinit with empty everything
 	connectionByUUID.clear()
@@ -540,7 +580,7 @@ api.get(`/${apiRoute.log}/:key`, async (ctx) => {
 
 
 api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
-	console.log(serverID, context.request.method.toUpperCase())
+	// console.log(serverID, context.request.method.toUpperCase(), context.request.url.pathname)
 	try {
 		const update = updateConnectionProperty(context.request, "identity")
 		notifyAllConnections(sseEvent.update, update)
@@ -647,6 +687,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(rooms)))
 
 			if (isNewConnection) {
+				await kv.set(KV_KEYS.newConnectionFlag, monotonicUlid())
 				notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
 			}
 
