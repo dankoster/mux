@@ -41,18 +41,20 @@ export type Room = {
 	ownerId: string
 }
 
+export type Identity = {
+	source?: string,
+	id?: string,
+	name?: string,
+	avatar_url?: string
+}
+
 export type Connection = {
 	id: string,
 	color?: string,
 	text?: string,
 	status?: string,
 	roomId?: string,
-	identity?: {
-		source?: string,
-		id?: string,
-		name?: string,
-		avatar_url?: string
-	}
+	identity?: Identity
 }
 
 type ConnectionLog = {
@@ -138,6 +140,8 @@ async function watchForConnectionChanges() {
 			console.log(serverID, 'KV connections list updated', { versionstamp: change.versionstamp })
 			const conList = change.value as Map<string, Connection>
 
+			if (!conList) break
+
 			//iterate over all the connections by UUID
 			for (const uuid of conList.keys()) {
 
@@ -168,6 +172,35 @@ async function watchForConnectionChanges() {
 						console.log(serverID, 'KV remove update function for', uuid)
 					}
 				}
+
+				//synchronize local connection with remote connection
+				const localCon = connectionByUUID.get(uuid)
+				const remoteCon = conList.get(uuid)
+				if (!localCon && remoteCon) {
+					console.log(serverID, 'KV new remote connection added to local', remoteCon)
+					connectionByUUID.set(uuid, remoteCon)
+				}
+				else if (localCon && remoteCon) {
+					merge(remoteCon, localCon);
+				}
+			}
+		}
+	}
+}
+
+function merge(remote: { [key: string]: any }, local: { [key: string]: any }) {
+	for (const key in remote) {
+		if (local[key] !== remote[key]) {
+			if (remote[key] === undefined) {
+				console.log(serverID, `KV set local property "${key}" to match remote value`, { local: local[key], remote: remote[key] });
+				delete local[key];
+			}
+			else if (typeof remote[key] === "object") {
+				merge(remote[key], local[key])
+			}
+			else {
+				console.log(serverID, `KV set local property "${key}" to match remote value`, { local: local[key], remote: remote[key] });
+				local[key] = remote[key];
 			}
 		}
 	}
@@ -176,12 +209,12 @@ async function watchForConnectionChanges() {
 async function watchForMessages(uuid: string) {
 	console.log(serverID, `KV watching cross-server messages for ${uuid}...`)
 
-	//delete any old messages
-	const entries = kv.list<string>({ prefix: KV_KEYS.messagePrefix(uuid) })
-	for await (const entry of entries) {
-		console.log(serverID, 'cleanup old message', entry)
-		await kv.delete(entry.key)
-	}
+	// //delete any old messages
+	// const entries = kv.list<string>({ prefix: KV_KEYS.messagePrefix(uuid) })
+	// for await (const entry of entries) {
+	// 	console.log(serverID, 'cleanup old message', entry)
+	// 	await kv.delete(entry.key)
+	// }
 
 	//KV can't watch a key prefix, you have to watch a specific key, so...
 	//Watch for a message flag to change, indicating that there are new messages for this UUID
@@ -190,28 +223,27 @@ async function watchForMessages(uuid: string) {
 		//get all of the messages for this UUID (they will have keys like ['message', UUID, ULID])
 		const messageList = kv.list<QueuedSSEEvent>({ prefix: KV_KEYS.messagePrefix(uuid) })
 		for await (const message of messageList) {
-			console.log(serverID, `KV message`, message)
+			console.log(serverID, `KV got message`, message)
 			const fn = updateFunctionByUUID.get(uuid)?.update
 			if (fn) {
 				const sseMessage = message.value
 				fn(sseMessage.event, sseMessage.value)
 				await kv.delete(message.key) //we processed this message. Remove it from KV
-				console.log(serverID, 'KV deleted message', message)
+				console.log(serverID, 'KV deleted message', message.key)
 			}
 			else console.log(serverID, 'KV no update function for', uuid)
 		}
 	}
 }
 
-async function updateConnectinonsInKV() {
+async function updateInKvTransaction(key: string[], value: any) {
 	// Retry the transaction until it succeeds.
 	let res = { ok: false };
 	while (!res.ok) {
 		// Read the current list of connections.
-		const conResult = await kv.get(KV_KEYS.connections)
+		const conResult = await kv.get(key)
 		if (conResult.value === null) {
-			console.error(serverID, `KV connections not found in KV`);
-			break //abandon the while loop
+			console.error(serverID, `KV connections not found in KV`, conResult);
 		}
 
 		// Attempt to commit the transaction. `res` returns an object with
@@ -219,7 +251,7 @@ async function updateConnectinonsInKV() {
 		// (i.e. the versionstamp for a key has changed)
 		res = await kv.atomic()
 			.check(conResult) // Ensure the list hasn't changed while we were getting set up
-			.set(KV_KEYS.connections, connectionByUUID) // Update the list of connections in KV
+			.set(KV_KEYS.connections, value) // Update the list of connections in KV
 			.commit();
 
 		console.log(serverID, 'KV updated connections list', res)
@@ -288,7 +320,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 
 function updateAllConnections(update: Update) {
 	console.log(serverID, sseEvent.update.toUpperCase(), update)
-	updateConnectinonsInKV()
+	updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
 	// var updateUuid = getUUID(update.connectionId);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		// if (uuid !== updateUuid)
@@ -298,7 +330,7 @@ function updateAllConnections(update: Update) {
 
 function updateAllConnections_newConnection(connection: Connection) {
 	console.log(serverID, sseEvent.update.toUpperCase(), connection)
-	updateConnectinonsInKV()
+	updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
@@ -322,7 +354,7 @@ function updateAllConnections_deleteRoom(room: Room) {
 
 function updateAllConnections_deleteConnection(connection: Connection) {
 	console.log(serverID, sseEvent.update.toUpperCase(), connection)
-	updateConnectinonsInKV()
+	updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
 	var updateUuid = getUUID(connection.id);
 	updateFunctionByUUID.forEach((fn, uuid) => {
 		if (uuid !== updateUuid)
@@ -537,7 +569,7 @@ api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
 
 	const success = connectionByUUID.delete(oldId)
 	if (success) {
-		updateConnectinonsInKV()
+		updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
 		if (oldCon) updateAllConnections_deleteConnection(oldCon)
 	}
 
@@ -564,7 +596,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	//reinit with empty everything
 	connectionByUUID.clear()
 	rooms.length = 0
-	updateConnectinonsInKV()
+	updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
 	kv.set(KV_KEYS.rooms, [])
 
 	//tell all cliens we burned it all down (this will cause any active calls to disconnect)
