@@ -182,6 +182,7 @@ async function watchForRoomUpdates() {
 
 //server is starting up... get connections list
 const connectionByUUID = await InitConnections()
+connectionByUUID.forEach((con, uuid) => watchForRemoteConnectionDisconnect(KV_KEYS.connection(uuid), uuid))
 watchForNewConnections()
 
 async function InitConnections() {
@@ -195,8 +196,6 @@ async function InitConnections() {
 		if (connection.status === 'online' && !updateFunctionByUUID.has(uuid)) {
 			createRemoteUpdateFunction(uuid)
 		}
-
-		watchForRemoteConnectionDisconnect(kv_connection.key, uuid)
 	}
 
 	console.log(serverID, "INIT Got connections from KV:", connections)
@@ -246,8 +245,11 @@ function createRemoteUpdateFunction(uuid: string) {
 }
 
 async function watchForRemoteConnectionDisconnect(key: Deno.KvKey, uuid: string) {
+	if(!connectionByUUID) 
+		throw new Error(`${serverID} cannot watch for disconnect before connectionByUUID exists!`)
+
 	//watch for changes to this connection
-	console.log(serverID, 'KV watching for updates', uuid)
+	console.log(serverID, 'KV watching for updates', key)
 	const stream = kv.watch([key]);
 	for await (const update of stream) {
 		// console.log(serverID, "KV connection updated", update[0])
