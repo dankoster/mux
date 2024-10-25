@@ -1,6 +1,8 @@
 *.env*
-!*.env.production
 *.db
+*.pem
+*.crt
+*.key
 
 # Logs
 logs

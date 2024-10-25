@@ -8,7 +8,7 @@ import { api } from "./api.ts";
 import { github } from "./github.ts";
 
 //@ts-ignore
-const PORT = import.meta.env?.VITE_SERVER_PORT ?? 8080;
+const PORT = Number.parseInt(Deno.env.get("SERVER_PORT")) || 8080;
 
 const logRouteDuration: Middleware = async (ctx, next) => {
 	const start = Date.now();
@@ -33,6 +33,7 @@ app.use(router.routes())
 //serve static files from /dist
 app.use(async (context, next) => {
 	try {
+		//console.log("[STATIC]", context.request.method, context.request.url.toString())
 		await context.send({
 			root: "./dist",
 			index: "index.html",
@@ -45,14 +46,6 @@ app.use(async (context, next) => {
 
 app.use(router.allowedMethods());
 
-app.addEventListener("close", (e) => {
-	console.log('server stopped by close event', e)
-})
-
-app.addEventListener("error", (e) => {
-	console.log('server stopped by error', e)
-})
-
 app.addEventListener("listen", ({ hostname, port, secure }) => {
 	const origin = `${secure ? "https://" : "http://"}${hostname ?? "localhost"}`
 	console.log(
@@ -60,11 +53,14 @@ app.addEventListener("listen", ({ hostname, port, secure }) => {
 	);
 });
 
-try {
-	await app.listen({ port: PORT });
-} catch (ex) {
-	console.log(`server stopped by exception`, ex)
+const cert = Deno.readTextFileSync(`./chatmux.crt`)
+const key = Deno.readTextFileSync(`./chatmux.key`)
+
+if (cert && key) {
+	console.log('starting server with certificate')
+	await app.listen({ port: PORT, secure: true, cert, key });
 }
-
-console.log(`server shutting down`)
-
+else {
+	console.log('starting server WITH NO CERTIFICATE')
+	await app.listen({ port: PORT });
+}

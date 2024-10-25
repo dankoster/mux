@@ -6,17 +6,23 @@
 	"configurations": [
 		{
 			"request": "launch",
-			"name": "Launch Program",
+			"name": "Debug server.ts",
 			"type": "node",
 			"program": "${workspaceFolder}/server/server.ts",
 			"cwd": "${workspaceFolder}",
 			"env": {},
-			"runtimeExecutable": "~/.deno/bin/deno",
+			"runtimeExecutable": "deno",
 			"runtimeArgs": [
 				"run",
 				"--inspect-wait",
 				"--allow-all",
-				"--unstable-ffi"
+				"--unstable-ffi",
+				"--allow-read=$PWD,'./dist',$HOME/Lab/certs/out/chatmux.crt,$HOME/Lab/certs/out/chatmux.key"
+				,"--allow-env"
+				,"--env"
+				,"--unstable-kv"
+				,"--allow-net"
+				,"--watch-hmr"
 			],
 			"attachSimplePort": 9229
 		}
