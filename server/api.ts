@@ -102,7 +102,10 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 }
 
 const KV_KEYS = {
-	rooms: ['rooms'],
+	//rooms: ['rooms'],
+	roomPrefix: ['room'],
+	roomChangeFlag: ['roomChangeFlag'],
+	room: (uuid: string) => [...KV_KEYS.roomPrefix, uuid],
 
 	newConnectionFlag: ['newConnectionFlag'],
 	connectionPrefix: ['connection'],
@@ -135,8 +138,47 @@ const updateFunctionByUUID = new Map<string, {
 	update: (event: SSEvent, value?: string) => void,
 }>()
 
+//server is starting up... get rooms list
+const roomByUUID = await InitRooms()
+async function InitRooms() {
+	const rooms = new Map<string, Room>()
+	const kv_rooms = kv.list<Room>({ prefix: KV_KEYS.roomPrefix });
+	for await (const kv_room of kv_rooms) {
+		const uuid = kv_room.key[1] as string
+		const room = kv_room.value as Room
+		rooms.set(uuid, room)
+	}
+
+	watchForRoomUpdates();
+
+	console.log(serverID, "INIT Got rooms from KV:", rooms)
+	return rooms
+}
+
+async function watchForRoomUpdates() {
+	console.log(serverID, 'KV watching for room changes');
+	for await (const changes of kv.watch([KV_KEYS.roomChangeFlag])) {
+
+		const kv_rooms = kv.list<Room>({ prefix: KV_KEYS.roomPrefix });
+		for await (const kv_room of kv_rooms) {
+			const uuid = kv_room.key[1] as string;
+			const room = kv_room.value as Room;
+
+			//add the room if we don't have it
+			if (!roomByUUID.has(uuid)) {
+				console.log(serverID, 'KV adding room created remoteley')
+				roomByUUID.set(uuid, room);
+			}
+
+			//TODO: what about deleting rooms?
+		}
+	}
+}
+
+
 //server is starting up... get connections list
 const connectionByUUID = await InitConnections()
+
 async function InitConnections() {
 	const connections = new Map<string, Connection>()
 	const kv_connections = kv.list<Connection>({ prefix: KV_KEYS.connectionPrefix });
@@ -149,7 +191,7 @@ async function InitConnections() {
 			createRemoteUpdateFunction(uuid)
 		}
 
-		watchForUpdates(kv_connection.key, uuid)
+		watchForRemoteConnectionDisconnect(kv_connection.key, uuid)
 	}
 
 	console.log(serverID, "INIT Got connections from KV:", connections)
@@ -176,7 +218,7 @@ async function watchForNewConnections() {
 					createRemoteUpdateFunction(uuid);
 				}
 
-				watchForUpdates(kv_connection.key, uuid)
+				watchForRemoteConnectionDisconnect(kv_connection.key, uuid)
 			}
 		}
 
@@ -195,7 +237,7 @@ function createRemoteUpdateFunction(uuid: string) {
 	console.log(serverID, 'KV set remote update function for', uuid, updateFunctionByUUID.get(uuid));
 }
 
-async function watchForUpdates(key: Deno.KvKey, uuid: string) {
+async function watchForRemoteConnectionDisconnect(key: Deno.KvKey, uuid: string) {
 	//watch for changes to this connection
 	console.log(serverID, 'KV watching for updates', uuid)
 	const stream = kv.watch([key]);
@@ -214,13 +256,6 @@ async function watchForUpdates(key: Deno.KvKey, uuid: string) {
 		}
 	}
 }
-
-
-//server is starting up... get rooms list
-const rooms = (await kv.get<Room[]>(KV_KEYS.rooms)).value ?? [] as Room[]
-console.log(serverID, "INIT Got rooms from KV:", rooms)
-cleanupRooms()
-
 
 async function watchForMessages(uuid: string) {
 	console.log(serverID, `KV watching cross-server messages for ${uuid}...`)
@@ -245,28 +280,28 @@ async function watchForMessages(uuid: string) {
 	}
 }
 
-function cleanupRooms() {
-	let modified = false
-	rooms.forEach(room => {
-		const ownerUUID = getUUID(room.ownerId)
-		if (!ownerUUID) {
-			console.log(serverID, 'cleanupRooms removed room because no owner found!', room)
-			rooms.splice(rooms.indexOf(room), 1)
-			updateFunctionByUUID.forEach(fn => fn.update(sseEvent.delete_room, JSON.stringify(room)))
-			modified = true
-			return
-		}
-		const owner = connectionByUUID.get(ownerUUID)
-		if (owner?.roomId !== room.id) {
-			console.log(serverID, 'cleanupRooms removed room because owner not in room!', room)
-			rooms.splice(rooms.indexOf(room), 1)
-			updateFunctionByUUID.forEach(fn => fn.update(sseEvent.delete_room, JSON.stringify(room)))
-			modified = true
-		}
-	})
+// function cleanupRooms() {
+// 	let modified = false
+// 	rooms.forEach(room => {
+// 		const ownerUUID = getUUID(room.ownerId)
+// 		if (!ownerUUID) {
+// 			console.log(serverID, 'cleanupRooms removed room because no owner found!', room)
+// 			rooms.splice(rooms.indexOf(room), 1)
+// 			updateFunctionByUUID.forEach(fn => fn.update(sseEvent.delete_room, JSON.stringify(room)))
+// 			modified = true
+// 			return
+// 		}
+// 		const owner = connectionByUUID.get(ownerUUID)
+// 		if (owner?.roomId !== room.id) {
+// 			console.log(serverID, 'cleanupRooms removed room because owner not in room!', room)
+// 			rooms.splice(rooms.indexOf(room), 1)
+// 			updateFunctionByUUID.forEach(fn => fn.update(sseEvent.delete_room, JSON.stringify(room)))
+// 			modified = true
+// 		}
+// 	})
 
-	if (modified) kv.set(KV_KEYS.rooms, rooms)
-}
+// 	if (modified) kv.set(KV_KEYS.rooms, rooms)
+// }
 
 export function validateConnectionByUUID(uuid: string) {
 	return connectionByUUID.has(uuid)
@@ -298,9 +333,10 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 
 function notifyAllConnections(event: SSEvent, update: Update | Room | Connection, options?: { excludeUUID?: string }) {
 	updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
-		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate)
+		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate) {
 			console.log(serverID, event.toUpperCase(), uuidToUpdate, update)
 			fn.update(event, JSON.stringify(update))
+		}
 	})
 }
 
@@ -331,7 +367,7 @@ function objectFrom<V>(map: Map<string, V>) {
 
 function deleteRoom(room: Room) {
 	//kick all users from the room
-	console.log("deleteRoom: kick all users!")
+	console.log(serverID, "deleteRoom: kick all users!")
 	connectionByUUID.forEach((connection, uuid) => {
 		if (connection.roomId === room.id) {
 			delete connection.roomId;
@@ -345,9 +381,9 @@ function deleteRoom(room: Room) {
 		}
 	});
 
-	rooms.splice(rooms.indexOf(room), 1);
-
-	//TODO: update KV rooms
+	roomByUUID.delete(room.id)
+	kv.delete(KV_KEYS.room(room.id))
+	kv.set(KV_KEYS.roomChangeFlag, monotonicUlid())
 
 	notifyAllConnections(sseEvent.delete_room, room)
 }
@@ -401,9 +437,7 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 		return
 	}
 
-	cleanupRooms()
-
-	const room = rooms.find(room => room.id === roomId)
+	const room = roomByUUID.get(roomId)
 	if (!room) {
 		ctx.response.status = 404
 		return
@@ -438,11 +472,13 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 	}
 
 	con.roomId = room.id
-	rooms.push(room)
+	roomByUUID.set(room.id, room)
 
-	//TODO: update KV rooms
-
-	kv.set(KV_KEYS.connection(uuid), con)
+	await Promise.all([
+		kv.set(KV_KEYS.room(room.id), room),
+		kv.set(KV_KEYS.roomChangeFlag, monotonicUlid()),
+		kv.set(KV_KEYS.connection(uuid), con),
+	])
 
 	notifyAllConnections(sseEvent.new_room, room)
 	notifyAllConnections(sseEvent.update, {
@@ -468,6 +504,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 
 	//remove the room reference regardless (we're leaving the room)
 	delete con.roomId
+	kv.set(KV_KEYS.connection(uuid), con)
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
 		field: "roomId",
@@ -476,7 +513,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	ctx.response.status = 200 //but we did successfully leave the room
 
 	//are we the owner? Nuke it!
-	const room = rooms.find(room => room.id === ctx.params.id)
+	const room = roomByUUID.get(ctx.params.id)
 	if (room && room.ownerId == con.id) {
 		deleteRoom(room);
 		ctx.response.body = room
@@ -486,32 +523,17 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 
 //Get room by id
 api.get(`/${apiRoute.room}/:id`, async (ctx) => {
-	ctx.response.body = rooms.find(room => room.id === ctx.params.id)
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
+	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
+
+	const con = connectionByUUID.get(uuid)
+	if (!con) {
+		ctx.response.status = 401 //unauthenticated
+		return
+	}
+
+	ctx.response.body = roomByUUID.get(ctx.params.id)
 })
-
-//Let a client clean up their old keys
-// api.post(`/${apiRoute.discardKey}/:key`, async (ctx) => {
-// 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
-// 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
-
-// 	//TODO: Do we need to verify that this user owned the previous key? 
-// 	// they ARE bearer tokens afterall... don't share your keys!
-// 	// probably just rate limit this to one per day or something
-
-// 	// const oldId = ctx.params.key
-// 	// const oldCon = connectionByUUID.get(oldId)
-// 	// console.log(serverID, apiRoute.discardKey.toUpperCase(), oldId, oldCon)
-
-// 	// const success = connectionByUUID.delete(oldId)
-// 	// if (success) {
-// 	// 	updateInKvTransaction(KV_KEYS.connections, connectionByUUID)
-// 	// 	if (oldCon) updateAllConnections_deleteConnection(oldCon)
-// 	// }
-
-// 	// ctx.response.body = success
-
-// 	ctx.response.status = 404
-// })
 
 //nuke it from orbit
 api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
@@ -523,7 +545,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	//here's what we're deleting...
 	const oldData = objectFrom(connectionByUUID);
-	console.log(serverID, "CLEAR", oldData, rooms)
+	console.log(serverID, "CLEAR", oldData, roomByUUID)
 	ctx.response.body = oldData
 
 	//delete all data
@@ -531,18 +553,15 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	for await (const entry of entries) {
 		await kv.delete(entry.key)
 	}
-	await kv.delete(KV_KEYS.rooms)
-	//await kv.delete(KV_KEYS.connections)
+
+	const rooms = kv.list({ prefix: KV_KEYS.roomPrefix })
+	for await (const room of rooms) {
+		kv.delete(room.key)
+	}
 
 	//reinit with empty everything
 	connectionByUUID.clear()
-	rooms.length = 0
-	kv.set(KV_KEYS.rooms, [])
-
-	//tell all cliens we burned it all down (this will cause any active calls to disconnect)
-	const connections = Array.from(connectionByUUID.values())
-	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.connections, JSON.stringify(connections)))
-	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.rooms, JSON.stringify(rooms)))
+	roomByUUID.clear()
 
 	//tell all clients to reconnect
 	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.reconnect))
@@ -684,7 +703,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			controller.enqueue(sseMessage(sseEvent.serverId, serverID?.toString()))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
-			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(rooms)))
+			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(Array.from(roomByUUID.values()))))
 
 			if (isNewConnection) {
 				await kv.set(KV_KEYS.newConnectionFlag, monotonicUlid())
@@ -708,7 +727,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			//are we disconnecting while we have a room open?
 			if (connection.roomId) {
-				const room = rooms.find(room => room.id === connection.roomId)
+				const room = roomByUUID.get(connection.roomId)
 
 				//do we own the room? Nuke it!
 				if (room && room.ownerId === connection.id) {
