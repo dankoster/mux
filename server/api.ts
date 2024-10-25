@@ -213,11 +213,13 @@ async function watchForNewConnections() {
 			const connection = kv_connection.value as Connection
 
 			if (!connectionByUUID.has(uuid)) {
+				console.log(serverID, 'KV Got new connection')
 				connectionByUUID.set(uuid, connection)
 				if (connection.status === 'online' && !updateFunctionByUUID.has(uuid)) {
 					createRemoteUpdateFunction(uuid);
 				}
 
+				notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
 				watchForRemoteConnectionDisconnect(kv_connection.key, uuid)
 			}
 		}
