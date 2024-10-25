@@ -171,6 +171,7 @@ async function watchForRoomUpdates() {
 			if (!roomByUUID.has(uuid)) {
 				console.log(serverID, 'KV adding room created remoteley')
 				roomByUUID.set(uuid, room);
+				notifyAllConnections(sseEvent.new_room, room)
 			}
 
 			//TODO: what about deleting rooms?
