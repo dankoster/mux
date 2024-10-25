@@ -53,8 +53,15 @@ app.addEventListener("listen", ({ hostname, port, secure }) => {
 	);
 });
 
-const cert = Deno.readTextFileSync(`./chatmux.crt`)
-const key = Deno.readTextFileSync(`./chatmux.key`)
+let cert
+let key
+
+try {
+	cert = Deno.readTextFileSync(`./chatmux.crt`)
+	key = Deno.readTextFileSync(`./chatmux.key`)
+} catch (error) {
+	console.log(error.message)
+}
 
 if (cert && key) {
 	console.log('starting server with certificate')
