@@ -49,17 +49,15 @@ function User(props: { con: Connection }) {
 	const [callState, setCallState] = createSignal<CallState>("no_call")
 	const startCall = async () => {
 		setCallState("server_wait")
-		const result = await server.createRoom()
+		const room = await server.createRoom()
 
-		if (!result.ok) {
-			console.error("error creating room!", result)
+		if (!room.id) {
+			console.error("error creating room!", room)
 			setCallState("server_error")
 			return
 		}
 
-		const newRoom = await result.json()
-		console.log('Call started!', newRoom)
-
+		console.log('Call started!')
 		setCallState("call_ready")
 	}
 

@@ -161,9 +161,19 @@ export async function becomeAnonymous() {
 }
 
 export async function createRoom() {
-	//TODO: optimistically create the room locally
+	const result = await POST(apiRoute.room)
+	if (!result.ok) throw new Error("could not create room")
+
+	//Optimistically create the room locally
 	// so we can update the UI while we wait for the server
-	return await POST(apiRoute.room)
+	// to send us a room ID via SSE
+	const room = await result.json() as Room
+	const myId = id()
+	const index = connections.findIndex(con => con.id === myId)
+	if (!(index >= 0)) throw new Error('ID not found!')
+
+	setConnections({ from: index, to: index }, "roomId", room.id)
+	return room
 }
 export async function joinRoom(roomId: string) {
 	return await POST(apiRoute["room/join"], { subRoute: roomId })
@@ -227,7 +237,7 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData);
-			updateConnectionStatus()
+			updateConnectionCounts()
 			console.log('SSE', event.event, conData);
 			break;
 		case sse.rooms:
@@ -239,16 +249,16 @@ function handleSseEvent(event: SSEventPayload) {
 			throw "reconnect requested by server"
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
+			console.log('SSE', event.event, update)
 			if (update.field === 'identity') {
 				console.log('parsing identity...')
 				update.value = update.value && JSON.parse(update.value)
 			}
-			console.log('SSE', event.event, update)
 			const index = connections.findIndex(con => con.id === update.connectionId)
-			if (!(index >= 0)) throw new Error('TODO: ask server for an updated list')
+			if (!(index >= 0)) throw new Error(`${update.connectionId} not found in connections`)
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
-			updateConnectionStatus()
+			updateConnectionCounts()
 			break;
 		case sse.new_room:
 			const newRoom = JSON.parse(event.data) as Room
@@ -273,14 +283,14 @@ function handleSseEvent(event: SSEventPayload) {
 			const newCon = JSON.parse(event.data) as Connection
 			console.log('SSE', event.event, newCon)
 			setConnections(connections.length, newCon)
-			updateConnectionStatus()
+			updateConnectionCounts()
 			console.log(connections)
 			break;
 		case sse.delete_connection:
 			const conId = event.data
 			console.log('SSE', event.event, conId)
 			setConnections(connections.filter(con => con.id !== conId))
-			updateConnectionStatus()
+			updateConnectionCounts()
 			break;
 		default:
 			console.warn(`Unknown SSE field "${event?.event}"`, event?.data)
@@ -300,7 +310,7 @@ export function sendWebRtcMessage(userId: string, message: string) {
 	return POST(apiRoute.webRTC, { subRoute: userId, body: message })
 }
 
-function updateConnectionStatus() {
+function updateConnectionCounts() {
 	setStats({
 		online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
 		offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
