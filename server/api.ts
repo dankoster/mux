@@ -140,6 +140,7 @@ const updateFunctionByUUID = new Map<string, {
 
 //server is starting up... get rooms list
 const roomByUUID = await InitRooms()
+watchForRoomUpdates();
 async function InitRooms() {
 	const rooms = new Map<string, Room>()
 	const kv_rooms = kv.list<Room>({ prefix: KV_KEYS.roomPrefix });
@@ -149,14 +150,16 @@ async function InitRooms() {
 		rooms.set(uuid, room)
 	}
 
-	watchForRoomUpdates();
-
 	console.log(serverID, "INIT Got rooms from KV:", rooms)
 	return rooms
 }
 
 async function watchForRoomUpdates() {
+	if(!roomByUUID) 
+		throw new Error(`${serverID} cannot watch roomByUUID before it exists!`)
+
 	console.log(serverID, 'KV watching for room changes');
+
 	for await (const changes of kv.watch([KV_KEYS.roomChangeFlag])) {
 
 		const kv_rooms = kv.list<Room>({ prefix: KV_KEYS.roomPrefix });
@@ -178,6 +181,7 @@ async function watchForRoomUpdates() {
 
 //server is starting up... get connections list
 const connectionByUUID = await InitConnections()
+watchForNewConnections()
 
 async function InitConnections() {
 	const connections = new Map<string, Connection>()
@@ -195,11 +199,13 @@ async function InitConnections() {
 	}
 
 	console.log(serverID, "INIT Got connections from KV:", connections)
-	watchForNewConnections()
 	return connections
 }
 
 async function watchForNewConnections() {
+	if(!connectionByUUID) 
+		throw new Error(`${serverID} cannot watch connectionByUUID before it exists!`)
+
 	console.log(serverID, `KV watching for new connections`)
 
 	//KV can't watch a key prefix, you have to watch a specific key, so...
@@ -223,7 +229,6 @@ async function watchForNewConnections() {
 				watchForRemoteConnectionDisconnect(kv_connection.key, uuid)
 			}
 		}
-
 	}
 }
 
