@@ -114,7 +114,6 @@ function User(props: { con: Connection }) {
 			<div class="buttons">
 				<Show when={!props.con.identity}>
 					<div class="color-button">
-						<span>color</span>
 						<input
 							type="color"
 							oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
@@ -122,6 +121,9 @@ function User(props: { con: Connection }) {
 							value={props.con.color ?? 'transparent'} />
 
 					</div>
+				</Show>
+				<Show when={!props.con.identity}>
+					<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
 				</Show>
 				<Show when={props.con.identity}>
 					<div class="avatar" onclick={becomeAnonymous}>
@@ -139,9 +141,6 @@ function User(props: { con: Connection }) {
 					<button class="room-button" onclick={startCall}>start call</button>
 				}
 			</div>
-			<Show when={!props.con.identity}>
-				<a class="room-button" href={server.githubAuthUrl()?.toString()}>github auth</a>
-			</Show>
 			<div class="server">{serverId()}</div>
 		</div>
 	</div>

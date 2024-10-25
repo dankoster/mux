@@ -168,11 +168,12 @@ div#root {
 	cursor: pointer;
 	display: flex;
 	align-items: center;
-	gap: 1rem;
+	gap: 0.5rem;
 	border: 1px solid;
-	border-radius: 50px;
-	padding-inline-end: 2rem;
+	border-radius: 5px;
+	padding-inline-end: 1rem;
 	text-wrap: nowrap;
+	overflow: hidden;
 
 	div {
 		position: relative;
@@ -190,7 +191,6 @@ div#root {
 
 	img {
 		max-width: 39px;
-		border-radius: 50%;
 	}
 }
 
@@ -225,7 +225,7 @@ div#root {
 
 .room-button {
 	color: white;
-	font-size: xx-large;
+	font-size: x-large;
 	border: 1px solid;
 	border-radius: 5px;
 	padding-inline: 1rem;
@@ -236,6 +236,7 @@ div#root {
 	text-wrap: nowrap;
 	touch-action: none;
 	text-decoration: none;
+	align-content: center;
 }
 
 .color-button {
