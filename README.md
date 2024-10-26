@@ -13,6 +13,8 @@ Added github login to let users identify themselves with a name and avatar image
 
 Added d3 visualization of chat rooms using [pack enclose](https://observablehq.com/@d3/d3-packenclose) with dynamic [svg path based labels](https://www.visualcinnamon.com/2015/09/placing-text-on-arcs/). 
 
+<img width="400" alt="Screenshot 2024-10-26 at 1 31 57 PM" src="https://github.com/user-attachments/assets/1863085b-8375-42a9-a22c-c16b45c8beb5">
+
 Then a friend went to Japan. I thought, 'What a great opportunity to test with someone very geographically distant!" That turned into an epic troubleshooting adventure. I learned a lot about how Deno Deploy works. I tried so hard to get this thing working reliably on Deno Deploy which is not really set up to handle long-running servers. It will spin up V8 isolates geographically close to users and then terminate them with no warning. DenoKV proved to be unreliable in general and a massive pain in practice for synchronizing state between the isolates. This is not the work I'm interested in doing. I've wasted a week on this. Ugh.
 
 ...sooo, I moved everything to a Digital Ocean droplet and learned a lot about to host things in Linux. That only took a few hours to figure out and now I have one always-on server with HTTPS that should be good for as many users as I'm likely to ever have for this thing, but will be easy to scale vertically if necessary. 
