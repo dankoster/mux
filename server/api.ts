@@ -24,7 +24,6 @@ export type ApiRoute = "sse"
 
 export type SSEvent = "pk"
 	| "id"
-	| "serverId"
 	| "webRTC"
 	| "connections"
 	| "new_connection"
@@ -73,7 +72,6 @@ export type Update = {
 const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
-	serverId: "serverId",
 	webRTC: "webRTC",
 	rooms: "rooms",
 	connections: "connections",
@@ -100,9 +98,6 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	log: "log"
 }
 
-
-const serverID = Date.now()
-
 const updateFunctionByUUID = new Map<string, {
 	isLocal: boolean,
 	update: (event: SSEvent, value?: string) => void,
@@ -120,7 +115,7 @@ export async function addConnectionIdentity(uuid: string, identity: Identity) {
 	if (!con) throw new Error(`connection not found for uuid ${uuid}`)
 	con.identity = identity
 
-	console.log(serverID, "addConnectionIdentity", con)
+	console.log("addConnectionIdentity", con)
 
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
@@ -143,7 +138,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 function notifyAllConnections(event: SSEvent, update: Update | Room | Connection, options?: { excludeUUID?: string }) {
 	updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
 		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate) {
-			console.log(serverID, event.toUpperCase(), uuidToUpdate, update)
+			console.log(event.toUpperCase(), uuidToUpdate, update)
 			fn.update(event, JSON.stringify(update))
 		}
 	})
@@ -176,7 +171,7 @@ function objectFrom<V>(map: Map<string, V>) {
 
 function deleteRoom(room: Room) {
 	//kick all users from the room
-	console.log(serverID, "deleteRoom: kick all users!")
+	console.log("deleteRoom: kick all users!")
 	connectionByUUID.forEach((connection, uuid) => {
 		if (connection.roomId === room.id) {
 			delete connection.roomId;
@@ -200,7 +195,7 @@ const api = new Router();
 //the actual conent of the messages, only that they are properly routed.
 //https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
-	console.log(serverID, ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
+	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -232,7 +227,7 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 //Join room by id
 api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 	const roomId = ctx.params.id
-	console.log(serverID, "[JOIN ROOM] POST", apiRoute.room.toUpperCase(), roomId)
+	console.log("[JOIN ROOM] POST", apiRoute.room.toUpperCase(), roomId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -261,7 +256,7 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 //Create a room
 api.post(`/${apiRoute.room}`, async (ctx) => {
 
-	console.log(serverID, "POST", apiRoute.room.toUpperCase())
+	console.log("POST", apiRoute.room.toUpperCase())
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -288,7 +283,7 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 
 //exit room (the room is deleted if the owner leaves)
 api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
-	console.log(serverID, "DELETE", apiRoute.room.toUpperCase(), ctx.params)
+	console.log("DELETE", apiRoute.room.toUpperCase(), ctx.params)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -340,7 +335,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	//here's what we're deleting...
 	const oldData = objectFrom(connectionByUUID);
-	console.log(serverID, "CLEAR", oldData, roomByUUID)
+	console.log("CLEAR", oldData, roomByUUID)
 	ctx.response.body = oldData
 
 	//reinit with empty everything
@@ -352,7 +347,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 })
 
 api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
-	// console.log(serverID, context.request.method.toUpperCase(), context.request.url.pathname)
+	// console.log(context.request.method.toUpperCase(), context.request.url.pathname)
 	try {
 		const update = updateConnectionProperty(context.request, "identity")
 		notifyAllConnections(sseEvent.update, update)
@@ -400,7 +395,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 	const uuid = oldKey ?? crypto.randomUUID()
 
 	const old = connectionByUUID.has(uuid)
-	console.log(serverID, "SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
 
 	let connection = connectionByUUID.get(uuid)
 
@@ -429,10 +424,9 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				}
 			})
 
-			console.log(serverID, "SSE connection   ", uuid, connection)
+			console.log("SSE connection   ", uuid, connection)
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
-			controller.enqueue(sseMessage(sseEvent.serverId, serverID?.toString()))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(Array.from(roomByUUID.values()))))
 
@@ -461,7 +455,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 				//do we own the room? Nuke it!
 				if (room && room.ownerId === connection.id) {
-					console.log(serverID, 'owner disconnected from room', room.id)
+					console.log('owner disconnected from room', room.id)
 					deleteRoom(room)
 				}
 
@@ -474,7 +468,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				})
 			}
 
-			console.log(serverID, "SSE Disconnect   ", uuid, connection)
+			console.log("SSE Disconnect   ", uuid, connection)
 			connection.status = ""
 
 			notifyAllConnections(sseEvent.update, {

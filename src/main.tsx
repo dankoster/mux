@@ -84,10 +84,9 @@ function User(props: { con: Connection }) {
 		}
 	})
 
-	const serverId = () => {
-		const serverId = server.serverId()
+	const userId = () => {
 		const id = server.id()
-		return `${serverId.substring(serverId.length - 4)} ⨳ ${id.substring(id.length - 4)}`
+		return id.substring(id.length - 4)
 	}
 
 
@@ -139,7 +138,7 @@ function User(props: { con: Connection }) {
 					<button class="room-button" onclick={startCall}>start call</button>
 				}
 			</div>
-			<div class="server">{serverId()}</div>
+			<div class="server">{userId()}</div>
 		</div>
 	</div>
 }

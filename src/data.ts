@@ -28,7 +28,6 @@ const sse: { [Property in SSEvent]: Property } = {
 	rooms: "rooms",
 	new_room: "new_room",
 	delete_room: "delete_room",
-	serverId: "serverId"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -41,13 +40,12 @@ type Stats = {
 const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
 const [id, setId] = createSignal("")
-const [serverId, setServerId] = createSignal("")
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
 export {
-	id, serverId, pk, connections, rooms, stats, serverOnline
+	id, pk, connections, rooms, stats, serverOnline
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -229,10 +227,6 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.id:
 			setId(event.data);
 			console.log('SSE', event.event, event.data);
-			break;
-		case sse.serverId:
-			setServerId(event.data)
-			console.log('SSE', event.event, event.data)
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
