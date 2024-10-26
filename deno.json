@@ -11,8 +11,8 @@
   },
   "tasks": {
     "watch": "deno run --allow-read --allow-write --allow-ffi --allow-run --allow-sys --allow-env --env --node-modules-dir npm:vite build --watch",
-    "serve": "deno task build && deno run --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/chatmux.crt,$HOME/Lab/certs/out/chatmux.key --allow-env --env --unstable-kv --allow-net --watch ./server/server.ts",
-    "vite": "deno run -A  --allow-read=$PWD,'./dist',$HOME/Lab/certs/out/chatmux.crt,$HOME/Lab/certs/out/chatmux.key --node-modules-dir npm:vite --host",
+    "serve": "deno task build && deno run --allow-read=$PWD,'./dist',cert/fullchain.pem,cert/privkey.pem --allow-env --env --unstable-kv --allow-net --watch ./server/server.ts",
+    "vite": "deno run -A  --allow-read=$PWD,'./dist',cert/fullchain.pem,cert/privkey.pem --node-modules-dir npm:vite --host",
     "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --unstable --node-modules-dir npm:vite preview"
   }
