@@ -53,19 +53,18 @@ app.addEventListener("listen", ({ hostname, port, secure }) => {
 	);
 });
 
-let cert
-let key
+const certPath = Deno.env.get("CERT_FILE")
+const keyPath = Deno.env.get("CERT_KEY")
 
-try {
-	cert = Deno.readTextFileSync(`./chatmux.crt`)
-	key = Deno.readTextFileSync(`./chatmux.key`)
-} catch (error) {
-	console.log(error.message)
-}
-
-if (cert && key) {
-	console.log('starting server with certificate')
-	await app.listen({ port: PORT, secure: true, cert, key });
+if (certPath && keyPath) {
+	try {
+		const cert = Deno.readTextFileSync(certPath)
+		const key = Deno.readTextFileSync(keyPath)
+		console.log('starting server with certificate')
+		await app.listen({ port: PORT, secure: true, cert, key });
+	} catch (error) {
+		console.log(error.message)
+	}
 }
 else {
 	console.log('starting server WITH NO CERTIFICATE')
