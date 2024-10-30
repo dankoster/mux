@@ -1,7 +1,7 @@
 import { API_URI } from "./API_URI";
-import type { ApiRoute, AuthTokenName, Connection, Room, SSEvent, Update } from "../server/api";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
+import { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update } from "../server/types";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -40,12 +40,13 @@ type Stats = {
 const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
 const [id, setId] = createSignal("")
+const [self, setSelf] = createSignal<Connection>()
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
 export {
-	id, pk, connections, rooms, stats, serverOnline
+	id, pk, connections, self, rooms, stats, serverOnline
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -226,11 +227,13 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.id:
 			setId(event.data);
+			if(event.data && connections) setSelf(connections.find(con => con.id === event.data))
 			console.log('SSE', event.event, event.data);
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData);
+			if(id() && connections) setSelf(connections.find(con => con.id === id()))
 			updateConnectionCounts()
 			console.log('SSE', event.event, conData);
 			break;
