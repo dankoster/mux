@@ -99,8 +99,11 @@ const updateFunctionByUUID = new Map<string, {
 }>()
 
 //server is starting up... get rooms list
-const roomByUUID = new Map<string, Room>()
+const roomByUUID = db.getRoomsByUUID() ?? new Map<string, Room>()
 const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection>()
+
+console.log('got rooms',roomByUUID)
+console.log('got connections', connectionByUUID)
 
 export function validateConnectionByUUID(uuid: string) {
 	return connectionByUUID.has(uuid)
@@ -178,6 +181,7 @@ function deleteRoom(room: Room) {
 		}
 	});
 
+	db.deleteRoom(room)
 	roomByUUID.delete(room.id)
 	notifyAllConnections(sseEvent.delete_room, room)
 }
@@ -264,6 +268,7 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 	}
 
 	con.roomId = room.id
+	db.persistRoom(room)
 	roomByUUID.set(room.id, room)
 
 	//TODO: persist room?
@@ -335,6 +340,9 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	const oldData = objectFrom(connectionByUUID);
 	console.log("CLEAR", oldData, roomByUUID)
 	ctx.response.body = oldData
+
+	roomByUUID.forEach(room => db.deleteRoom(room))
+	connectionByUUID.forEach((con, uuid) => db.deleteConnection(uuid))
 
 	//reinit with empty everything
 	connectionByUUID.clear()

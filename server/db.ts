@@ -1,6 +1,6 @@
 import { Database } from "jsr:@db/sqlite";
-import { Connection, type Identity } from "./api.ts";
 import { assertEquals } from "jsr:@std/assert";
+import type { Connection, Identity, Room } from "./api.ts";
 
 //const db = new Database("test.db");
 
@@ -36,7 +36,19 @@ createTableIdentity.run()
 createTableRoom.run()
 createTableConnection.run()
 
+const upsertRoom = db.prepare(`
+	INSERT
+	INTO room ( id, ownerId )
+	VALUES ( :id, :ownerId )
+	ON CONFLICT(id)
+	DO UPDATE SET 
+		ownerId = excluded.ownerId
+	RETURNING *;
+`)
 
+const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
+const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId = :ownerId;`)
+const selectRooms = db.prepare(`SELECT * FROM room;`)
 
 const upsertConnection = db.prepare(`
 	INSERT 
@@ -66,14 +78,26 @@ const upsertIdentity = db.prepare(`INSERT
 	RETURNING *;`
 )
 
-const selectConnections = db.prepare(`SELECT * FROM connection`)
-const selectIdentityById = db.prepare(`SELECT * FROM identity WHERE id = :id`)
+const selectConnections = db.prepare(`SELECT * FROM connection;`)
+const selectIdentityById = db.prepare(`SELECT * FROM identity WHERE id = :id;`)
 const selectIdentityBySource = db.prepare(
 	`SELECT * 
 	FROM identity 
 	WHERE source = :source 
 	AND source_id = :source_id;`
 )
+
+export function persistRoom(room: Room) {
+	return upsertRoom.get({...room})
+}
+
+export function deleteRoom(room: Room) {
+	return deleteRoomByIds.get({...room})
+}
+
+export function deleteConnection(uuid: string) {
+	return deleteConnectionByUUID.get({uuid})
+}
 
 export function persistConnection(uuid: string, con: Connection) {
 
@@ -119,6 +143,13 @@ export function getConnectionsByUUID() {
 		result.set(c.uuid, con as Connection)
 	})
 
+	return result
+}
+
+export function getRoomsByUUID() {
+	const rooms = selectRooms.all()
+	const result = new Map<string, Room>()
+	rooms.forEach(r => result.set(r.id, r as Room))
 	return result
 }
 
