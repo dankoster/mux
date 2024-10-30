@@ -22,7 +22,7 @@ const App = () => {
 		setCallState("no_call")
 	}
 
-	const room = createMemo(() => server.rooms.find(r => r.id === server.self().roomId))
+	const room = createMemo(() => server.rooms.find(r => r.id === server.self()?.roomId))
 
 	const [callState, setCallState] = createSignal<CallState>("no_call")
 	const startCall = async () => {
@@ -48,9 +48,9 @@ const App = () => {
 		trackStore(server.connections)
 
 		// get raw connection objects out of the SolidJS Signal where they are proxies
-		const connections = server.self().roomId && server.connections
+		const connections = server.self()?.roomId && server.connections
 			.map(node => Object.assign({}, node))
-			.filter(node => node.roomId === server.self().roomId)
+			.filter(node => node.roomId === server.self()?.roomId)
 
 		//figure out how many connections are in the user's room
 		if (!connections) {
@@ -62,7 +62,7 @@ const App = () => {
 		}
 	},)
 
-	const userId = () => {
+	const shortUserId = () => {
 		const id = server.id()
 		return id.substring(id.length - 4)
 	}
@@ -96,21 +96,21 @@ const App = () => {
 						<VideoCall
 							user={con()}
 							room={room()}
-							connections={server.connections.filter(sc => con().roomId && sc.id != con().id && sc.roomId === con().roomId)} />
+							connections={server.connections.filter(sc => con()?.roomId && sc.id != con()?.id && sc.roomId === con()?.roomId)} />
 					</div>
 					<div class="toolbar">
 						<div class="buttons">
-							<Show when={!con().identity}>
+							<Show when={!con()?.identity}>
 								<div class="color-button">
 									<input
 										type="color"
 										oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
 										onchange={(e) => server.setColor(e.target.value)}
-										value={con().color ?? 'transparent'} />
+										value={con()?.color ?? 'transparent'} />
 
 								</div>
 							</Show>
-							<Show when={!con().identity}>
+							<Show when={!con()?.identity}>
 								<a class="room-button" href={server.githubAuthUrl()?.toString()}>
 									<svg height="16" width="16" viewBox="0 0 16 16" version="1.1" aria-hidden="true">
 										<path
@@ -120,23 +120,23 @@ const App = () => {
 									</svg>
 									login</a>
 							</Show>
-							<Show when={con().identity}>
+							<Show when={con()?.identity}>
 								<div class="avatar" onclick={becomeAnonymous}>
-									<img src={con().identity.avatar_url} />
-									<div>{con().identity.name}</div>
+									<img src={con()?.identity.avatar_url} />
+									<div>{con()?.identity.name}</div>
 								</div>
 							</Show>
 
-							{con().roomId &&
-								<button class="room-button" onclick={() => exitRoom(con().roomId)}>
+							{con()?.roomId &&
+								<button class="room-button" onclick={() => exitRoom(con()?.roomId)}>
 									{isRoomOwner(con()) ? "End" : "Leave"} call
 								</button>
 							}
-							{!con().roomId &&
+							{!con()?.roomId &&
 								<button class="room-button" onclick={startCall}>start call</button>
 							}
 						</div>
-						<div class="server">{userId()}</div>
+						<div class="server">{shortUserId()}</div>
 					</div>
 				</div>}
 			</Show>
@@ -149,4 +149,4 @@ function isRoomOwner(con: Connection) {
 	return server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id;
 }
 
-render(() => <App />, document.getElementById("root"));
+render(() => <App />, document.body);

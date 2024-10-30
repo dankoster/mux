@@ -41,7 +41,7 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 				if (!connectionsByRoomId.has(con.roomId))
 					connectionsByRoomId.set(con.roomId, [con.id])
 				else
-					connectionsByRoomId.get(con.roomId).push(con.id)
+					connectionsByRoomId.get(con.roomId)?.push(con.id)
 			}
 		})
 
@@ -209,22 +209,22 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			if (inRoom) {
 				sim?.force("x", d3.forceX(svgRef.clientWidth / 2))
 					.force("y", d3.forceY(svgRef.clientHeight / 2))
-					.force("charge", d3.forceManyBody().strength(500))
+					.force("charge", d3.forceManyBody()?.strength(500))
 					.force("link", null)
 					.force("collide", d3.forceCollide((d) => d.r || 50))
 			} else {
 				sim?.force("x", d3.forceX(svgRef.clientWidth / 2))
 					.force("y", d3.forceY(svgRef.clientHeight / 2))
-					.force("charge", d3.forceManyBody().strength(-500))
-					.force("link", d3.forceLink().id(d => d.id).distance(50))
+					.force("charge", d3.forceManyBody()?.strength(-500))
+					.force("link", d3.forceLink()?.id(d => d.id)?.distance(50))
 					.force("collide", d3.forceCollide((d) => d.r))
 			}
 
 			const linkForce = simulation?.force("link")
 			if (linkForce && Array.isArray(links) && links.length)
-				linkForce.links(links).distance(50); //https://d3js.org/d3-force/link
+				linkForce.links(links)?.distance(50); //https://d3js.org/d3-force/link
 
-			sim?.alpha(0.6).restart();
+			sim?.alpha(0.6)?.restart();
 		} catch (error) {
 			console.error(error)
 		}
@@ -240,10 +240,10 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 
 		// Make a shallow copy to protect against mutation, while
 		// recycling old nodes to preserve position and velocity.
-		const oldAnonymous = new Map(avatarCircles?.data().map(d => [d.id, d]));
+		const oldAnonymous = new Map(avatarCircles?.data()?.map(d => [d.id, d]));
 		anonymous = anonymous?.map(d => Object.assign(oldAnonymous.get(d.id) || {}, d));
 
-		const oldIdentified = new Map(avatarImages?.data().map(d => [d.id, d]));
+		const oldIdentified = new Map(avatarImages?.data()?.map(d => [d.id, d]));
 		identified = identified?.map(d => Object.assign(oldIdentified.get(d.id) || {}, d));
 
 		links = links?.map(d => Object.assign({}, d));
@@ -265,17 +265,17 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			.join(
 				enter => enter
 					.append("circle")
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("r", d => d.status === "online" ? 20 : 10)
 					.attr("fill", d => d.color ?? "transparent")
 				, update => update
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("r", d => d.status === "online" ? 20 : 10)
 					.attr("fill", d => d.color ?? "transparent")
 				, exit => exit
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', 0)
 					.attr("r", 0)
 					.remove()
@@ -290,18 +290,18 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 					.attr("y", svgRef.clientHeight / 2)
 					.attr('width', 0)
 					.attr('height', 0)
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("width", d => d.status === "online" ? 50 : 30)
 					.attr("height", d => d.status === "online" ? 50 : 30)
 					.attr('clip-path', 'circle()')
 				, update => update
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', d => d.status === "online" ? 1 : 0.2)
 					.attr("width", d => d.status === "online" ? 50 : 30)
 					.attr("height", d => d.status === "online" ? 50 : 30)
 				, exit => exit
-					.transition().duration(1000)
+					.transition()?.duration(1000)
 					.style('opacity', 0)
 					.attr("width", 0)
 					.attr("height", 0)
