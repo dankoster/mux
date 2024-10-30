@@ -9,14 +9,17 @@ const db = new Database("data.db");
 db.prepare(`PRAGMA journal_mode=WAL;`).run()
 db.prepare(`PRAGMA foreign_keys = ON;`).run()
 
-const createTableIdentity = db.prepare(`CREATE TABLE IF NOT EXISTS identity (
+const createTableIdentity = db.prepare(
+	`CREATE TABLE IF NOT EXISTS identity (
 	id INTEGER PRIMARY KEY,
 	source TEXT,
 	source_id TEXT,
 	name TEXT,
-	avatar_url TEXT);`)
+	avatar_url TEXT);`
+)
 
-const createTableConnection = db.prepare(`CREATE TABLE IF NOT EXISTS connection (
+const createTableConnection = db.prepare(
+	`CREATE TABLE IF NOT EXISTS connection (
 		uuid TEXT PRIMARY KEY,
 		id TEXT NOT NULL,
 		identityId INTEGER,
@@ -25,16 +28,62 @@ const createTableConnection = db.prepare(`CREATE TABLE IF NOT EXISTS connection 
 		status TEXT,
 		roomId TEXT,
 		kind TEXT,
-		FOREIGN KEY(identityId) REFERENCES identity(id));`)
+		FOREIGN KEY(identityId) REFERENCES identity(id)
+	);`
+)
 
-const createTableRoom = db.prepare(`CREATE TABLE IF NOT EXISTS room (
+const createTableRoom = db.prepare(
+	`CREATE TABLE IF NOT EXISTS room (
 		id TEXT PRIMARY KEY,
-		ownerId TEXT);`)
+		ownerId TEXT
+	);`
+)
+
+const createTableLog = db.prepare(
+	`CREATE TABLE IF NOT EXISTS log (
+		id INTEGER PRIMARY KEY,
+		timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+		action TEXT,
+		ip TEXT,
+		userAgent TEXT,
+		uuid TEXT,
+		identityId TEXT,
+		roomId TEXT,
+		note TEXT
+	);`
+)
+
 
 //can't prepare queries before creating the tables they depend upon
+createTableLog.run()
 createTableIdentity.run()
 createTableRoom.run()
 createTableConnection.run()
+
+const insertLog = db.prepare(
+	`INSERT INTO log (action, ip, userAgent, uuid, identityId, roomId, note)
+	VALUES (:action, :ip, :userAgent, :uuid, :identityId, :roomId, :note);`
+)
+export function log({ action, ip = null, userAgent = null, uuid = null, identityId = null, roomId = null, note = null }
+	: {
+		action: string,
+		ip?: string | null,
+		userAgent?: string | null,
+		uuid?: string | null,
+		identityId?: string | null,
+		roomId?: string | null,
+		note?: string | null,
+	}) {
+	insertLog.run({
+		action
+		, ip
+		, userAgent
+		, uuid
+		, identityId
+		, roomId
+		, note
+	})
+}
 
 const upsertRoom = db.prepare(`
 	INSERT
@@ -88,15 +137,15 @@ const selectIdentityBySource = db.prepare(
 )
 
 export function persistRoom(room: Room) {
-	return upsertRoom.get({...room})
+	return upsertRoom.get({ ...room })
 }
 
 export function deleteRoom(room: Room) {
-	return deleteRoomByIds.get({...room})
+	return deleteRoomByIds.get({ ...room })
 }
 
 export function deleteConnection(uuid: string) {
-	return deleteConnectionByUUID.get({uuid})
+	return deleteConnectionByUUID.get({ uuid })
 }
 
 export function persistConnection(uuid: string, con: Connection) {
@@ -123,8 +172,13 @@ export function persistConnection(uuid: string, con: Connection) {
 	}
 	delete dbCon.identity
 
-	const conResult = upsertConnection.get(dbCon)
-	console.log('DB UPSERTED', conResult, idResult)
+	const conResult = upsertConnection.get(dbCon) as Connection
+	// console.log('DB UPSERTED', conResult, idResult)
+
+	if (conResult && !conResult.identity) {
+		conResult.identity = idResult
+	}
+	return conResult
 }
 
 export function getConnectionsByUUID() {
@@ -157,7 +211,7 @@ function removeNullFields(obj: any) {
 	for (const prop in obj) {
 		if (obj[prop] == null)
 			delete obj[prop]
-		else if(typeof obj[prop] === 'object')
+		else if (typeof obj[prop] === 'object')
 			removeNullFields(obj[prop])
 	}
 }
@@ -185,7 +239,7 @@ function test() {
 	connectionByUUID.forEach((con, uuid) => persistConnection(uuid, con))
 
 	const cons = getConnectionsByUUID()
-	
+
 	assertEquals(connectionByUUID, cons)
 }
 

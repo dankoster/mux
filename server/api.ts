@@ -43,7 +43,7 @@ export type Room = {
 export type Identity = {
 	id?: string,
 	source?: string,
-	source_id?:string,
+	source_id?: string,
 	name?: string,
 	avatar_url?: string
 }
@@ -102,8 +102,10 @@ const updateFunctionByUUID = new Map<string, {
 const roomByUUID = db.getRoomsByUUID() ?? new Map<string, Room>()
 const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection>()
 
-console.log('got rooms',roomByUUID)
+console.log('got rooms', roomByUUID)
 console.log('got connections', connectionByUUID)
+
+db.log({ action: 'INIT', note: `${connectionByUUID.size} connections, ${roomByUUID.size} rooms` })
 
 export function validateConnectionByUUID(uuid: string) {
 	return connectionByUUID.has(uuid)
@@ -114,8 +116,9 @@ export async function addConnectionIdentity(uuid: string, identity: Identity) {
 	con.identity = identity
 
 	console.log("addConnectionIdentity", con)
+	const result = db.persistConnection(uuid, con)
+	db.log({ action: "addConnectionIdentity", uuid, identityId: result?.identity?.id })
 
-	db.persistConnection(uuid, con)
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
 		field: "identity",
@@ -155,7 +158,7 @@ function getConnection(req: Request) {
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 	const con = connectionByUUID.get(uuid);
 	if (!con) throw new Error(`No connection found for key ${uuid}`);
-	return {uuid,con};
+	return { uuid, con };
 }
 
 function objectFrom<V>(map: Map<string, V>) {
@@ -186,6 +189,10 @@ function deleteRoom(room: Room) {
 	notifyAllConnections(sseEvent.delete_room, room)
 }
 
+function event(req: Request) {
+	return `${req.method} ${req.url.pathname}`.toUpperCase()
+}
+
 const api = new Router();
 
 //we just need to relay webRTC signaling messages between users so they can
@@ -193,7 +200,7 @@ const api = new Router();
 //the actual conent of the messages, only that they are properly routed.
 //https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
-	console.log(ctx.request.method.toUpperCase(), ctx.request.url.pathname, ctx.params.userId)
+	console.log(event(ctx.request), ctx.params.userId)
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
@@ -243,6 +250,7 @@ api.post(`/${apiRoute["room/join"]}/:id`, async (ctx) => {
 
 	con.roomId = room?.id
 	db.persistConnection(uuid, con)
+	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: room.id })
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
 		field: "roomId",
@@ -269,9 +277,9 @@ api.post(`/${apiRoute.room}`, async (ctx) => {
 
 	con.roomId = room.id
 	db.persistRoom(room)
+	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: room.id })
 	roomByUUID.set(room.id, room)
 
-	//TODO: persist room?
 	db.persistConnection(uuid, con)
 	notifyAllConnections(sseEvent.new_room, room)
 	notifyAllConnections(sseEvent.update, {
@@ -296,6 +304,7 @@ api.delete(`/${apiRoute.room}/:id`, async (ctx) => {
 	}
 
 	//remove the room reference regardless (we're leaving the room)
+	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
 	delete con.roomId
 	db.persistConnection(uuid, con)
 	notifyAllConnections(sseEvent.update, {
@@ -343,6 +352,7 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 
 	roomByUUID.forEach(room => db.deleteRoom(room))
 	connectionByUUID.forEach((con, uuid) => db.deleteConnection(uuid))
+	db.log({ action: event(ctx.request), note: 'key:' + ctx.params.key })
 
 	//reinit with empty everything
 	connectionByUUID.clear()
@@ -352,10 +362,10 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.reconnect))
 })
 
-api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
-	// console.log(context.request.method.toUpperCase(), context.request.url.pathname)
+api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	try {
-		const {uuid, con} = getConnection(context.request);
+		const { uuid, con } = getConnection(ctx.request);
+		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id })
 		delete con.identity
 		db.persistConnection(uuid, con)
 		notifyAllConnections(sseEvent.update, {
@@ -363,52 +373,54 @@ api.post(`/${apiRoute.becomeAnonymous}`, async (context) => {
 			field: "identity",
 			value: "",
 		})
-		context.response.status = 200
+		ctx.response.status = 200
 	} catch (err) {
-		console.error(err, context.request)
-		context.response.status = 400
+		console.error(err, ctx.request)
+		ctx.response.status = 400
 	}
 })
 
-api.post(`/${apiRoute.setText}`, async (context) => {
+api.post(`/${apiRoute.setText}`, async (ctx) => {
 	try {
-		const text = await context.request.body.text()
+		const text = await ctx.request.body.text()
 		if (text.length > 123)
 			throw new Error("invalid text")
 
-		const {uuid,con} = getConnection(context.request)
+		const { uuid, con } = getConnection(ctx.request)
 		con.text = text
 		db.persistConnection(uuid, con)
+		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
 		notifyAllConnections(sseEvent.update, {
 			connectionId: con.id,
 			field: 'text',
 			value: text
 		})
-		context.response.status = 200
+		ctx.response.status = 200
 	} catch (err) {
-		console.error(err, context.request)
-		context.response.status = 400
+		console.error(err, ctx.request)
+		ctx.response.status = 400
 	}
 })
 
-api.post(`/${apiRoute.setColor}`, async (context) => {
+api.post(`/${apiRoute.setColor}`, async (ctx) => {
 	try {
-		const color = await context.request.body.text()
+		const color = await ctx.request.body.text()
 		if (!color.startsWith("#") || color.length > 9)
 			throw new Error("invalid color")
 
-		const {uuid,con} = getConnection(context.request)
+		const { uuid, con } = getConnection(ctx.request)
 		con.color = color
 		db.persistConnection(uuid, con)
+		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
 		notifyAllConnections(sseEvent.update, {
 			connectionId: con.id,
 			field: 'color',
 			value: color
 		})
-		context.response.status = 200
+		ctx.response.status = 200
 	} catch (err) {
-		console.error(err, context.request)
-		context.response.status = 400
+		console.error(err, ctx.request)
+		ctx.response.status = 400
 	}
 });
 
@@ -420,7 +432,6 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 	const old = connectionByUUID.has(uuid)
 	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
-
 	let connection = connectionByUUID.get(uuid)
 
 	context.response.headers.append("Content-Type", "text/event-stream");
@@ -440,6 +451,15 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			connection.kind = context.request.userAgent.os.name
 
 			db.persistConnection(uuid, connection)
+			db.log({
+				action: event(context.request),
+				uuid,
+				identityId: connection?.identity?.id,
+				ip: context.request.ip,
+				userAgent: context.request.userAgent.os.name,
+				note: `CONNECT (${old ? "known" : "new"})`
+			})
+
 
 			updateFunctionByUUID.set(uuid, {
 				isLocal: true, update: (event, value) => {
@@ -489,6 +509,14 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				//we're also leaving the room
 				delete connection.roomId
 				db.persistConnection(uuid, connection)
+				db.log({
+					action: event(context.request),
+					uuid,
+					identityId: connection?.identity?.id,
+					ip: context.request.ip,
+					userAgent: context.request.userAgent.toString(),
+					note: `DISCONNECT`
+				})
 				notifyAllConnections(sseEvent.update, {
 					connectionId: connection.id,
 					field: "roomId",
