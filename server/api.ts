@@ -39,7 +39,8 @@ const updateFunctionByUUID = new Map<string, {
 	update: (event: SSEvent, value?: string) => void,
 }>()
 
-//server is starting up... get rooms list
+//server is starting up... cleanup and then get persisted data
+db.serverInitAndCleanup()
 const roomByUUID = db.getRoomsByUUID() ?? new Map<string, Room>()
 const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection>()
 

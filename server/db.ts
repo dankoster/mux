@@ -4,8 +4,8 @@ import type { Connection, Identity, Room } from "./types.ts";
 
 const db = new Database("data.db");
 
-db.prepare(`PRAGMA journal_mode=WAL;`).run()
-db.prepare(`PRAGMA foreign_keys = ON;`).run()
+db.exec(`PRAGMA journal_mode=WAL;`)
+db.exec(`PRAGMA foreign_keys = ON;`)
 
 const createTableIdentity = db.prepare(
 	`CREATE TABLE IF NOT EXISTS identity (
@@ -90,8 +90,8 @@ const upsertRoom = db.prepare(`
 	ON CONFLICT(id)
 	DO UPDATE SET 
 		ownerId = excluded.ownerId
-	RETURNING *;
-`)
+	RETURNING *;`
+)
 
 const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
 const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId = :ownerId;`)
@@ -133,6 +133,10 @@ const selectIdentityBySource = db.prepare(
 	WHERE source = :source 
 	AND source_id = :source_id;`
 )
+
+export function serverInitAndCleanup() {
+	return db.exec(`UPDATE connection SET status = NULL`)
+}
 
 export function persistRoom(room: Room) {
 	return upsertRoom.get({ ...room })
@@ -240,7 +244,3 @@ function test() {
 
 	assertEquals(connectionByUUID, cons)
 }
-
-//test()
-
-//db.close();
