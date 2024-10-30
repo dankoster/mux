@@ -1,9 +1,10 @@
 *.env*
-*.db
+*.db*
 *.pem
 *.crt
 *.key
-
+/notes
+/cert
 # Logs
 logs
 *.log
