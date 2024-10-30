@@ -1,8 +1,6 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, Identity, Room } from "./api.ts";
-
-//const db = new Database("test.db");
+import type { Connection, Identity, Room } from "./types.ts";
 
 const db = new Database("data.db");
 
