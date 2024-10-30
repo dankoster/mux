@@ -257,6 +257,9 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 			rooms = []
 		}
 
+		//hide anonymous users who are not online
+		anonymous = anonymous.filter(con => con.status)
+
 		updateForceLayout(simulation, links, !!props.self.roomId)
 
 		simulation?.nodes([...anonymous, ...identified]) //yay more copying of the data!
