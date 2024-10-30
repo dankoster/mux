@@ -1,7 +1,7 @@
 import { API_URI } from "./API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update } from "../server/types";
+import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update } from "../server/types";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",

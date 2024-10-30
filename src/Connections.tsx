@@ -1,12 +1,13 @@
 import "./Connections.css"
 
 //@ts-ignore
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm"
 
 import { trackStore } from "@solid-primitives/deep"
-import { createEffect, onCleanup, onMount } from "solid-js";
-import { Connection } from "../server/api";
+import { createEffect, onCleanup, onMount } from "solid-js"
 import * as server from "./data"
+
+import type { Connection } from "../server/types"
 
 //TODO: update the force directed graph to reflect changes to the connections
 // ✓ online/offline status

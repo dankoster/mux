@@ -1,8 +1,8 @@
 
-import { createEffect, createSignal, For, onCleanup, onMount, Setter, Show } from "solid-js";
+import { createEffect, onCleanup, Show } from "solid-js";
 import "./VideoCall.css"
 import * as server from "./data"
-import { Connection, Room } from "../server/api";
+import type { Connection, Room } from "../server/types"
 
 //TODO: get this from the TURN server for each client, obviously
 const servers: RTCConfiguration = {
