@@ -1,10 +1,10 @@
-name: Deploy
+name: Deploy to Deno Deploy
 
 on:
   push:
-    branches: ["main"]
+    branches: ["deno-deploy"]
   pull_request:
-    branches: ["main"]
+    branches: ["deno-deploy"]
   
 
 jobs:
