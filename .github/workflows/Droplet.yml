@@ -32,7 +32,7 @@ jobs:
           SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
 
       - name: Get latest source
-        run: ssh prod 'cd mux && git fetch && git pull'
+        run: ssh prod 'cd /mux && git fetch && git pull'
 
       - name: Rebuild and start the server
         run: ssh prod 'systemctl restart chatmux'
