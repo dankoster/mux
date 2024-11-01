@@ -21,6 +21,7 @@ const sse: { [Property in SSEvent]: Property } = {
 	id: "id",
 	webRTC: "webRTC",
 	connections: "connections",
+	refresh: "refresh",
 	reconnect: "reconnect",
 	update: "update",
 	new_connection: "new_connection",
@@ -244,6 +245,9 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
+		case sse.refresh:
+			location.reload()
+			break;
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
 			console.log('SSE', event.event, update)

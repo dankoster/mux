@@ -20,16 +20,17 @@ export type ApiRoute = "sse" |
 
 
 export type SSEvent = "pk" |
-  "id" |
-  "webRTC" |
-  "connections" |
-  "new_connection" |
-  "rooms" |
-  "new_room" |
-  "delete_connection" |
-  "delete_room" |
-  "update" |
-  "reconnect";
+	"id" |
+	"webRTC" |
+	"connections" |
+	"new_connection" |
+	"rooms" |
+	"new_room" |
+	"delete_connection" |
+	"delete_room" |
+	"update" |
+	"refresh" |
+	"reconnect";
 
 export type Room = {
   id: string;

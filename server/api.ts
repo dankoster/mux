@@ -2,6 +2,7 @@ import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
 import type { SSEvent, AuthTokenName, ApiRoute, Room, Connection, Identity, Update } from "./types.ts";
+import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
 
@@ -11,6 +12,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",
 	rooms: "rooms",
 	connections: "connections",
+	refresh: "refresh",
 	reconnect: "reconnect",
 	new_connection: "new_connection",
 	delete_connection: "delete_connection",
@@ -46,6 +48,13 @@ const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection
 
 console.log('got rooms', roomByUUID)
 console.log('got connections', connectionByUUID)
+
+if (Deno.env.get('ENVIRONMENT') === 'local') {
+	onLocalBuild('./dist', () => {
+		//tell all connections to reload the page
+		updateFunctionByUUID.forEach(updater => updater.update(sseEvent.refresh))
+	})
+}
 
 db.log({ action: 'INIT', note: `${connectionByUUID.size} connections, ${roomByUUID.size} rooms` })
 
