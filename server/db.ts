@@ -1,22 +1,60 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, Identity, Room } from "./types.ts";
+import type { Connection, Friend, FriendRequest, Identity, Room } from "./types.ts";
 
 const db = new Database("data.db");
 
 db.exec(`PRAGMA journal_mode=WAL;`)
 db.exec(`PRAGMA foreign_keys = ON;`)
 
-const createTableIdentity = db.prepare(
+db.exec(
 	`CREATE TABLE IF NOT EXISTS identity (
-	id INTEGER PRIMARY KEY,
-	source TEXT,
-	source_id TEXT,
-	name TEXT,
-	avatar_url TEXT);`
+		id INTEGER PRIMARY KEY,
+		source TEXT,
+		source_id TEXT,
+		name TEXT,
+		avatar_url TEXT
+	);`
 )
 
-const createTableConnection = db.prepare(
+db.exec(
+	`CREATE TABLE IF NOT EXISTS friend (
+		id INTEGER PRIMARY KEY,
+		myId INTEGER,
+		friendId INTEGER,
+		status TEXT,
+		created TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+		updated TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+		UNIQUE(myId,friendId)
+		FOREIGN KEY(myId) REFERENCES identity(id)
+		FOREIGN KEY(friendId) REFERENCES identity(id)
+		CHECK(myId != friendId)
+	);`
+)
+
+db.exec(
+	`CREATE TABLE IF NOT EXISTS friendRequest (
+		id INTEGER PRIMARY KEY,
+		fromId INTEGER,
+		toId INTEGER,
+		status TEXT DEFAULT 'requested',
+		created TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+		updated TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+		UNIQUE(fromId,toId)
+		FOREIGN KEY(fromId) REFERENCES identity(id)
+		FOREIGN KEY(toId) REFERENCES identity(id)
+		CHECK(fromId != toId)
+	);`
+)
+
+db.exec(
+	`CREATE TABLE IF NOT EXISTS room (
+		id TEXT PRIMARY KEY,
+		ownerId TEXT
+	);`
+)
+
+db.exec(
 	`CREATE TABLE IF NOT EXISTS connection (
 		uuid TEXT PRIMARY KEY,
 		id TEXT NOT NULL,
@@ -30,14 +68,7 @@ const createTableConnection = db.prepare(
 	);`
 )
 
-const createTableRoom = db.prepare(
-	`CREATE TABLE IF NOT EXISTS room (
-		id TEXT PRIMARY KEY,
-		ownerId TEXT
-	);`
-)
-
-const createTableLog = db.prepare(
+db.exec(
 	`CREATE TABLE IF NOT EXISTS log (
 		id INTEGER PRIMARY KEY,
 		timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
@@ -50,13 +81,6 @@ const createTableLog = db.prepare(
 		note TEXT
 	);`
 )
-
-
-//can't prepare queries before creating the tables they depend upon
-createTableLog.run()
-createTableIdentity.run()
-createTableRoom.run()
-createTableConnection.run()
 
 const insertLog = db.prepare(
 	`INSERT INTO log (action, ip, userAgent, uuid, identityId, roomId, note)
@@ -97,8 +121,8 @@ const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :
 const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId = :ownerId;`)
 const selectRooms = db.prepare(`SELECT * FROM room;`)
 
-const upsertConnection = db.prepare(`
-	INSERT 
+const upsertConnection = db.prepare(
+	`INSERT 
 	INTO connection (uuid, id, identityId, color, text, status, roomId, kind) 
 	VALUES (:uuid, :id, :identityId, :color, :text, :status, :roomId, :kind)
 	ON CONFLICT(uuid)
@@ -133,6 +157,76 @@ const selectIdentityBySource = db.prepare(
 	WHERE source = :source 
 	AND source_id = :source_id;`
 )
+
+const selectFriends = db.prepare(
+	`SELECT *
+	FROM friend
+	WHERE myId = :myId`
+)
+const insertFriendRequest = db.prepare(
+	`INSERT INTO friendRequest (fromId, toId)
+	VALUES (:fromId, :toId)
+	RETURNING *;`
+)
+const updateFriendRequest = db.prepare(
+	`UPDATE friendRequest
+	SET status = :status
+	WHERE id = :id
+	RETURNING *;`
+)
+const selectFriendRequest = db.prepare(
+	`SELECT * FROM friendRequest WHERE id = :id;`
+)
+const selectFriendRequests = db.prepare(
+	`SELECT * 
+	FROM friendrequest 
+	WHERE fromId = :identityId 
+	AND status = 'requested'
+	UNION
+	SELECT * 
+	FROM friendRequest
+	WHERE toId = :identityId
+	AND status = 'requested';`
+)
+const upsertFriend = db.prepare(
+	`INSERT INTO friend (myId, friendId, status)
+	VALUES (:myId, :friendId, :status)
+	ON CONFLICT(myId, friendId)
+	DO UPDATE SET 
+		status = excluded.status,
+		updated = unixepoch('subsec')
+	RETURNING *;`
+)
+export function getFriendsByIdentityId(identityId: string) {
+	return selectFriends.all<Friend>({ myId: identityId })
+}
+export function getFriendRequestsByIdentityId(identityId: string) {
+	return selectFriendRequests.all<FriendRequest>({ identityId })
+}
+
+export function addFriendRequest(fromId: string, toId: string) {
+	const result = insertFriendRequest.get<FriendRequest>({
+		fromId: fromId,
+		toId: toId
+	})
+	console.log("ADD FRIEND REQUEST", result)
+	return result
+}
+
+export function acceptFriendRequest(id: string) {
+	//const result:{request: FriendRequest|undefined, friends: Friend|undefined[]|undefined} = {friends: []}
+	const updateFriendRequestTransaction = db.transaction(() => {
+		const fr = selectFriendRequest.get<FriendRequest>({ id })
+		if (fr === undefined) throw new Error(`no friend requst with id ${id}`)
+		const requestor = upsertFriend.get<Friend>({ myId: fr.fromId, friendId: fr.toId })
+		const requestee = upsertFriend.get<Friend>({ myId: fr.toId, friendId: fr.fromId })
+		const request = updateFriendRequest.get<FriendRequest>({ id, status: 'accepted' })
+
+		return {request, requestor, requestee}
+	})
+	console.log("ACCEPT FRIEND REQUEST", id)
+	return updateFriendRequestTransaction()
+}
 
 export function serverInitAndCleanup() {
 	return db.exec(`UPDATE connection SET status = NULL`)

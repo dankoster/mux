@@ -1,15 +1,17 @@
 
 export type AuthTokenName = "Authorization";
 export type ApiRoute = "sse" |
-  "becomeAnonymous" |
-  "setColor" |
-  "setText" |
-  "clear" |
-  "log" |
-  "discardKey" |
-  "webRTC" |
-  "room" |
-  "room/join";
+	"becomeAnonymous" |
+	"setColor" |
+	"setText" |
+	"clear" |
+	"log" |
+	"discardKey" |
+	"webRTC" |
+	"room" |
+	"room/join" |
+	"friendRequest" | 
+	"acceptFriendRequest";
 
 //is there a way to have the RoomRoute be nested under ApiRoute
 // like this { setColor: "setColor", room: { join: "room/join"}}
@@ -30,33 +32,50 @@ export type SSEvent = "pk" |
 	"delete_room" |
 	"update" |
 	"refresh" |
-	"reconnect";
+	"reconnect" |
+	"friendRequest" |
+	"friendRequests" |
+	"friendList" | 
+	"friendRequestAccepted";
 
 export type Room = {
-  id: string;
-  ownerId: string;
+	id: string;
+	ownerId: string;
 };
 
 export type Identity = {
-  id?: string;
-  source?: string;
-  source_id?: string;
-  name?: string;
-  avatar_url?: string;
+	id?: string;
+	source?: string;
+	source_id?: string;
+	name?: string;
+	avatar_url?: string;
 };
 
 export type Connection = {
-  id: string;
-  color?: string;
-  text?: string;
-  status?: string | null;
-  roomId?: string;
-  kind?: string;
-  identity?: Identity;
+	id: string;
+	color?: string;
+	text?: string;
+	status?: string | null;
+	roomId?: string;
+	kind?: string;
+	identity?: Identity;
 };
 
 export type Update = {
-  connectionId: string;
-  field: keyof Connection;
-  value: string;
+	connectionId: string;
+	field: keyof Connection;
+	value: string;
 };
+
+export type Friend = { 
+	id: string, 
+	myId: string, 
+	friendId: string 
+}
+
+export type FriendRequest = {
+	id: string,
+	fromId: string,
+	toId: string,
+	status: string
+}

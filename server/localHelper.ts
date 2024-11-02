@@ -6,6 +6,6 @@ export async function onLocalBuild(pathToWatch: string, callback: ()=>void) {
 		clearTimeout(debounce)
 		debounce = setTimeout(() => {
 			callback()
-		}, 500);
+		}, 100);
 	}
 }

@@ -1,7 +1,7 @@
 import { API_URI } from "./API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update } from "../server/types";
+import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend } from "../server/types";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -13,7 +13,9 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	room: "room",
 	"room/join": "room/join",
 	becomeAnonymous: "becomeAnonymous",
-	log: "log"
+	log: "log",
+	friendRequest: "friendRequest",
+	acceptFriendRequest: "acceptFriendRequest"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -29,6 +31,10 @@ const sse: { [Property in SSEvent]: Property } = {
 	rooms: "rooms",
 	new_room: "new_room",
 	delete_room: "delete_room",
+	friendRequest: "friendRequest",
+	friendList: "friendList",
+	friendRequests: "friendRequests",
+	friendRequestAccepted: "friendRequestAccepted"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -40,6 +46,8 @@ type Stats = {
 
 const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
+const [friendRequests, setFriendRequests] = createStore<FriendRequest[]>([])
+const [friends, setFriends] = createStore<Friend[]>([])
 const [id, setId] = createSignal("")
 const [self, setSelf] = createSignal<Connection>()
 const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
@@ -47,7 +55,7 @@ const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
 export {
-	id, pk, connections, self, rooms, stats, serverOnline
+	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -148,6 +156,17 @@ export function githubAuthUrl() {
 	return url
 }
 
+export async function sendFriendRequest(con: Connection) {
+	return await POST(apiRoute.friendRequest, { body: con.id })
+}
+
+export async function acceptFriendRequest(con: Connection) {
+	if (!con.identity) throw new Error(`connection ${con.id} has no identity`)
+	const fr = friendRequests.find(fr => fr.fromId === con.identity?.id)
+	if (!fr) throw new Error(`friend request not found for connection with identity ${con.identity?.id}`)
+	return await POST(apiRoute.acceptFriendRequest, { body: fr.id })
+}
+
 //dump my identity and require login to get it back
 export async function becomeAnonymous() {
 	const response = await POST(apiRoute.becomeAnonymous)
@@ -228,13 +247,13 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.id:
 			setId(event.data);
-			if(event.data && connections) setSelf(connections.find(con => con.id === event.data))
+			if (event.data && connections) setSelf(connections.find(con => con.id === event.data))
 			console.log('SSE', event.event, event.data);
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData);
-			if(id() && connections) setSelf(connections.find(con => con.id === id()))
+			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			updateConnectionCounts()
 			console.log('SSE', event.event, conData);
 			break;
@@ -293,6 +312,30 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections(connections.filter(con => con.id !== conId))
 			updateConnectionCounts()
 			break;
+		case sse.friendRequest:
+			const frenReq = JSON.parse(event.data)
+			setFriendRequests(friendRequests.length, frenReq)
+			console.log('SSE', event.event, frenReq)
+			break;
+		case sse.friendRequests:
+			const frenReqList = JSON.parse(event.data)
+			setFriendRequests(frenReqList)
+			console.log('SSE', event.event, frenReqList)
+			break;
+		case sse.friendRequestAccepted:
+			const newFriend = JSON.parse(event.data) as Friend
+			const acceptedFrenReq = friendRequests.find(
+				fr => fr.fromId === newFriend.friendId || fr.toId === newFriend.friendId)
+			setFriendRequests(friendRequests.filter(fr => fr.id !== acceptedFrenReq.id))
+			setFriends(friends.length, newFriend)
+			console.log('SSE', event.event, {newFriend, acceptedFrenReq})
+			break;
+		case sse.friendList:
+			const friendsList = JSON.parse(event.data) as Friend[]
+			setFriends(friendsList)
+			console.log('SSE', event.event, friends)
+			break;
+
 		default:
 			console.warn(`Unknown SSE field "${event?.event}"`, event?.data)
 			if (event?.event === undefined) {

@@ -1,7 +1,7 @@
 import "./index.css"
 import "./main.css"
 
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
 import * as server from "./data";
 import VideoCall from "./VideoCall";
@@ -39,6 +39,10 @@ const App = () => {
 		setCallState("call_ready")
 	}
 
+	const friendRequest = async (con: Connection) => {
+		const result = await server.sendFriendRequest(con)
+	}
+
 	const becomeAnonymous = () => {
 		server.becomeAnonymous()
 	}
@@ -63,9 +67,18 @@ const App = () => {
 	},)
 
 	const shortUserId = () => {
-		const id = server.id()
-		return id.substring(id.length - 4)
+		const c = server.self()
+		return c?.identity?.id ? `[${c?.identity.id}]` : `[${c?.id?.substring(c?.id.length - 4)}]`
 	}
+
+
+	const isOnline = (c: Connection) => c.status === 'online'
+	const hasIdentity = (c: Connection) => !!c?.identity
+	const hasPendingFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.toId === c.identity?.id)
+	const hasFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.fromId === c.identity?.id)
+	const isFriend = (c: Connection) => server.friends.some(f => f.friendId === c.identity?.id)
+	const isSelf = (c: Connection) => c.id === server.self()?.id
+	const hasFriends = (c: Connection) => server.friends.length > 0
 
 	return <>
 		<Show when={!server.serverOnline()}>
@@ -79,9 +92,9 @@ const App = () => {
 					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
 				</div>
 			</div>
-			{/* render this user */}
+
 			<Show when={server.connections.find(con => con.id === server.id())}>
-				{(con) => <div class="user-view">
+				{(con) => <>
 					<div class={`middle ${callState()}`}>
 						<ConnectionsGraph self={con()} connections={server.connections} />
 						<Show when={callState() === "server_wait"}>
@@ -97,6 +110,45 @@ const App = () => {
 							user={con()}
 							room={room()}
 							connections={server.connections.filter(sc => con()?.roomId && sc.id != con()?.id && sc.roomId === con()?.roomId)} />
+					</div>
+					<Show when={hasIdentity(server.self()) && hasFriends(server.self())}>
+
+						<div class='connection-list'>
+							friends
+							<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
+								{(c) => <div class={`avatar list-item ${c.status}`}>
+									<Show when={c.identity}>
+										<img src={c?.identity?.avatar_url} />
+									</Show>
+									{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+									{c.identity?.name || `guest`} ({c.kind})
+								</div>
+								}
+							</For>
+						</div>
+					</Show>
+
+					<div class='connection-list'>
+						<For each={server.connections.filter(c => !isSelf(c) && !isFriend(c) && (hasIdentity(c) || isOnline(c)))}>
+							{(c) => <div class={`avatar list-item ${c.status}`}>
+								<Show when={!c.identity}>
+									<div style={{ "background-color": c.color }}></div>
+								</Show>
+								<Show when={c.identity}>
+									<img src={c?.identity?.avatar_url} />
+								</Show>
+								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+								{c.identity?.name || `guest`} ({c.kind})
+								<Show when={hasPendingFriendRequest(c)}>pending friend request...</Show>
+								<Show when={hasIdentity(server.self()) && hasIdentity(c) && !isFriend(c) && !hasFriendRequest(c) && !hasPendingFriendRequest(c)}>
+									<button onClick={() => friendRequest(c)}>friend request</button>
+								</Show>
+								<Show when={hasFriendRequest(c)}>
+									<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
+								</Show>
+							</div>
+							}
+						</For>
 					</div>
 					<div class="toolbar">
 						<div class="buttons">
@@ -121,9 +173,9 @@ const App = () => {
 									login</a>
 							</Show>
 							<Show when={con()?.identity}>
-								<div class="avatar" onclick={becomeAnonymous}>
+								<div class="avatar button" onclick={becomeAnonymous}>
 									<img src={con()?.identity.avatar_url} />
-									<div>{con()?.identity.name}</div>
+									<div class="name">{con()?.identity.name}</div>
 								</div>
 							</Show>
 
@@ -138,7 +190,7 @@ const App = () => {
 						</div>
 						<div class="server">{shortUserId()}</div>
 					</div>
-				</div>}
+				</>}
 			</Show>
 		</Show>
 	</>

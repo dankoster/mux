@@ -19,6 +19,10 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	update: "update",
 	new_room: "new_room",
 	delete_room: "delete_room",
+	friendRequest: "friendRequest",
+	friendList: "friendList",
+	friendRequests: "friendRequests",
+	friendRequestAccepted: "friendRequestAccepted"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -33,13 +37,17 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	room: "room",
 	"room/join": "room/join",
 	becomeAnonymous: "becomeAnonymous",
-	log: "log"
+	log: "log",
+	friendRequest: "friendRequest",
+	acceptFriendRequest: "acceptFriendRequest"
 }
 
 const updateFunctionByUUID = new Map<string, {
 	isLocal: boolean,
 	update: (event: SSEvent, value?: string) => void,
 }>()
+
+
 
 //server is starting up... cleanup and then get persisted data
 db.serverInitAndCleanup()
@@ -50,7 +58,9 @@ console.log('got rooms', roomByUUID)
 console.log('got connections', connectionByUUID)
 
 if (Deno.env.get('ENVIRONMENT') === 'local') {
+	console.log('LOCAL BUILD watching for frontend changes...')
 	onLocalBuild('./dist', () => {
+		console.log('LOCAL BUILD! Tell all connections to refresh...')
 		//tell all connections to reload the page
 		updateFunctionByUUID.forEach(updater => updater.update(sseEvent.refresh))
 	})
@@ -110,6 +120,18 @@ function getConnection(req: Request) {
 	const con = connectionByUUID.get(uuid);
 	if (!con) throw new Error(`No connection found for key ${uuid}`);
 	return { uuid, con };
+}
+
+
+function getConnectionById(id: string) {
+	let requestee: Connection | undefined;
+	for (const c of connectionByUUID.values()) {
+		if (c.id === id) {
+			requestee = c;
+			break;
+		}
+	}
+	return requestee;
 }
 
 function objectFrom<V>(map: Map<string, V>) {
@@ -313,6 +335,66 @@ api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
 	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.reconnect))
 })
 
+api.post(`/${apiRoute.friendRequest}`, async (ctx) => {
+	const { uuid, con: requestor } = getConnection(ctx.request);
+	db.log({ action: event(ctx.request), uuid, identityId: requestor.identity?.id })
+
+	const requesteeId = await ctx.request.body.text()
+	let requestee = getConnectionById(requesteeId);
+	const requesteeUuid = getUUID(requesteeId)
+
+	if (!requestee || !requesteeUuid) {
+		ctx.response.status = 404
+		return
+	}
+
+	if (!requestor.identity?.id || !requestee.identity?.id) {
+		ctx.response.status = 405 //not allowed
+		ctx.response.body = 'both parties must be identified'
+		return
+	}
+
+	const friendRequest = db.addFriendRequest(requestor.identity?.id, requestee.identity?.id)
+	if (!friendRequest) {
+		ctx.response.status = 500
+		return
+	}
+
+	updateFunctionByUUID.get(uuid)?.update(sseEvent.friendRequest, JSON.stringify(friendRequest))
+	updateFunctionByUUID.get(requesteeUuid)?.update(sseEvent.friendRequest, JSON.stringify(friendRequest))
+	ctx.response.body = friendRequest
+})
+
+api.post(`/${apiRoute.acceptFriendRequest}`, async (ctx) => {
+	const { uuid: requesteeUuid, con } = getConnection(ctx.request);
+	const friendRequestId = await ctx.request.body.text()
+
+	db.log({ action: event(ctx.request), uuid: requesteeUuid, identityId: con.identity?.id, note: friendRequestId })
+
+	if (!friendRequestId) throw new Error(`friend request id ${friendRequestId} not found`)
+
+	const result = db.acceptFriendRequest(friendRequestId)
+
+	//get the uuid of the requestor
+	let requestorUuid
+	for (const [uuid, con] of connectionByUUID.entries()) {
+		if (con.identity?.id === result.requestor?.myId) {
+			requestorUuid = uuid
+			break;
+		}
+	}
+
+	if (!requestorUuid) throw new Error(`requestorUuid not found for friend request ${friendRequestId}`)
+
+	console.log("ACCEPT FRIEND REQUEST", `${result.requestee?.myId} accepted request from ${result.requestor?.myId}`)
+
+	updateFunctionByUUID.get(requesteeUuid)?.update(sseEvent.friendRequestAccepted, JSON.stringify(result.requestee))
+	updateFunctionByUUID.get(requestorUuid)?.update(sseEvent.friendRequestAccepted, JSON.stringify(result.requestor))
+	ctx.response.status = 200
+})
+
+
+
 api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	try {
 		const { uuid, con } = getConnection(ctx.request);
@@ -422,11 +504,20 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				}
 			})
 
+			//The user has connected!  Send them a bunch of stuff!
 			console.log("SSE connection   ", uuid, connection)
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 			controller.enqueue(sseMessage(sseEvent.rooms, JSON.stringify(Array.from(roomByUUID.values()))))
+
+			if (connection.identity?.id) {
+				const friends = db.getFriendsByIdentityId(connection.identity?.id)
+				controller.enqueue(sseMessage(sseEvent.friendList, JSON.stringify(friends)))
+
+				const friendRequests = db.getFriendRequestsByIdentityId(connection.identity?.id)
+				controller.enqueue(sseMessage(sseEvent.friendRequests, JSON.stringify(friendRequests)))
+			}
 
 			if (isNewConnection) {
 				notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
