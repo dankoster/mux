@@ -76,9 +76,11 @@ export async function addConnectionIdentity(uuid: string, identity: Identity) {
 	if (!con) throw new Error(`connection not found for uuid ${uuid}`)
 	con.identity = identity
 
-	console.log("addConnectionIdentity", con)
 	const result = db.persistConnection(uuid, con)
 	db.log({ action: "addConnectionIdentity", uuid, identityId: result?.identity?.id })
+
+	con.identity.id = result?.identity?.id
+	console.log("addConnectionIdentity", con)
 
 	notifyAllConnections(sseEvent.update, {
 		connectionId: con.id,
@@ -342,6 +344,8 @@ api.post(`/${apiRoute.friendRequest}`, async (ctx) => {
 	const requesteeId = await ctx.request.body.text()
 	let requestee = getConnectionById(requesteeId);
 	const requesteeUuid = getUUID(requesteeId)
+
+	console.log("FRIEND REQUEST", { requesteeId, requestor, requestee })
 
 	if (!requestee || !requesteeUuid) {
 		ctx.response.status = 404

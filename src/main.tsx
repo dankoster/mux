@@ -77,8 +77,18 @@ const App = () => {
 	const hasPendingFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.toId === c.identity?.id)
 	const hasFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.fromId === c.identity?.id)
 	const isFriend = (c: Connection) => server.friends.some(f => f.friendId === c.identity?.id)
+	const isUnknown = (c: Connection) => !isSelf(c) && !hasSameIdentity(c, server.self()) && !isFriend(c) && (hasIdentity(c) || isOnline(c))
 	const isSelf = (c: Connection) => c.id === server.self()?.id
+	const hasSameIdentity = (c1: Connection, c2: Connection) => c1?.identity?.id === c2?.identity?.id
 	const hasFriends = (c: Connection) => server.friends.length > 0
+	const canFriendRequest = (c: Connection) =>
+		hasIdentity(server.self())
+		&& hasIdentity(c)
+		&& !hasSameIdentity(c, server.self())
+		&& !isSelf(c)
+		&& !isFriend(c)
+		&& !hasFriendRequest(c)
+		&& !hasPendingFriendRequest(c)
 
 	return <>
 		<Show when={!server.serverOnline()}>
@@ -111,8 +121,22 @@ const App = () => {
 							room={room()}
 							connections={server.connections.filter(sc => con()?.roomId && sc.id != con()?.id && sc.roomId === con()?.roomId)} />
 					</div>
-					<Show when={hasIdentity(server.self()) && hasFriends(server.self())}>
-
+					<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+						<div class='connection-list'>
+							also me
+							<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+								{(c) => <div class={`avatar list-item ${c.status}`}>
+									<Show when={c.identity}>
+										<img src={c?.identity?.avatar_url} />
+									</Show>
+									{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+									{c.identity?.name || `guest`} ({c.kind})
+								</div>
+								}
+							</For>
+						</div>
+					</Show>
+					<Show when={hasFriends(server.self())}>
 						<div class='connection-list'>
 							friends
 							<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
@@ -129,7 +153,7 @@ const App = () => {
 					</Show>
 
 					<div class='connection-list'>
-						<For each={server.connections.filter(c => !isSelf(c) && !isFriend(c) && (hasIdentity(c) || isOnline(c)))}>
+						<For each={server.connections.filter(c => isUnknown(c))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={!c.identity}>
 									<div style={{ "background-color": c.color }}></div>
@@ -140,7 +164,7 @@ const App = () => {
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
 								<Show when={hasPendingFriendRequest(c)}>pending friend request...</Show>
-								<Show when={hasIdentity(server.self()) && hasIdentity(c) && !isFriend(c) && !hasFriendRequest(c) && !hasPendingFriendRequest(c)}>
+								<Show when={canFriendRequest(c)}>
 									<button onClick={() => friendRequest(c)}>friend request</button>
 								</Show>
 								<Show when={hasFriendRequest(c)}>
