@@ -163,7 +163,7 @@ const App = () => {
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
-								<Show when={hasPendingFriendRequest(c)}>pending friend request...</Show>
+								<Show when={hasPendingFriendRequest(c)}><span>pending friend request...</span></Show>
 								<Show when={canFriendRequest(c)}>
 									<button onClick={() => friendRequest(c)}>friend request</button>
 								</Show>
