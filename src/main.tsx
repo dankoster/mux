@@ -111,12 +111,14 @@ const App = () => {
 		</Show>
 		<Show when={server.serverOnline()}>
 			<div class="header">
-				<h3 class="logo">⨳ chatMUX</h3>
-				<div class="stats">
-					<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
-					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
+				<div class="header-left">
+					<h3 class="logo">⨳ chatMUX</h3>
+					<div class="stats">
+						<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
+						<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
+					</div>
 				</div>
-				<div>
+				<div class="user">
 					<Show when={!server.self()?.identity}>
 						<div class="color-button">
 							<input
@@ -139,8 +141,8 @@ const App = () => {
 					</Show>
 					<Show when={server.self()?.identity}>
 						<div class="avatar button" onclick={() => server.becomeAnonymous()}>
-							<img src={server.self()?.identity.avatar_url} />
 							<div class="name">{server.self()?.identity.name}</div>
+							<img src={server.self()?.identity.avatar_url} />
 						</div>
 					</Show>
 
