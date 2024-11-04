@@ -1,7 +1,7 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Room, Connection, Identity, Update } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Room, Connection, Identity, Update, DM } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
@@ -22,7 +22,8 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	friendRequest: "friendRequest",
 	friendList: "friendList",
 	friendRequests: "friendRequests",
-	friendRequestAccepted: "friendRequestAccepted"
+	friendRequestAccepted: "friendRequestAccepted",
+	dm: "dm"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -39,7 +40,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	becomeAnonymous: "becomeAnonymous",
 	log: "log",
 	friendRequest: "friendRequest",
-	acceptFriendRequest: "acceptFriendRequest"
+	acceptFriendRequest: "acceptFriendRequest",
+	dm: "dm"
 }
 
 const updateFunctionByUUID = new Map<string, {
@@ -126,14 +128,14 @@ function getConnection(req: Request) {
 
 
 function getConnectionById(id: string) {
-	let requestee: Connection | undefined;
+	let con: Connection | undefined;
 	for (const c of connectionByUUID.values()) {
 		if (c.id === id) {
-			requestee = c;
+			con = c;
 			break;
 		}
 	}
-	return requestee;
+	return con;
 }
 
 function objectFrom<V>(map: Map<string, V>) {
@@ -455,6 +457,47 @@ api.post(`/${apiRoute.setColor}`, async (ctx) => {
 			value: color
 		})
 		ctx.response.status = 200
+	} catch (err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 400
+	}
+});
+
+api.post(`/${apiRoute.dm}`, async (ctx) => {
+	try {
+		const { uuid, con } = getConnection(ctx.request)
+		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
+
+		const message = await ctx.request.body.json() as DM
+		console.log('DM', message)
+
+		const toCon = getConnectionById(message.to)
+		if (!toCon) {
+			ctx.response.status = 404
+			ctx.response.body = 'no connection with specified id'
+			return
+		}
+
+
+		const toUuid = getUUID(toCon.id)
+		if (!toUuid) {
+			ctx.response.status = 500
+			ctx.response.body = 'uuid not found for connection'
+			return
+		}
+
+		message.from = con.id
+		message.timestamp = Date.now()
+		const updater = updateFunctionByUUID.get(toUuid)
+		if (updater) {
+			updater.update(sseEvent.dm, JSON.stringify(message))
+			ctx.response.status = 200
+		}
+		else {
+			//TODO: save dm for later delivery
+			ctx.response.status = 501 //not implemented
+		}
+
 	} catch (err) {
 		console.error(err, ctx.request)
 		ctx.response.status = 400

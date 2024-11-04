@@ -1,7 +1,7 @@
 import { API_URI } from "./API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend } from "../server/types";
+import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM } from "../server/types";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -15,7 +15,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	becomeAnonymous: "becomeAnonymous",
 	log: "log",
 	friendRequest: "friendRequest",
-	acceptFriendRequest: "acceptFriendRequest"
+	acceptFriendRequest: "acceptFriendRequest",
+	dm: "dm"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -34,7 +35,8 @@ const sse: { [Property in SSEvent]: Property } = {
 	friendRequest: "friendRequest",
 	friendList: "friendList",
 	friendRequests: "friendRequests",
-	friendRequestAccepted: "friendRequestAccepted"
+	friendRequestAccepted: "friendRequestAccepted",
+	dm: "dm"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -176,6 +178,8 @@ export async function becomeAnonymous() {
 		const index = connections.findIndex(con => con.id === myId)
 		if (!(index >= 0)) throw new Error('ID not found!')
 		setConnections({ from: index, to: index }, "identity", undefined)
+		setFriends([])
+		setFriendRequests([])
 	}
 }
 
@@ -211,6 +215,14 @@ const SSEvents = new SSEventEmitter()
 export function onWebRtcMessage(callback: (message: { senderId: string, message: string }) => void) {
 	const ac = new AbortController()
 	SSEvents.addEventListener(sse.webRTC, async (e: CustomEvent) => {
+		callback(e.detail)
+	}, { signal: ac.signal })
+	return ac
+}
+
+export function onDM(callback: (dm: DM) => void) {
+	const ac = new AbortController()
+	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
 		callback(e.detail)
 	}, { signal: ac.signal })
 	return ac
@@ -328,12 +340,18 @@ function handleSseEvent(event: SSEventPayload) {
 				fr => fr.fromId === newFriend.friendId || fr.toId === newFriend.friendId)
 			setFriendRequests(friendRequests.filter(fr => fr.id !== acceptedFrenReq.id))
 			setFriends(friends.length, newFriend)
-			console.log('SSE', event.event, {newFriend, acceptedFrenReq})
+			console.log('SSE', event.event, { newFriend, acceptedFrenReq })
 			break;
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
 			console.log('SSE', event.event, friends)
+			break;
+
+		case sse.dm:
+			const dm = JSON.parse(event.data) as DM
+			console.log('SSE', event.event, dm)
+			SSEvents.onSseEvent(sse.dm, dm)
 			break;
 
 		default:
@@ -365,7 +383,12 @@ export async function setColor(color: string, key?: string) {
 	return await POST(apiRoute.setColor, { body: color, authToken: key })
 }
 export async function setText(text: string, key?: string) {
-	return await POST(apiRoute.setText, { body: text, authToken: key });
+	return await POST(apiRoute.setText, { body: text, authToken: key })
+}
+
+export async function dm(con: Connection, message: string) {
+	const dm: DM = { to: con.id, message }
+	return await POST(apiRoute.dm, { body: JSON.stringify(dm) })
 }
 
 async function GET(route: ApiRoute) {

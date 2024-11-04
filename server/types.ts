@@ -11,7 +11,8 @@ export type ApiRoute = "sse" |
 	"room" |
 	"room/join" |
 	"friendRequest" | 
-	"acceptFriendRequest";
+	"acceptFriendRequest" | 
+	"dm";
 
 //is there a way to have the RoomRoute be nested under ApiRoute
 // like this { setColor: "setColor", room: { join: "room/join"}}
@@ -36,7 +37,8 @@ export type SSEvent = "pk" |
 	"friendRequest" |
 	"friendRequests" |
 	"friendList" | 
-	"friendRequestAccepted";
+	"friendRequestAccepted" |
+	"dm";
 
 export type Room = {
 	id: string;
@@ -78,4 +80,11 @@ export type FriendRequest = {
 	fromId: string,
 	toId: string,
 	status: string
+}
+
+export type DM = { 
+	to: string, 
+	from?: string,
+	timestamp?: number,
+	message: string, 
 }

@@ -102,10 +102,6 @@ body {
 	}
 }
 
-.connection-list {
-	border-top: 1px solid;
-}
-
 .toolbar {
 	padding: 1rem;
 	border-top: 1px solid;
@@ -157,13 +153,6 @@ body {
 
 }
 
-
-.server {
-	position: absolute;
-	bottom: 0;
-	font-size: xx-small;
-	color: #ffffff50;
-}
 
 .avatar {
 
@@ -316,7 +305,12 @@ body {
 	}
 }
 
-.connections {
+.connection-list {
+	border-top: 1px solid;
+}
+
+/* .connections {
+	border: 1px solid gold;
 	margin: 1rem;
 	display: grid;
 	gap: 1rem;
@@ -351,4 +345,4 @@ body {
 			margin: auto;
 		}
 	}
-}
+} */

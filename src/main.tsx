@@ -8,7 +8,7 @@ import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";
 import { trackStore } from "@solid-primitives/deep";
 
-import type { Connection } from "../server/types"
+import type { Connection, DM } from "../server/types"
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
 
@@ -39,14 +39,7 @@ const App = () => {
 		setCallState("call_ready")
 	}
 
-	const friendRequest = async (con: Connection) => {
-		const result = await server.sendFriendRequest(con)
-	}
-
-	const becomeAnonymous = () => {
-		server.becomeAnonymous()
-	}
-
+	const friendRequest = async (con: Connection) => await server.sendFriendRequest(con)
 
 	createEffect(() => {
 		trackStore(server.connections)
@@ -71,7 +64,7 @@ const App = () => {
 		return c?.identity?.id ? `[${c?.identity.id}]` : `[${c?.id?.substring(c?.id.length - 4)}]`
 	}
 
-
+	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
 	const isOnline = (c: Connection) => c.status === 'online'
 	const hasIdentity = (c: Connection) => !!c?.identity
 	const hasPendingFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.toId === c.identity?.id)
@@ -80,7 +73,8 @@ const App = () => {
 	const isUnknown = (c: Connection) => !isSelf(c) && !hasSameIdentity(c, server.self()) && !isFriend(c) && (hasIdentity(c) || isOnline(c))
 	const isSelf = (c: Connection) => c.id === server.self()?.id
 	const hasSameIdentity = (c1: Connection, c2: Connection) => c1?.identity?.id === c2?.identity?.id
-	const hasFriends = (c: Connection) => server.friends.length > 0
+	const hasFriends = () => server.friends.length > 0
+	const hasUnknownConnections = () => server.connections.some(c => isUnknown(c))
 	const canFriendRequest = (c: Connection) =>
 		hasIdentity(server.self())
 		&& hasIdentity(c)
@@ -89,6 +83,27 @@ const App = () => {
 		&& !isFriend(c)
 		&& !hasFriendRequest(c)
 		&& !hasPendingFriendRequest(c)
+
+	const onMessageKeyDown = (e: KeyboardEvent, con: Connection) => {
+		const input = e.target as HTMLTextAreaElement
+		if (e.key === 'Enter') {
+			const value = input.value
+			console.log(value)
+			input.value = ''
+			server.dm(con, value)
+		}
+	}
+
+	//not bothering with a solidjs store because they're a massive pain
+	const dmByConId = {}
+	server.onDM((dm: DM) => {
+		//set the dm from a particular user by con.id === dm.from
+		const dms = dmByConId[dm.from] ?? []
+		dms.push(dm)
+
+		const el = document.querySelector(`#con${dm.from}.latest-dm`)
+		if(el) el.textContent = dm.message
+	})
 
 	return <>
 		<Show when={!server.serverOnline()}>
@@ -121,58 +136,66 @@ const App = () => {
 							room={room()}
 							connections={server.connections.filter(sc => con()?.roomId && sc.id != con()?.id && sc.roomId === con()?.roomId)} />
 					</div>
-					<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
-						<div class='connection-list'>
-							also me
-							<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
-								{(c) => <div class={`avatar list-item ${c.status}`}>
-									<Show when={c.identity}>
-										<img src={c?.identity?.avatar_url} />
-									</Show>
-									{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-									{c.identity?.name || `guest`} ({c.kind})
-								</div>
-								}
-							</For>
-						</div>
-					</Show>
-					<Show when={hasFriends(server.self())}>
-						<div class='connection-list'>
-							friends
-							<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
-								{(c) => <div class={`avatar list-item ${c.status}`}>
-									<Show when={c.identity}>
-										<img src={c?.identity?.avatar_url} />
-									</Show>
-									{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-									{c.identity?.name || `guest`} ({c.kind})
-								</div>
-								}
-							</For>
-						</div>
-					</Show>
-
-					<div class='connection-list'>
-						<For each={server.connections.filter(c => isUnknown(c))}>
-							{(c) => <div class={`avatar list-item ${c.status}`}>
-								<Show when={!c.identity}>
-									<div style={{ "background-color": c.color }}></div>
-								</Show>
-								<Show when={c.identity}>
-									<img src={c?.identity?.avatar_url} />
-								</Show>
-								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-								{c.identity?.name || `guest`} ({c.kind})
-								<Show when={hasPendingFriendRequest(c)}><span>pending friend request...</span></Show>
-								<Show when={canFriendRequest(c)}>
-									<button onClick={() => friendRequest(c)}>friend request</button>
-								</Show>
-								<Show when={hasFriendRequest(c)}>
-									<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
-								</Show>
+					<div class="connections">
+						<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+							<div class='connection-list'>
+								also me
+								<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+									{(c) => <div class={`avatar list-item ${c.status}`}>
+										<Show when={c.identity}>
+											<img src={c?.identity?.avatar_url} />
+										</Show>
+										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+										{c.identity?.name || `guest`} ({c.kind})
+									</div>
+									}
+								</For>
 							</div>
-							}
-						</For>
+						</Show>
+						<Show when={hasFriends()}>
+							<div class='connection-list'>
+								friends
+								<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
+									{(c) => <div class={`avatar list-item ${c.status}`}>
+										<Show when={c.identity}>
+											<img src={c?.identity?.avatar_url} />
+										</Show>
+										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+										{c.identity?.name || `guest`} ({c.kind})
+
+										<Show when={isOnline(c)}>
+											<input type="text" onKeyDown={(e) => onMessageKeyDown(e, c)} />
+											<span class='latest-dm' id={`con${c.id}`}></span>
+										</Show>
+									</div>
+									}
+								</For>
+							</div>
+						</Show>
+						<Show when={hasUnknownConnections()}>
+							<div class='connection-list'>
+								<For each={server.connections.filter(c => isUnknown(c))}>
+									{(c) => <div class={`avatar list-item ${c.status}`}>
+										<Show when={!c.identity}>
+											<div style={{ "background-color": c.color }}></div>
+										</Show>
+										<Show when={c.identity}>
+											<img src={c?.identity?.avatar_url} />
+										</Show>
+										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+										{c.identity?.name || `guest`} ({c.kind})
+										<Show when={hasPendingFriendRequest(c)}><span>pending friend request...</span></Show>
+										<Show when={canFriendRequest(c)}>
+											<button onClick={() => friendRequest(c)}>friend request</button>
+										</Show>
+										<Show when={hasFriendRequest(c)}>
+											<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
+										</Show>
+									</div>
+									}
+								</For>
+							</div>
+						</Show>
 					</div>
 					<div class="toolbar">
 						<div class="buttons">
@@ -197,7 +220,7 @@ const App = () => {
 									login</a>
 							</Show>
 							<Show when={con()?.identity}>
-								<div class="avatar button" onclick={becomeAnonymous}>
+								<div class="avatar button" onclick={() => server.becomeAnonymous()}>
 									<img src={con()?.identity.avatar_url} />
 									<div class="name">{con()?.identity.name}</div>
 								</div>
@@ -212,7 +235,6 @@ const App = () => {
 								<button class="room-button" onclick={startCall}>start call</button>
 							}
 						</div>
-						<div class="server">{shortUserId()}</div>
 					</div>
 				</>}
 			</Show>
@@ -220,9 +242,5 @@ const App = () => {
 	</>
 };
 
-
-function isRoomOwner(con: Connection) {
-	return server.rooms.find(room => room.id === con.roomId)?.ownerId === con.id;
-}
 
 render(() => <App />, document.body);
