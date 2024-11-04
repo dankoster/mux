@@ -1,14 +1,12 @@
 /* override browser default */
-html,
-body {
-	margin: 0;
-	padding: 0;
-}
-
 /* use viewport-relative units to cover page fully */
+html,
 body {
 	height: 100svh;
 	width: 100%;
+
+	padding: 0;
+	margin: 0;
 
 	display: grid;
 	grid-auto-flow: row;
@@ -16,9 +14,36 @@ body {
 }
 
 /* include border and padding in element width and height */
-* {
+*,
+*::before,
+*::before {
 	box-sizing: border-box;
+	
+	/*debugging*/
+	/* outline: 1px solid lime; */
 }
+
+:root {
+	font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+	font-weight: 400;
+
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	-webkit-text-size-adjust: 100%;
+
+	--separator-color: #ffffff20;
+	--subtext-color: #ffffff50;
+	--background-color: #1f0e3c;
+	--text-color: rgba(255, 255, 255, 0.87);
+
+	color-scheme: light dark;
+	color: var(--text-color);
+	background-color: var(--background-color);
+}
+
 
 .offlineMessage {
 	display: grid;
@@ -31,10 +56,9 @@ body {
 .header {
 	display: flex;
 	gap: 2rem;
-	border-bottom: 1px solid;
+	border-bottom: 1px solid var(--separator-color);
 	align-items: center;
 	touch-action: none;
-	backdrop-filter: blur(10px);
 	overflow: hidden;
 	/* position: sticky;
     top: 0; */
@@ -46,17 +70,9 @@ body {
 		position: relative;
 	}
 
-	.logo::after {
-		content: "chat with people, not ai";
-		position: absolute;
-		font-size: x-small;
-		bottom: -0.5rem;
-		right: 0;
-		color: #ffffff99;
-	}
-
 	.stats {
 		touch-action: none;
+		font-size: small;
 
 		.userCount {
 			touch-action: none;
@@ -104,9 +120,10 @@ body {
 
 .toolbar {
 	padding: 1rem;
-	border-top: 1px solid;
+	border-top: 1px solid var(--separator-color);
 	position: sticky;
 	bottom: 0;
+	margin-top: 1rem;
 
 	display: flex;
 	flex-direction: row;
@@ -116,9 +133,6 @@ body {
 	justify-content: center;
 	align-items: center;
 	touch-action: none;
-
-	backdrop-filter: saturate(3.5) brightness(0.3) blur(20px);
-	background-color: #1f0e3c;
 
 	container-type: inline-size;
 	container-name: toolbar;
@@ -154,8 +168,11 @@ body {
 }
 
 
-.avatar {
+.connection-list {
+	/* border-top: 1px solid; */
+}
 
+.avatar {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
@@ -176,6 +193,7 @@ body {
 			border-radius: 25%;
 			border: 0.5px solid;
 		}
+
 		img {
 			width: 1rem;
 			height: 1rem;
@@ -305,9 +323,6 @@ body {
 	}
 }
 
-.connection-list {
-	border-top: 1px solid;
-}
 
 /* .connections {
 	border: 1px solid gold;

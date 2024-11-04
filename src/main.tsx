@@ -39,8 +39,6 @@ const App = () => {
 		setCallState("call_ready")
 	}
 
-	const friendRequest = async (con: Connection) => await server.sendFriendRequest(con)
-
 	createEffect(() => {
 		trackStore(server.connections)
 
@@ -102,8 +100,10 @@ const App = () => {
 		dms.push(dm)
 
 		const el = document.querySelector(`#con${dm.from}.latest-dm`)
-		if(el) el.textContent = dm.message
+		if (el) el.textContent = dm.message
 	})
+
+	const [selectedDm, setSlectedDm] = createSignal<Connection>()
 
 	return <>
 		<Show when={!server.serverOnline()}>
@@ -111,133 +111,139 @@ const App = () => {
 		</Show>
 		<Show when={server.serverOnline()}>
 			<div class="header">
-				<h1 class="logo">⨳ chatMUX</h1>
+				<h3 class="logo">⨳ chatMUX</h3>
 				<div class="stats">
 					<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
 					<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
 				</div>
+				<div>
+					<Show when={!server.self()?.identity}>
+						<div class="color-button">
+							<input
+								type="color"
+								oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
+								onchange={(e) => server.setColor(e.target.value)}
+								value={server.self()?.color ?? 'transparent'} />
+
+						</div>
+					</Show>
+					<Show when={!server.self()?.identity}>
+						<a class="room-button" href={server.githubAuthUrl()?.toString()}>
+							<svg height="16" width="16" viewBox="0 0 16 16" version="1.1" aria-hidden="true">
+								<path
+									d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+									fill-rule="evenodd"
+									fill="currentColor"></path>
+							</svg>
+							login</a>
+					</Show>
+					<Show when={server.self()?.identity}>
+						<div class="avatar button" onclick={() => server.becomeAnonymous()}>
+							<img src={server.self()?.identity.avatar_url} />
+							<div class="name">{server.self()?.identity.name}</div>
+						</div>
+					</Show>
+
+				</div>
 			</div>
 
-			<Show when={server.connections.find(con => con.id === server.id())}>
-				{(con) => <>
-					<div class={`middle ${callState()}`}>
-						<ConnectionsGraph self={con()} connections={server.connections} />
-						<Show when={callState() === "server_wait"}>
-							<div class="call_state_message">waiting for server... hit [start call] to retry.</div>
-						</Show>
-						<Show when={callState() === "server_error"}>
-							<div class="call_state_message">the server is unhappy... please refresh!</div>
-						</Show>
-						<Show when={callState() === "call_ready"}>
-							<div class="call_state_message">waiting for someone else to join...</div>
-						</Show>
-						<VideoCall
-							user={con()}
-							room={room()}
-							connections={server.connections.filter(sc => con()?.roomId && sc.id != con()?.id && sc.roomId === con()?.roomId)} />
-					</div>
-					<div class="connections">
-						<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
-							<div class='connection-list'>
-								also me
-								<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={c.identity}>
-											<img src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
-									</div>
-									}
-								</For>
-							</div>
-						</Show>
-						<Show when={hasFriends()}>
-							<div class='connection-list'>
-								friends
-								<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={c.identity}>
-											<img src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
-
-										<Show when={isOnline(c)}>
-											<input type="text" onKeyDown={(e) => onMessageKeyDown(e, c)} />
-											<span class='latest-dm' id={`con${c.id}`}></span>
-										</Show>
-									</div>
-									}
-								</For>
-							</div>
-						</Show>
-						<Show when={hasUnknownConnections()}>
-							<div class='connection-list'>
-								<For each={server.connections.filter(c => isUnknown(c))}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={!c.identity}>
-											<div style={{ "background-color": c.color }}></div>
-										</Show>
-										<Show when={c.identity}>
-											<img src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
-										<Show when={hasPendingFriendRequest(c)}><span>pending friend request...</span></Show>
-										<Show when={canFriendRequest(c)}>
-											<button onClick={() => friendRequest(c)}>friend request</button>
-										</Show>
-										<Show when={hasFriendRequest(c)}>
-											<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
-										</Show>
-									</div>
-									}
-								</For>
-							</div>
-						</Show>
-					</div>
-					<div class="toolbar">
-						<div class="buttons">
-							<Show when={!con()?.identity}>
-								<div class="color-button">
-									<input
-										type="color"
-										oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
-										onchange={(e) => server.setColor(e.target.value)}
-										value={con()?.color ?? 'transparent'} />
-
-								</div>
-							</Show>
-							<Show when={!con()?.identity}>
-								<a class="room-button" href={server.githubAuthUrl()?.toString()}>
-									<svg height="16" width="16" viewBox="0 0 16 16" version="1.1" aria-hidden="true">
-										<path
-											d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-											fill-rule="evenodd"
-											fill="currentColor"></path>
-									</svg>
-									login</a>
-							</Show>
-							<Show when={con()?.identity}>
-								<div class="avatar button" onclick={() => server.becomeAnonymous()}>
-									<img src={con()?.identity.avatar_url} />
-									<div class="name">{con()?.identity.name}</div>
-								</div>
-							</Show>
-
-							{con()?.roomId &&
-								<button class="room-button" onclick={() => exitRoom(con()?.roomId)}>
-									{isRoomOwner(con()) ? "End" : "Leave"} call
-								</button>
-							}
-							{!con()?.roomId &&
-								<button class="room-button" onclick={startCall}>start call</button>
-							}
-						</div>
-					</div>
-				</>}
+			<div class={`middle ${callState()}`}>
+				<ConnectionsGraph self={server.self()} connections={server.connections} />
+				<Show when={callState() === "server_wait"}>
+					<div class="call_state_message">waiting for server... hit [start call] to retry.</div>
+				</Show>
+				<Show when={callState() === "server_error"}>
+					<div class="call_state_message">the server is unhappy... please refresh!</div>
+				</Show>
+				<Show when={callState() === "call_ready"}>
+					<div class="call_state_message">waiting for someone else to join...</div>
+				</Show>
+				<VideoCall
+					user={server.self()}
+					room={room()}
+					connections={server.connections.filter(sc => server.self()?.roomId && sc.id != server.self()?.id && sc.roomId === server.self()?.roomId)} />
+			</div>
+			<Show when={selectedDm()}>
+				<div class="dm">
+					<h6>dm with {selectedDm().identity?.name}</h6>
+					<span onclick={() => setSlectedDm(null)}>close</span>
+					<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDm())} />
+					<span class='latest-dm' id={`con${selectedDm().id}`}></span>
+				</div>
 			</Show>
+			<div class="connections">
+				<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+					<div class='connection-list'>
+						also me
+						<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+							{(c) => <div class={`avatar list-item ${c.status}`}>
+								<Show when={c.identity}>
+									<img src={c?.identity?.avatar_url} />
+								</Show>
+								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+								{c.identity?.name || `guest`} ({c.kind})
+							</div>
+							}
+						</For>
+					</div>
+				</Show>
+				<Show when={hasFriends()}>
+					<div class='connection-list'>
+						friends
+						<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
+							{(c) => <div class={`avatar list-item ${c.status}`}>
+								<Show when={c.identity}>
+									<img src={c?.identity?.avatar_url} />
+								</Show>
+								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+								{c.identity?.name || `guest`} ({c.kind})
+
+								<Show when={isOnline(c)}>
+									<div onclick={() => setSlectedDm(c)}>💬</div>
+								</Show>
+							</div>}
+						</For>
+					</div>
+				</Show>
+				<Show when={hasUnknownConnections()}>
+					<div class='connection-list'>
+						<For each={server.connections.filter(c => isUnknown(c))}>
+							{(c) => <div class={`avatar list-item ${c.status}`}>
+								<Show when={!c.identity}>
+									<div style={{ "background-color": c.color }}></div>
+								</Show>
+								<Show when={c.identity}>
+									<img src={c?.identity?.avatar_url} />
+								</Show>
+								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+								{c.identity?.name || `guest`} ({c.kind})
+								<Show when={hasPendingFriendRequest(c)}><span>pending friend request...</span></Show>
+								<Show when={canFriendRequest(c)}>
+									<button onClick={() => server.sendFriendRequest(c)}>friend request</button>
+								</Show>
+								<Show when={hasFriendRequest(c)}>
+									<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
+								</Show>
+							</div>
+							}
+						</For>
+					</div>
+				</Show>
+			</div>
+			<div class="toolbar">
+				<div class="buttons">
+
+					{server.self()?.roomId &&
+						<button class="room-button" onclick={() => exitRoom(server.self()?.roomId)}>
+							{isRoomOwner(server.self()) ? "End" : "Leave"} call
+						</button>
+					}
+					{!server.self()?.roomId &&
+						<button class="room-button" onclick={startCall}>start call</button>
+					}
+				</div>
+			</div>
+
 		</Show>
 	</>
 };

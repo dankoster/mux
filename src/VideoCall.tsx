@@ -223,9 +223,9 @@ class PeerConnection extends EventTarget {
 
 export default function VideoCall(props: { room: Room, user: Connection, connections: Connection[] }) {
 
-	if (!props.user) {
-		return "no user"
-	}
+	// if (!props.user) {
+	// 	return "no user"
+	// }
 
 	let localVideo: HTMLVideoElement
 

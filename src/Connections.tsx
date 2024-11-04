@@ -125,11 +125,11 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 
 
 		svgObserver = new ResizeObserver(() => {
-			updateForceLayout(simulation, null, !!props.self.roomId)
+			updateForceLayout(simulation, null, !!props.self?.roomId)
 		})
 		svgObserver.observe(svgRef)
 		simulation = d3.forceSimulation()
-		updateForceLayout(simulation, [], !!props.self.roomId)
+		updateForceLayout(simulation, [], !!props.self?.roomId)
 
 		simulation.on("tick", function ticked() {
 			avatarCircles?.attr("cx", d => d.x)
@@ -250,9 +250,9 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		rooms = [...rooms]
 
 		//if we're in a call, only show ourself and the others in the call
-		if (props.self.roomId) {
-			anonymous = anonymous.filter(n => n.roomId === props.self.roomId)
-			identified = identified.filter(n => n.roomId === props.self.roomId)
+		if (props.self?.roomId) {
+			anonymous = anonymous.filter(n => n.roomId === props.self?.roomId)
+			identified = identified.filter(n => n.roomId === props.self?.roomId)
 			links = []
 			rooms = []
 		}
@@ -260,7 +260,7 @@ export default function ConnectionsGraph(props: { self: Connection, connections:
 		//hide anonymous users who are not online
 		anonymous = anonymous.filter(con => con.status)
 
-		updateForceLayout(simulation, links, !!props.self.roomId)
+		updateForceLayout(simulation, links, !!props.self?.roomId)
 
 		simulation?.nodes([...anonymous, ...identified]) //yay more copying of the data!
 
