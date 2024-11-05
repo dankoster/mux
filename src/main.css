@@ -361,9 +361,7 @@ body {
 		height: 100%;
 	}
 
-	/* chrome override default padding 
-	https://rebeccamdeprey.com/blog/styling-the-html-color-input
-	*/
+
 	input[type="color" i]::-webkit-color-swatch-wrapper {
 		padding: 0;
 	}
