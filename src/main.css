@@ -18,7 +18,7 @@ body {
 *::before,
 *::before {
 	box-sizing: border-box;
-	
+
 	/*debugging*/
 	/* outline: 1px solid lime; */
 }
@@ -59,7 +59,7 @@ body {
 	grid-auto-flow: column;
 	grid-template-columns: 1fr;
 	gap: 1rem;
-	border-bottom: 1px solid var(--separator-color);
+	/* border-bottom: 1px solid var(--separator-color); */
 	align-items: center;
 	touch-action: none;
 	overflow: hidden;
@@ -84,12 +84,11 @@ body {
 		touch-action: none;
 		font-size: small;
 		display: flex;
-        column-gap: 1rem;
-        flex-wrap: wrap;
+		column-gap: 1rem;
+		flex-wrap: wrap;
 		justify-content: center;
 
 		opacity: 0.6;
-		/* color: var(--subtext-color); */
 
 		.userCount {
 			touch-action: none;
@@ -99,6 +98,8 @@ body {
 
 	.user {
 		overflow: hidden;
+		display: flex;
+		column-gap: 1rem;
 
 		.name {
 			overflow: hidden;
@@ -206,6 +207,22 @@ body {
 	text-wrap: nowrap;
 	overflow: hidden;
 
+
+	&.button {
+		cursor: pointer;
+		border: 1px solid var(--button-outline-color);
+		border-radius: 5px;
+
+		.name {
+			position: relative;
+			font-weight: bold;
+		}
+
+		img {
+			max-width: 1.75rem;
+		}
+	}
+
 	&.list-item {
 		padding-inline: 1rem;
 		filter: opacity(0.5) blur(0.7px);
@@ -226,21 +243,6 @@ body {
 			height: 1rem;
 			border-radius: 25%;
 		}
-	}
-
-	&.button {
-		cursor: pointer;
-		border: 1px solid var(--button-outline-color);
-		border-radius: 5px;
-	}
-
-	.name {
-		position: relative;
-		font-weight: bold;
-	}
-
-	img {
-		max-width: 39px;
 	}
 }
 
@@ -291,7 +293,40 @@ body {
 	gap: 0.5rem;
 }
 
-.color-button {
+.color-picker {
+	border-radius: 50%;
+	border: 1px solid white;
+	position: relative;
+	overflow: hidden;
+
+	.color-input {
+		-webkit-appearance: none;
+		-moz-appearance: none;
+		appearance: none;
+		background-color: transparent;
+		width: 2rem;
+		height: 1rem;
+		border: none;
+		cursor: pointer;
+
+		&::-webkit-color-swatch-wrapper {
+			position: absolute;
+			padding: 0;
+			top: 0;
+			left: 0;
+		}
+
+		&::-webkit-color-swatch {
+			border: none;
+		}
+
+		&::-moz-color-swatch {
+			border: none;
+		}
+	}
+}
+
+/* .color-button {
 	color: white;
 	font-size: xx-large;
 	border: 1px solid;
@@ -338,7 +373,7 @@ body {
 		border: none;
 		border-radius: 0;
 	}
-}
+} */
 
 
 /* .connections {

@@ -62,6 +62,9 @@ const App = () => {
 		return c?.identity?.id ? `[${c?.identity.id}]` : `[${c?.id?.substring(c?.id.length - 4)}]`
 	}
 
+	const hasFriends = () => server.friends.length > 0
+	const connectedFriends = () => server.connections.filter(c => !isSelf(c) && isFriend(c))
+
 	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
 	const isOnline = (c: Connection) => c.status === 'online'
 	const hasIdentity = (c: Connection) => !!c?.identity
@@ -70,8 +73,7 @@ const App = () => {
 	const isFriend = (c: Connection) => server.friends.some(f => f.friendId === c.identity?.id)
 	const isUnknown = (c: Connection) => !isSelf(c) && !hasSameIdentity(c, server.self()) && !isFriend(c) && (hasIdentity(c) || isOnline(c))
 	const isSelf = (c: Connection) => c.id === server.self()?.id
-	const hasSameIdentity = (c1: Connection, c2: Connection) => c1?.identity?.id === c2?.identity?.id
-	const hasFriends = () => server.friends.length > 0
+	const hasSameIdentity = (c1: Connection, c2: Connection) => c1?.identity && c2?.identity && c1?.identity?.id === c2?.identity?.id
 	const hasUnknownConnections = () => server.connections.some(c => isUnknown(c))
 	const canFriendRequest = (c: Connection) =>
 		hasIdentity(server.self())
@@ -120,8 +122,9 @@ const App = () => {
 				</div>
 				<div class="user">
 					<Show when={!server.self()?.identity}>
-						<div class="color-button">
-							<input
+						<div class="color-picker">
+							<input 
+								class="color-input"
 								type="color"
 								oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
 								onchange={(e) => server.setColor(e.target.value)}
@@ -189,10 +192,10 @@ const App = () => {
 						</For>
 					</div>
 				</Show>
-				<Show when={hasFriends()}>
+				<Show when={connectedFriends().length > 0}>
 					<div class='connection-list'>
 						friends
-						<For each={server.connections.filter(c => !isSelf(c) && isFriend(c))}>
+						<For each={connectedFriends()}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
 									<img src={c?.identity?.avatar_url} />
@@ -209,6 +212,7 @@ const App = () => {
 				</Show>
 				<Show when={hasUnknownConnections()}>
 					<div class='connection-list'>
+						randos
 						<For each={server.connections.filter(c => isUnknown(c))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={!c.identity}>
