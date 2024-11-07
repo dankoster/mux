@@ -7,8 +7,7 @@ const db = new Database("data.db");
 db.exec(`PRAGMA journal_mode=WAL;`)
 db.exec(`PRAGMA foreign_keys = ON;`)
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS identity (
+db.exec(`CREATE TABLE IF NOT EXISTS identity (
 		id INTEGER PRIMARY KEY,
 		source TEXT,
 		source_id TEXT,
@@ -17,8 +16,7 @@ db.exec(
 	);`
 )
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS friend (
+db.exec(`CREATE TABLE IF NOT EXISTS friend (
 		id INTEGER PRIMARY KEY,
 		myId INTEGER,
 		friendId INTEGER,
@@ -32,8 +30,7 @@ db.exec(
 	);`
 )
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS friendRequest (
+db.exec(`CREATE TABLE IF NOT EXISTS friendRequest (
 		id INTEGER PRIMARY KEY,
 		fromId INTEGER,
 		toId INTEGER,
@@ -47,15 +44,13 @@ db.exec(
 	);`
 )
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS room (
+db.exec(`CREATE TABLE IF NOT EXISTS room (
 		id TEXT PRIMARY KEY,
 		ownerId TEXT
 	);`
 )
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS connection (
+db.exec(`CREATE TABLE IF NOT EXISTS connection (
 		uuid TEXT PRIMARY KEY,
 		id TEXT NOT NULL,
 		identityId INTEGER,
@@ -68,8 +63,7 @@ db.exec(
 	);`
 )
 
-db.exec(
-	`CREATE TABLE IF NOT EXISTS log (
+db.exec(`CREATE TABLE IF NOT EXISTS log (
 		id INTEGER PRIMARY KEY,
 		timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
 		action TEXT,
@@ -82,8 +76,8 @@ db.exec(
 	);`
 )
 
-const insertLog = db.prepare(
-	`INSERT INTO log (action, ip, userAgent, uuid, identityId, roomId, note)
+const insertLog = db.prepare(`INSERT INTO log 
+	(action, ip, userAgent, uuid, identityId, roomId, note)
 	VALUES (:action, :ip, :userAgent, :uuid, :identityId, :roomId, :note);`
 )
 export function log({ action, ip = null, userAgent = null, uuid = null, identityId = null, roomId = null, note = null }
@@ -107,9 +101,8 @@ export function log({ action, ip = null, userAgent = null, uuid = null, identity
 	})
 }
 
-const upsertRoom = db.prepare(`
-	INSERT
-	INTO room ( id, ownerId )
+const upsertRoom = db.prepare(`INSERT INTO room 
+	( id, ownerId )
 	VALUES ( :id, :ownerId )
 	ON CONFLICT(id)
 	DO UPDATE SET 
@@ -121,9 +114,8 @@ const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :
 const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId = :ownerId;`)
 const selectRooms = db.prepare(`SELECT * FROM room;`)
 
-const upsertConnection = db.prepare(
-	`INSERT 
-	INTO connection (uuid, id, identityId, color, text, status, roomId, kind) 
+const upsertConnection = db.prepare(`INSERT INTO connection 
+	(uuid, id, identityId, color, text, status, roomId, kind) 
 	VALUES (:uuid, :id, :identityId, :color, :text, :status, :roomId, :kind)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
@@ -137,8 +129,8 @@ const upsertConnection = db.prepare(
 	RETURNING *;`
 )
 
-const upsertIdentity = db.prepare(`INSERT 
-	INTO identity (id, source, source_id, name, avatar_url) 
+const upsertIdentity = db.prepare(`INSERT INTO identity 
+	(id, source, source_id, name, avatar_url) 
 	VALUES (:id, :source, :source_id, :name, :avatar_url)
 	ON CONFLICT(id)
 	DO UPDATE SET 
@@ -151,35 +143,28 @@ const upsertIdentity = db.prepare(`INSERT
 
 const selectConnections = db.prepare(`SELECT * FROM connection;`)
 const selectIdentityById = db.prepare(`SELECT * FROM identity WHERE id = :id;`)
-const selectIdentityBySource = db.prepare(
-	`SELECT * 
-	FROM identity 
+const selectIdentityBySource = db.prepare(`SELECT * FROM identity 
 	WHERE source = :source 
 	AND source_id = :source_id;`
 )
 
-const selectFriends = db.prepare(
-	`SELECT *
-	FROM friend
+const selectFriends = db.prepare(`SELECT * FROM friend
 	WHERE myId = :myId`
 )
-const insertFriendRequest = db.prepare(
-	`INSERT INTO friendRequest (fromId, toId)
+
+const insertFriendRequest = db.prepare(`INSERT INTO friendRequest 
+	(fromId, toId)
 	VALUES (:fromId, :toId)
 	RETURNING *;`
 )
-const updateFriendRequest = db.prepare(
-	`UPDATE friendRequest
+const updateFriendRequest = db.prepare(`UPDATE friendRequest
 	SET status = :status
 	WHERE id = :id
 	RETURNING *;`
 )
-const selectFriendRequest = db.prepare(
-	`SELECT * FROM friendRequest WHERE id = :id;`
-)
-const selectFriendRequests = db.prepare(
-	`SELECT * 
-	FROM friendrequest 
+const selectFriendRequest = db.prepare(`SELECT * FROM friendRequest WHERE id = :id;`)
+
+const selectFriendRequests = db.prepare(`SELECT * FROM friendrequest 
 	WHERE fromId = :identityId 
 	AND status = 'requested'
 	UNION
@@ -188,8 +173,8 @@ const selectFriendRequests = db.prepare(
 	WHERE toId = :identityId
 	AND status = 'requested';`
 )
-const upsertFriend = db.prepare(
-	`INSERT INTO friend (myId, friendId, status)
+const upsertFriend = db.prepare(`INSERT INTO friend 
+	(myId, friendId, status)
 	VALUES (:myId, :friendId, :status)
 	ON CONFLICT(myId, friendId)
 	DO UPDATE SET 
@@ -197,6 +182,7 @@ const upsertFriend = db.prepare(
 		updated = unixepoch('subsec')
 	RETURNING *;`
 )
+
 export function getFriendsByIdentityId(identityId: string) {
 	return selectFriends.all<Friend>({ myId: identityId })
 }
