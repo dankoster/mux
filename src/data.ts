@@ -386,9 +386,15 @@ export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key })
 }
 
-export async function dm(con: Connection, message: string) {
-	const dm: DM = { to: con.id, message }
-	return await POST(apiRoute.dm, { body: JSON.stringify(dm) })
+export async function sendDm(con: Connection, message: string) {
+	const dm: DM = { 
+		toId: con.id, 
+		fromName: self().identity?.name,
+		timestamp: Date.now(),
+		message, 
+	}
+	await POST(apiRoute.dm, { body: JSON.stringify(dm) })
+	return dm
 }
 
 async function GET(route: ApiRoute) {

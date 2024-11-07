@@ -195,9 +195,14 @@ body {
 
 }
 
+.dm-chat {
+	border-top: 1px solid var(--separator-color);
+	padding: 2rem;
+}
 
 .connection-list {
-	/* border-top: 1px solid; */
+	border-top: 1px solid var(--separator-color);
+	margin-top: 0.5rem;
 }
 
 .avatar {
@@ -231,14 +236,14 @@ body {
 			filter: opacity(1)
 		}
 
-		div {
+		.avatar-color {
 			width: 1rem;
 			height: 1rem;
 			border-radius: 25%;
 			border: 0.5px solid;
 		}
 
-		img {
+		.avatar-image {
 			width: 1rem;
 			height: 1rem;
 			border-radius: 25%;

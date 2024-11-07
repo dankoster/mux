@@ -62,7 +62,6 @@ const App = () => {
 		return c?.identity?.id ? `[${c?.identity.id}]` : `[${c?.id?.substring(c?.id.length - 4)}]`
 	}
 
-	const hasFriends = () => server.friends.length > 0
 	const connectedFriends = () => server.connections.filter(c => !isSelf(c) && isFriend(c))
 
 	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
@@ -84,29 +83,42 @@ const App = () => {
 		&& !hasFriendRequest(c)
 		&& !hasPendingFriendRequest(c)
 
-	const onMessageKeyDown = (e: KeyboardEvent, con: Connection) => {
+	const onMessageKeyDown = async (e: KeyboardEvent, con: Connection) => {
 		const input = e.target as HTMLTextAreaElement
 		if (e.key === 'Enter') {
 			const value = input.value
-			console.log(value)
 			input.value = ''
-			server.dm(con, value)
+			const dm = await server.sendDm(con, value)
+
+			saveLocalDm(dm, dm.toId)
 		}
 	}
 
-	//not bothering with a solidjs store because they're a massive pain
 	const dmByConId = {}
-	server.onDM((dm: DM) => {
-		//set the dm from a particular user by con.id === dm.from
-		const dms = dmByConId[dm.from] ?? []
-		dms.push(dm)
+	function saveLocalDm(dm: DM, conId: string) {
+		if (!dmByConId[conId])
+			dmByConId[conId] = [dm];
+		else
+			dmByConId[conId].push(dm);
 
-		const el = document.querySelector(`#con${dm.from}.latest-dm`)
-		if (el) el.textContent = dm.message
+		if (conId === selectedDmTarget()?.id)
+			setDmList([...dmByConId[conId]])
+	}
+
+	server.onDM((dm: DM) => {
+		if (!selectedDmTarget())
+			setSelectedDmTarget(server.connections.find(c => c.id === dm.fromId))
+
+		saveLocalDm(dm, dm.fromId)
 	})
 
-	const [selectedDm, setSlectedDm] = createSignal<Connection>()
+	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
+	const [dmList, setDmList] = createSignal<DM[]>()
 
+	const showDmConversation = (c: Connection) => {
+		setSelectedDmTarget(c)
+		setDmList(c && dmByConId[c?.id])
+	}
 
 	return <>
 		<meta name="theme-color" content="#1f0e3c"></meta>
@@ -164,12 +176,17 @@ const App = () => {
 					room={room()}
 					connections={server.connections.filter(sc => server.self()?.roomId && sc.id != server.self()?.id && sc.roomId === server.self()?.roomId)} />
 			</div>
-			<Show when={selectedDm()}>
-				<div class="dm">
-					<h6>dm with {selectedDm().identity?.name}</h6>
-					<span onclick={() => setSlectedDm(null)}>close</span>
-					<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDm())} />
-					<span class='latest-dm' id={`con${selectedDm().id}`}></span>
+			<Show when={selectedDmTarget()}>
+				<div class="dm-chat">
+					<h6>dm with {selectedDmTarget().identity?.name}</h6>
+					<span onclick={() => showDmConversation(null)}>close</span>
+					<div class="dm-messages">
+						<For each={dmList()}>
+							{dm => <div>[{new Date(dm.timestamp).toLocaleTimeString()}] {dm.fromName || dm.fromId}: {dm.message}</div>}
+						</For>
+					</div>
+					<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
+					<span class='latest-dm' id={`con${selectedDmTarget().id}`}></span>
 				</div>
 			</Show>
 			<div class="connections">
@@ -179,7 +196,7 @@ const App = () => {
 						<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
-									<img src={c?.identity?.avatar_url} />
+									<img class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
@@ -194,13 +211,13 @@ const App = () => {
 						<For each={connectedFriends()}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
-									<img src={c?.identity?.avatar_url} />
+									<img class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
 
 								<Show when={isOnline(c)}>
-									<div onclick={() => setSlectedDm(c)}>💬</div>
+									<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
 								</Show>
 							</div>}
 						</For>
@@ -208,14 +225,14 @@ const App = () => {
 				</Show>
 				<Show when={hasUnknownConnections()}>
 					<div class='connection-list'>
-						randos
+						others
 						<For each={server.connections.filter(c => isUnknown(c))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={!c.identity}>
-									<div style={{ "background-color": c.color }}></div>
+									<div class="avatar-color" style={{ "background-color": c.color }}></div>
 								</Show>
 								<Show when={c.identity}>
-									<img src={c?.identity?.avatar_url} />
+									<img class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
@@ -234,7 +251,6 @@ const App = () => {
 			</div>
 			<div class="toolbar">
 				<div class="buttons">
-
 					{server.self()?.roomId &&
 						<button class="room-button" onclick={() => exitRoom(server.self()?.roomId)}>
 							{isRoomOwner(server.self()) ? "End" : "Leave"} call
@@ -252,3 +268,4 @@ const App = () => {
 
 
 render(() => <App />, document.body)
+

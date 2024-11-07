@@ -471,7 +471,7 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		const message = await ctx.request.body.json() as DM
 		console.log('DM', message)
 
-		const toCon = getConnectionById(message.to)
+		const toCon = getConnectionById(message.toId)
 		if (!toCon) {
 			ctx.response.status = 404
 			ctx.response.body = 'no connection with specified id'
@@ -486,7 +486,9 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
-		message.from = con.id
+		//overwrite any data from the sender that they should not control
+		message.fromId = con.id
+		message.fromName = con.identity?.name
 		message.timestamp = Date.now()
 		const updater = updateFunctionByUUID.get(toUuid)
 		if (updater) {
