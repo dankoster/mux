@@ -14,7 +14,9 @@ SQLite really is cool and It's strangely nostalgic to be writing SQL again... bu
 
 More devops has happened. I set up a github action for continuous deployment to the Digital Ocean droplet. I can now push to the repo and see my changes live in production seconds later. Full yolo. I also now know more than ever I wanted to about configuring users, services, policies, and permissions on Ubuntu. 
 
-I also added friends with request/accept mechanics.\
+Oh, and I already have a channel for server sent events... so I set up a little local automation to tell the site to refresh when the server detects changes to the dist files, which are re-generated whenever a source file is saved. It's not as granular as HMR, but it's super simple and works great. This solution would even work if I ditch solidJS and go full no-build.
+
+Getting back to code, I also added friends with request/accept mechanics.\
 Then I added direct messages between friends.\
 Then end-to-end encryption for direct messages.
 
