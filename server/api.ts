@@ -41,7 +41,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	log: "log",
 	friendRequest: "friendRequest",
 	acceptFriendRequest: "acceptFriendRequest",
-	dm: "dm"
+	dm: "dm",
+	publicKey: "publicKey"
 }
 
 const updateFunctionByUUID = new Map<string, {
@@ -463,6 +464,23 @@ api.post(`/${apiRoute.setColor}`, async (ctx) => {
 	}
 });
 
+
+api.post(`/${apiRoute.publicKey}`, async (ctx) => {
+	const { uuid, con } = getConnection(ctx.request)
+	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
+	const publicKey = await ctx.request.body.text()
+
+	if (!publicKey) {
+		ctx.response.status = 400 //bad request
+	}
+
+	con.publicKey = publicKey
+	db.persistPublicKey({ uuid, publicKey })
+	ctx.response.status = 200
+
+	console.log('PUBLIC KEY', 'saved for', uuid)
+})
+
 api.post(`/${apiRoute.dm}`, async (ctx) => {
 	try {
 		const { uuid, con } = getConnection(ctx.request)
@@ -532,16 +550,20 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			connection.status = "online"
 			connection.kind = context.request.userAgent.os.name
 
-			db.persistConnection(uuid, connection)
-			db.log({
-				action: event(context.request),
-				uuid,
-				identityId: connection?.identity?.id,
-				ip: context.request.ip,
-				userAgent: context.request.userAgent.os.name,
-				note: `CONNECT (${old ? "known" : "new"})`
-			})
-
+			try {
+				db.persistConnection(uuid, connection)
+				db.log({
+					action: event(context.request),
+					uuid,
+					identityId: connection?.identity?.id,
+					ip: context.request.ip,
+					userAgent: context.request.userAgent.os.name,
+					note: `CONNECT (${old ? "known" : "new"})`
+				})
+			} catch (error) {
+				console.error(error)
+				return
+			}
 
 			updateFunctionByUUID.set(uuid, {
 				isLocal: true, update: (event, value) => {

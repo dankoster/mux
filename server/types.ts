@@ -12,7 +12,8 @@ export type ApiRoute = "sse" |
 	"room/join" |
 	"friendRequest" | 
 	"acceptFriendRequest" | 
-	"dm";
+	"dm" |
+	"publicKey";
 
 //is there a way to have the RoomRoute be nested under ApiRoute
 // like this { setColor: "setColor", room: { join: "room/join"}}
@@ -60,6 +61,7 @@ export type Connection = {
 	status?: string | null;
 	roomId?: string;
 	kind?: string;
+	publicKey?: string;
 	identity?: Identity;
 };
 

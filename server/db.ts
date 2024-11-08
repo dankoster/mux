@@ -76,6 +76,45 @@ db.exec(`CREATE TABLE IF NOT EXISTS log (
 	);`
 )
 
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
+function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableName: string, columnName: string, columnType: "TEXT" }) {
+	const transaction = db.transaction(() => {
+		const getColumns = db.prepare(
+			`SELECT ti.name AS 'column'
+			FROM sqlite_schema AS m,
+			pragma_table_info(m.name) AS ti
+			WHERE m.type='table'
+			AND m.name = :tableName
+			`
+		)
+		const columns = getColumns.all<{['column']: string}>({ tableName })
+
+		if(columns.length === 0) {
+			console.log('ADD COLUMN', `ERROR: table ${tableName} has no existing columns!`)
+			return
+		}
+		if(columns.some(c => c.column === columnName)) {
+			console.log('ADD COLUMN', `column already exists: ${tableName}.${columnName} ${columnType}`)
+			return
+		}
+
+		console.log('ADD COLUMN', `Column ${columnName} NOT FOUND in ${tableName}. Adding...`)
+		db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}`)
+	})
+	transaction()
+}
+
+export function persistPublicKey({uuid, publicKey}: {uuid: string, publicKey: string}) {
+	const updatePublicKey = db.prepare(
+		`UPDATE connection 
+		SET publicKey = :publicKey 
+		WHERE uuid = :uuid
+		RETURNING *;`)
+	return updatePublicKey.all({uuid, publicKey})
+}
+
+
+
 const insertLog = db.prepare(`INSERT INTO log 
 	(action, ip, userAgent, uuid, identityId, roomId, note)
 	VALUES (:action, :ip, :userAgent, :uuid, :identityId, :roomId, :note);`
@@ -115,8 +154,8 @@ const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId 
 const selectRooms = db.prepare(`SELECT * FROM room;`)
 
 const upsertConnection = db.prepare(`INSERT INTO connection 
-	(uuid, id, identityId, color, text, status, roomId, kind) 
-	VALUES (:uuid, :id, :identityId, :color, :text, :status, :roomId, :kind)
+	(uuid, id, identityId, color, text, status, roomId, kind, publicKey) 
+	VALUES (:uuid, :id, :identityId, :color, :text, :status, :roomId, :kind, :publicKey)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
 		id = excluded.id,
@@ -125,7 +164,8 @@ const upsertConnection = db.prepare(`INSERT INTO connection
 		text = excluded.text,
 		status = excluded.status,
 		roomId = excluded.roomId,
-		kind = excluded.kind
+		kind = excluded.kind,
+		publicKey = excluded.publicKey
 	RETURNING *;`
 )
 
@@ -208,7 +248,7 @@ export function acceptFriendRequest(id: string) {
 		const requestee = upsertFriend.get<Friend>({ myId: fr.toId, friendId: fr.fromId })
 		const request = updateFriendRequest.get<FriendRequest>({ id, status: 'accepted' })
 
-		return {request, requestor, requestee}
+		return { request, requestor, requestee }
 	})
 	console.log("ACCEPT FRIEND REQUEST", id)
 	return updateFriendRequestTransaction()

@@ -2,6 +2,7 @@ import { API_URI } from "./API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM } from "../server/types";
+import { decryptMessage, encryptMessage, getKeys, publicJwkToCryptoKey } from "./crypto";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -16,7 +17,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	log: "log",
 	friendRequest: "friendRequest",
 	acceptFriendRequest: "acceptFriendRequest",
-	dm: "dm"
+	dm: "dm",
+	publicKey: "publicKey"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -45,6 +47,17 @@ type Stats = {
 	online: number;
 	offline: number;
 }
+
+console.log('GETTING CRYPTO KEYS')
+let keys: CryptoKeyPair & { publicJWK: JsonWebKey }
+getKeys().then(keypair => {
+	keys = keypair
+	sendPublicKey(keys.publicJWK)
+}).catch((error) => {
+	console.error(error)
+}).finally(() => console.log('GOT CRYPTO KEYS', keys))
+
+const publicKeyByConnectionId = new Map<string, CryptoKey>()
 
 const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
@@ -350,8 +363,13 @@ function handleSseEvent(event: SSEventPayload) {
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			console.log('SSE', event.event, dm)
-			SSEvents.onSseEvent(sse.dm, dm)
+			decryptMessage(keys.privateKey, dm.message)
+			.then(message => {
+				dm.message = message
+				SSEvents.onSseEvent(sse.dm, dm)
+			})
+			.catch(error => console.error(error))
+			.finally(() => console.log('SSE', event.event, dm))
 			break;
 
 		default:
@@ -387,20 +405,31 @@ export async function setText(text: string, key?: string) {
 }
 
 export async function sendDm(con: Connection, message: string) {
-	const dm: DM = { 
-		toId: con.id, 
+	const dm: DM = {
+		toId: con.id,
 		fromName: self().identity?.name,
 		timestamp: Date.now(),
-		message, 
+		message,
 	}
-	await POST(apiRoute.dm, { body: JSON.stringify(dm) })
+	
+	if(!publicKeyByConnectionId.has(con.id)) 
+		publicKeyByConnectionId.set(con.id, await publicJwkToCryptoKey(con.publicKey))
+
+	const encryptedDm = {...dm, message: await encryptMessage(publicKeyByConnectionId.get(con.id), dm.message)}
+	
+	await POST(apiRoute.dm, { body: JSON.stringify(encryptedDm) })
+
 	return dm
 }
 
-async function GET(route: ApiRoute) {
+export async function sendPublicKey(key: JsonWebKey) {
+	return POST(apiRoute.publicKey, { body: JSON.stringify(key) })
+}
+
+async function GET(route: ApiRoute, subRoute?: string) {
 	const headers = {};
 	headers[AUTH_TOKEN_HEADER_NAME] = pk();
-	const url = [API_URI, route].filter(s => s).join('/')
+	const url = [API_URI, route, subRoute].filter(s => s).join('/')
 	return await fetch(url, {
 		method: "GET",
 		headers
