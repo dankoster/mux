@@ -476,9 +476,15 @@ api.post(`/${apiRoute.publicKey}`, async (ctx) => {
 
 	con.publicKey = publicKey
 	db.persistPublicKey({ uuid, publicKey })
+	console.log('PUBLIC KEY', 'saved for', con.identity?.name, uuid)
 	ctx.response.status = 200
 
-	console.log('PUBLIC KEY', 'saved for', uuid)
+	//tell everyone else that I have a new public key
+	notifyAllConnections(sseEvent.update, {
+		connectionId: con.id,
+		field: "publicKey",
+		value: con.publicKey
+	}, { excludeUUID: uuid })
 })
 
 api.post(`/${apiRoute.dm}`, async (ctx) => {

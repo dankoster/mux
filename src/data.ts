@@ -52,7 +52,7 @@ console.log('GETTING CRYPTO KEYS')
 let keys: CryptoKeyPair & { publicJWK: JsonWebKey }
 getKeys().then(keypair => {
 	keys = keypair
-	sendPublicKey(keys.publicJWK)
+	broadcastPublicKey(keys.publicJWK)
 }).catch((error) => {
 	console.error(error)
 }).finally(() => console.log('GOT CRYPTO KEYS', keys))
@@ -422,7 +422,7 @@ export async function sendDm(con: Connection, message: string) {
 	return dm
 }
 
-export async function sendPublicKey(key: JsonWebKey) {
+export async function broadcastPublicKey(key: JsonWebKey) {
 	return POST(apiRoute.publicKey, { body: JSON.stringify(key) })
 }
 
