@@ -1,6 +1,6 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, Friend, FriendRequest, Identity, Room } from "./types.ts";
+import type { Connection, NewDM, Friend, FriendRequest, Identity, Room } from "./types.ts";
 
 const db = new Database("data.db");
 
@@ -63,6 +63,29 @@ db.exec(`CREATE TABLE IF NOT EXISTS connection (
 	);`
 )
 
+db.exec(`CREATE TABLE IF NOT EXISTS directMessage (
+	id INTEGER PRIMARY KEY,
+	toUuid TEXT NOT NULL, 
+	fromUuid TEXT NOT NULL,
+	message TEXT,
+	timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
+	FOREIGN KEY(toUuid) REFERENCES connection(uuid),
+	FOREIGN KEY(fromUuid) REFERENCES connection(uuid),
+	CHECK(fromUuid != toUuid));`
+)
+
+const insertDm = db.prepare(`INSERT INTO directMessage 
+	(toUuid, fromUuid, message)
+	VALUES (:toUuid, :fromUuid, :message)
+	RETURNING *;`
+)
+
+export function persistDm(dm: NewDM) {
+	const result = insertDm.get(dm) as {[key:string]:string}
+	const timestamp = Number.parseFloat(result['timestamp'])
+	return timestamp
+}
+
 db.exec(`CREATE TABLE IF NOT EXISTS log (
 		id INTEGER PRIMARY KEY,
 		timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
@@ -87,13 +110,13 @@ function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableNam
 			AND m.name = :tableName
 			`
 		)
-		const columns = getColumns.all<{['column']: string}>({ tableName })
+		const columns = getColumns.all<{ ['column']: string }>({ tableName })
 
-		if(columns.length === 0) {
+		if (columns.length === 0) {
 			console.log('ADD COLUMN', `ERROR: table ${tableName} has no existing columns!`)
 			return
 		}
-		if(columns.some(c => c.column === columnName)) {
+		if (columns.some(c => c.column === columnName)) {
 			console.log('ADD COLUMN', `column already exists: ${tableName}.${columnName} ${columnType}`)
 			return
 		}
@@ -104,16 +127,14 @@ function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableNam
 	transaction()
 }
 
-export function persistPublicKey({uuid, publicKey}: {uuid: string, publicKey: string}) {
+export function persistPublicKey({ uuid, publicKey }: { uuid: string, publicKey: string }) {
 	const updatePublicKey = db.prepare(
 		`UPDATE connection 
 		SET publicKey = :publicKey 
 		WHERE uuid = :uuid
 		RETURNING *;`)
-	return updatePublicKey.all({uuid, publicKey})
+	return updatePublicKey.all({ uuid, publicKey })
 }
-
-
 
 const insertLog = db.prepare(`INSERT INTO log 
 	(action, ip, userAgent, uuid, identityId, roomId, note)

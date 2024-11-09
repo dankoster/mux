@@ -493,7 +493,6 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
 
 		const message = await ctx.request.body.json() as DM
-		console.log('DM', message)
 
 		const toCon = getConnectionById(message.toId)
 		if (!toCon) {
@@ -502,7 +501,6 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
-
 		const toUuid = getUUID(toCon.id)
 		if (!toUuid) {
 			ctx.response.status = 500
@@ -510,18 +508,23 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
+		const timestamp = db.persistDm({
+			toUuid: toUuid,
+			fromUuid: uuid,
+			message: message.message
+		})
+
 		//overwrite any data from the sender that they should not control
 		message.fromId = con.id
 		message.fromName = con.identity?.name
-		message.timestamp = Date.now()
+		message.timestamp = timestamp * 1000 //we don't need a subsecond timestamp on the frontend
+		// console.log('DM SAVED', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
+
 		const updater = updateFunctionByUUID.get(toUuid)
 		if (updater) {
 			updater.update(sseEvent.dm, JSON.stringify(message))
 			ctx.response.status = 200
-		}
-		else {
-			//TODO: save dm for later delivery
-			ctx.response.status = 501 //not implemented
+			// console.log('DM SENT', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
 		}
 
 	} catch (err) {

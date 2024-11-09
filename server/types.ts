@@ -86,8 +86,14 @@ export type FriendRequest = {
 
 export type DM = { 
 	toId: string, 
-	fromId?: string,
+	fromId: string,
 	fromName?: string,
 	timestamp?: number,
+	message: string, 
+}
+
+export type NewDM = { 
+	toUuid: string, 
+	fromUuid: string,
 	message: string, 
 }

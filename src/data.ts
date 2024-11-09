@@ -407,6 +407,7 @@ export async function setText(text: string, key?: string) {
 export async function sendDm(con: Connection, message: string) {
 	const dm: DM = {
 		toId: con.id,
+		fromId: self().id,
 		fromName: self().identity?.name,
 		timestamp: Date.now(),
 		message,
