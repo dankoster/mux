@@ -13,6 +13,7 @@ export type ApiRoute = "sse" |
 	"friendRequest" | 
 	"acceptFriendRequest" | 
 	"dm" |
+	"dmHistory" |
 	"publicKey";
 
 //is there a way to have the RoomRoute be nested under ApiRoute
@@ -89,11 +90,20 @@ export type DM = {
 	fromId: string,
 	fromName?: string,
 	timestamp?: number,
-	message: string, 
+	message: string | EncryptedMessage, 
 }
 
-export type NewDM = { 
+export type EncryptedMessage = { iv: string, data: string }
+
+
+export type DMInsert = { 
 	toUuid: string, 
 	fromUuid: string,
-	message: string, 
+	message: string | EncryptedMessage, 
+}
+
+export type DMRequest = {
+	qty: number,
+	timestamp: number,
+	conId: string
 }

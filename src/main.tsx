@@ -7,7 +7,7 @@ import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";
 import { trackStore } from "@solid-primitives/deep";
 
-import type { Connection, DM } from "../server/types"
+import type { Connection, DM, DMRequest } from "../server/types"
 import { GitHubSvg } from "./GitHubSvg";
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
@@ -88,13 +88,17 @@ const App = () => {
 		if (e.key === 'Enter') {
 			const value = input.value
 			input.value = ''
-			const dm = await server.sendDm(con, value)
 
-			saveLocalDm(dm, dm.toId)
+			try {
+				const dm = await server.sendDm(con, value)
+				saveLocalDm(dm, dm.toId)
+			} catch (err) {
+				setDmError(err.message)
+			}
 		}
 	}
 
-	const dmByConId = {}
+	const dmByConId: { [key: string]: DM[] } = {}
 	function saveLocalDm(dm: DM, conId: string) {
 		if (!dmByConId[conId])
 			dmByConId[conId] = [dm];
@@ -114,10 +118,29 @@ const App = () => {
 
 	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
 	const [dmList, setDmList] = createSignal<DM[]>()
+	const [dmError, setDmError] = createSignal("")
 
-	const showDmConversation = (c: Connection) => {
-		setSelectedDmTarget(c)
-		setDmList(c && dmByConId[c?.id])
+	const showDmConversation = async (con: Connection) => {
+		setDmError(null)
+		setSelectedDmTarget(con)
+		
+		if (!con.publicKey) {
+			setDmError(`Cannot enctypt messages to ${con.identity?.name}! They need to sign in to generate a public key.`)
+			return
+		}
+
+		let history = dmByConId[con?.id]
+
+		try {
+			const req: DMRequest = { qty: 20, timestamp: Date.now(), conId: con.id }
+			if (!history || history.length === 0) {
+				history = await server.getDmHistory(con, req)
+				dmByConId[con?.id] = history
+				setDmList(con && history)
+			}
+		} catch (err) {
+			setDmError(err.message)
+		}
 	}
 
 	return <>
@@ -153,7 +176,7 @@ const App = () => {
 					<Show when={server.self()?.identity}>
 						<div class="avatar button" onclick={() => server.becomeAnonymous()}>
 							<div class="name">{server.self()?.identity.name}</div>
-							<img src={server.self()?.identity.avatar_url} />
+							<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} />
 						</div>
 					</Show>
 
@@ -178,15 +201,18 @@ const App = () => {
 			</div>
 			<Show when={selectedDmTarget()}>
 				<div class="dm-chat">
-					<h6>dm with {selectedDmTarget().identity?.name}</h6>
-					<span onclick={() => showDmConversation(null)}>close</span>
-					<div class="dm-messages">
-						<For each={dmList()}>
-							{dm => <div>[{new Date(dm.timestamp).toLocaleTimeString()}] {dm.fromName || dm.fromId}: {dm.message}</div>}
-						</For>
-					</div>
-					<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
-					<span class='latest-dm' id={`con${selectedDmTarget().id}`}></span>
+					<h2>dm with {selectedDmTarget().identity?.name}</h2>
+					<Show when={dmError()}>ERROR: {dmError()}</Show>
+					<Show when={!dmError()}>
+						<span onclick={() => showDmConversation(null)}>close</span>
+						<div class="dm-messages">
+							<For each={dmList()}>
+								{dm => <div>[{new Date(dm.timestamp).toLocaleTimeString()}] {dm.fromName || dm.fromId}: {dm.message as string}</div>}
+							</For>
+						</div>
+						<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
+						<span class='latest-dm' id={`con${selectedDmTarget().id}`}></span>
+					</Show>
 				</div>
 			</Show>
 			<div class="connections">
@@ -196,7 +222,7 @@ const App = () => {
 						<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
-									<img class="avatar-image" src={c?.identity?.avatar_url} />
+									<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
@@ -211,13 +237,14 @@ const App = () => {
 						<For each={connectedFriends()}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
-									<img class="avatar-image" src={c?.identity?.avatar_url} />
+									<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
 
+								<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
 								<Show when={isOnline(c)}>
-									<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
+									online!
 								</Show>
 							</div>}
 						</For>
@@ -232,7 +259,7 @@ const App = () => {
 									<div class="avatar-color" style={{ "background-color": c.color }}></div>
 								</Show>
 								<Show when={c.identity}>
-									<img class="avatar-image" src={c?.identity?.avatar_url} />
+									<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
 								</Show>
 								{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
 								{c.identity?.name || `guest`} ({c.kind})
@@ -257,8 +284,9 @@ const App = () => {
 						</button>
 					}
 					{!server.self()?.roomId &&
-						<button class="room-button" onclick={startCall}>start call</button>
+						<button class="room-button" onclick={startCall}>🤙 call</button>
 					}
+					{/* <button class="room-button" onclick={startCall}>💬 chat</button> */}
 				</div>
 			</div>
 

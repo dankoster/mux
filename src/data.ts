@@ -1,8 +1,8 @@
 import { API_URI } from "./API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM } from "../server/types";
-import { decryptMessage, encryptMessage, getKeys, publicJwkToCryptoKey } from "./crypto";
+import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../server/types";
+import { computeSharedKey, decryptMessage, encryptMessage, exportJWK, getLocalKeyPair, jwkToCryptoKey } from "./crypto_ecdh_aes";
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
@@ -18,7 +18,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	friendRequest: "friendRequest",
 	acceptFriendRequest: "acceptFriendRequest",
 	dm: "dm",
-	publicKey: "publicKey"
+	publicKey: "publicKey",
+	dmHistory: "dmHistory"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -49,15 +50,21 @@ type Stats = {
 }
 
 console.log('GETTING CRYPTO KEYS')
-let keys: CryptoKeyPair & { publicJWK: JsonWebKey }
-getKeys().then(keypair => {
-	keys = keypair
-	broadcastPublicKey(keys.publicJWK)
+let myPrivateKey: CryptoKey
+const sharedKeyByConnectionId = new Map<string, CryptoKey>()
+getLocalKeyPair().then(async keypair => {
+	const jwk = await exportJWK(keypair.publicKey)
+	myPrivateKey = keypair.privateKey
+	broadcastPublicKey(jwk)
+	console.log('GOT CRYPTO KEYS', keypair)
 }).catch((error) => {
+	if (error.message === 'The JWK "kty" member was not "EC"') {
+		//we had an old RSA key, so delete that and retry
+	}
+	console.log(error.message)
 	console.error(error)
-}).finally(() => console.log('GOT CRYPTO KEYS', keys))
+})
 
-const publicKeyByConnectionId = new Map<string, CryptoKey>()
 
 const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
@@ -363,13 +370,10 @@ function handleSseEvent(event: SSEventPayload) {
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			decryptMessage(keys.privateKey, dm.message)
-			.then(message => {
-				dm.message = message
+			getSharedKey(dm.fromId).then(async key => {
+				dm.message = await decryptMessage(dm.message as EncryptedMessage, key)
 				SSEvents.onSseEvent(sse.dm, dm)
 			})
-			.catch(error => console.error(error))
-			.finally(() => console.log('SSE', event.event, dm))
 			break;
 
 		default:
@@ -382,6 +386,21 @@ function handleSseEvent(event: SSEventPayload) {
 			nope(event.event) //this will prevent unhandled cases
 			break;
 	}
+}
+
+async function getSharedKey(conId: string) {
+	if (!sharedKeyByConnectionId.has(conId)) {
+		const con = connections.find(c => c.id === conId)
+
+		if (!con.publicKey)
+			return
+
+		const pubKey = await jwkToCryptoKey(JSON.parse(con.publicKey))
+		const key = await computeSharedKey(myPrivateKey, pubKey)
+		sharedKeyByConnectionId.set(con.id, key)
+	}
+
+	return sharedKeyByConnectionId.get(conId)
 }
 
 export function sendWebRtcMessage(userId: string, message: string) {
@@ -404,6 +423,20 @@ export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key })
 }
 
+export async function getDmHistory(con: Connection, dmReq: DMRequest) {
+	const result = await POST(apiRoute.dmHistory, { body: JSON.stringify(dmReq) })
+	const messages = await result.json() as DM[]
+
+	const key = await getSharedKey(con.id)
+
+	for (const m of messages) {
+		const decrypted = await decryptMessage(JSON.parse(m.message as string), key)
+		m.message = decrypted
+	}
+
+	return messages
+}
+
 export async function sendDm(con: Connection, message: string) {
 	const dm: DM = {
 		toId: con.id,
@@ -412,12 +445,19 @@ export async function sendDm(con: Connection, message: string) {
 		timestamp: Date.now(),
 		message,
 	}
-	
-	if(!publicKeyByConnectionId.has(con.id)) 
-		publicKeyByConnectionId.set(con.id, await publicJwkToCryptoKey(con.publicKey))
 
-	const encryptedDm = {...dm, message: await encryptMessage(publicKeyByConnectionId.get(con.id), dm.message)}
-	
+	if (!sharedKeyByConnectionId.has(con.id)) {
+		const jwk = JSON.parse(con.publicKey) as JsonWebKey
+		const theirPublicKey = await jwkToCryptoKey(jwk)
+		const sharedKey = await computeSharedKey(myPrivateKey, theirPublicKey)
+		sharedKeyByConnectionId.set(con.id, sharedKey)
+	}
+
+	const encryptedDm = {
+		...dm,
+		message: await encryptMessage(message, sharedKeyByConnectionId.get(con.id))
+	}
+
 	await POST(apiRoute.dm, { body: JSON.stringify(encryptedDm) })
 
 	return dm

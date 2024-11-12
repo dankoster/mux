@@ -1,7 +1,7 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Room, Connection, Identity, Update, DM } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Room, Connection, Identity, Update, DM, DMRequest } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
@@ -42,7 +42,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	friendRequest: "friendRequest",
 	acceptFriendRequest: "acceptFriendRequest",
 	dm: "dm",
-	publicKey: "publicKey"
+	publicKey: "publicKey",
+	dmHistory: "dmHistory"
 }
 
 const updateFunctionByUUID = new Map<string, {
@@ -487,10 +488,34 @@ api.post(`/${apiRoute.publicKey}`, async (ctx) => {
 	}, { excludeUUID: uuid })
 })
 
+api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
+	const { uuid, con } = getConnection(ctx.request)
+	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
+
+	const dmRequest = await ctx.request.body.json() as DMRequest
+	const timestamp = new Date(dmRequest.timestamp)
+
+	if (!dmRequest || dmRequest.qty <= 0 || !timestamp.valueOf()) {
+		ctx.response.status = 400 //bad request
+		return
+	}
+
+	const otherUuid = getUUID(dmRequest.conId)
+	if (!otherUuid) {
+		ctx.response.status = 404 //not found
+		return
+	}
+
+	const messages = db.getDirectMessages(uuid, otherUuid, dmRequest)
+	ctx.response.body = messages
+})
+
 api.post(`/${apiRoute.dm}`, async (ctx) => {
 	try {
+		const action = event(ctx.request)
+		console.log(action)
 		const { uuid, con } = getConnection(ctx.request)
-		db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
+		db.log({ action, uuid, identityId: con.identity?.id, roomId: con.roomId })
 
 		const message = await ctx.request.body.json() as DM
 
@@ -498,6 +523,7 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		if (!toCon) {
 			ctx.response.status = 404
 			ctx.response.body = 'no connection with specified id'
+			console.log('no connection with specified id')
 			return
 		}
 
@@ -505,6 +531,7 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		if (!toUuid) {
 			ctx.response.status = 500
 			ctx.response.body = 'uuid not found for connection'
+			console.log('uuid not found for connection')
 			return
 		}
 
@@ -513,17 +540,18 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			fromUuid: uuid,
 			message: message.message
 		})
-
+		
 		//overwrite any data from the sender that they should not control
 		message.fromId = con.id
 		message.fromName = con.identity?.name
 		message.timestamp = timestamp * 1000 //we don't need a subsecond timestamp on the frontend
 		// console.log('DM SAVED', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
-
+		
+		ctx.response.status = 200
+		
 		const updater = updateFunctionByUUID.get(toUuid)
 		if (updater) {
 			updater.update(sseEvent.dm, JSON.stringify(message))
-			ctx.response.status = 200
 			// console.log('DM SENT', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
 		}
 

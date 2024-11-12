@@ -1,6 +1,6 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, NewDM, Friend, FriendRequest, Identity, Room } from "./types.ts";
+import type { Connection, DMInsert, DMRequest, Friend, FriendRequest, Identity, Room } from "./types.ts";
 
 const db = new Database("data.db");
 
@@ -80,10 +80,33 @@ const insertDm = db.prepare(`INSERT INTO directMessage
 	RETURNING *;`
 )
 
-export function persistDm(dm: NewDM) {
+const selectDmRange = db.prepare(`SELECT * FROM (
+		SELECT dm.id as id, 
+		cTo.id as toId, 
+		cFr.id as fromId,
+		iFr.name as fromName,
+		dm.timestamp * 1000 as timestamp, 
+		dm.message
+		FROM directMessage dm
+		JOIN connection cTo on cTo.uuid = dm.toUuid
+		JOIN connection cFr on cFr.uuid = dm.fromUuid
+		LEFT JOIN identity iFr on iFr.id = cfr.identityId
+		WHERE timestamp <= :timestamp
+		AND ((toUuid = :uuid1 AND fromUuid = :uuid2)
+		OR (toUuid = :uuid2 AND fromUuid = :uuid1))
+		ORDER BY dm.timestamp DESC
+		LIMIT :qty)
+	ORDER BY id ASC;`
+)
+
+export function persistDm(dm: DMInsert) {
 	const result = insertDm.get(dm) as {[key:string]:string}
 	const timestamp = Number.parseFloat(result['timestamp'])
 	return timestamp
+}
+
+export function getDirectMessages(uuid1: string, uuid2: string, req: DMRequest) {
+	return selectDmRange.all({ uuid1, uuid2, timestamp: req.timestamp, qty: req.qty })
 }
 
 db.exec(`CREATE TABLE IF NOT EXISTS log (

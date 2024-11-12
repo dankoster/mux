@@ -153,6 +153,8 @@ body {
 	bottom: 0;
 	margin-top: 1rem;
 
+	backdrop-filter: blur(10px);
+
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -200,11 +202,13 @@ body {
 	padding: 2rem;
 }
 
-.connection-list {
+.connections {
 	border-top: 1px solid var(--separator-color);
-	margin-top: 0.5rem;
+	.connection-list {	
+		margin-top: 0.5rem;
+	}
 }
-
+	
 .avatar {
 	display: flex;
 	align-items: center;
@@ -330,89 +334,3 @@ body {
 		}
 	}
 }
-
-/* .color-button {
-	color: white;
-	font-size: xx-large;
-	border: 1px solid;
-	border-radius: 5px;
-	padding-inline: 1rem;
-	font-family: monospace;
-	font-weight: bold;
-	cursor: pointer;
-	background: transparent;
-	text-wrap: nowrap;
-	touch-action: none;
-	text-align: center;
-	position: relative;
-
-	span {
-		pointer-events: none;
-		position: relative;
-		z-index: 1;
-	}
-
-	input[type="color"] {
-		appearance: none;
-		-moz-appearance: none;
-		-webkit-appearance: none;
-		background: none;
-		cursor: pointer;
-
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-	}
-
-
-	input[type="color" i]::-webkit-color-swatch-wrapper {
-		padding: 0;
-	}
-
-	input[type="color" i]::-webkit-color-swatch,
-	input[type="color" i]::-moz-color-swatch {
-		border: none;
-		border-radius: 0;
-	}
-} */
-
-
-/* .connections {
-	border: 1px solid gold;
-	margin: 1rem;
-	display: grid;
-	gap: 1rem;
-	touch-action: none;
-
-	.connection {
-		padding-block: 1rem;
-		padding-inline: 2rem;
-		border-radius: 15px;
-		border: 1px solid #cccccc1f;
-		box-shadow: 2px 2px 15px #0000004a;
-
-		display: grid;
-		gap: 1rem;
-		justify-content: center;
-		align-items: center;
-		grid-template-columns: minmax(1rem, 1fr) min-content min-content;
-		touch-action: none;
-
-
-		.status {
-			touch-action: none;
-			font-size: x-large;
-			position: fixed;
-			right: 1.5rem;
-			transform: translateY(-2rem);
-		}
-
-		h2 {
-			touch-action: none;
-			text-align: center;
-			margin: auto;
-		}
-	}
-} */
