@@ -15,14 +15,27 @@
 			"runtimeArgs": [
 				"run",
 				"--inspect-wait",
-				"--allow-all",
-				"--unstable-ffi",
-				"--allow-read=$PWD,'./dist',$HOME/Lab/certs/out/chatmux.crt,$HOME/Lab/certs/out/chatmux.key"
-				,"--allow-env"
-				,"--env"
-				,"--unstable-kv"
-				,"--allow-net"
-				,"--watch-hmr"
+				"--allow-write=/root/.cache/deno/plug",
+				"--allow-read",
+				"--allow-env", 
+				"--allow-ffi", 
+				"--env", 
+				"--allow-net"
+			],
+			"attachSimplePort": 9229
+		},
+		{
+			"request": "launch",
+			"name": "Debug db.ts",
+			"type": "node",
+			"program": "${workspaceFolder}/server/db.ts",
+			"cwd": "${workspaceFolder}",
+			"env": {},
+			"runtimeExecutable": "deno",
+			"runtimeArgs": [
+				"run",
+				"-A",
+				"--unstable-ffi"
 			],
 			"attachSimplePort": 9229
 		}
