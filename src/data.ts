@@ -19,7 +19,8 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	acceptFriendRequest: "acceptFriendRequest",
 	dm: "dm",
 	publicKey: "publicKey",
-	dmHistory: "dmHistory"
+	dmHistory: "dmHistory",
+	dmUnread: "dmUnread"
 };
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -56,12 +57,7 @@ getLocalKeyPair().then(async keypair => {
 	const jwk = await exportJWK(keypair.publicKey)
 	myPrivateKey = keypair.privateKey
 	broadcastPublicKey(jwk)
-	console.log('GOT CRYPTO KEYS', keypair)
 }).catch((error) => {
-	if (error.message === 'The JWK "kty" member was not "EC"') {
-		//we had an old RSA key, so delete that and retry
-	}
-	console.log(error.message)
 	console.error(error)
 })
 
@@ -79,6 +75,32 @@ const [stats, setStats] = createSignal<Stats>()
 export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
+
+const LAST_CHECKED_DMS = 'lastCheckedDms'
+const directMessagesByConId = new Map<string, DM[]>()
+const lastCheckedDms: number = Number.parseInt(localStorage.getItem(LAST_CHECKED_DMS))
+
+async function udpateUnreadMessages() {
+	//wait for both friedns AND connections to load
+	if (!friends?.length || !connections?.length) {
+		console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
+		return
+	}
+	console.log('getting unread messages...')
+	const friendConId = connections
+		.filter(c => friends.some(f => f.friendId === c.identity?.id))
+		.map(c => c.id)
+
+	for (const conId of friendConId) {
+		const unread = await getUnreadDms({ timestamp: lastCheckedDms, conId })
+		if (unread?.length > 0)
+			directMessagesByConId.set(conId, unread)
+	}
+	//TODO: have a separate timestamp for each friend/connection
+	localStorage.setItem(LAST_CHECKED_DMS, Date.now().toString())
+	console.log('unread DMs', directMessagesByConId)
+}
+
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
@@ -284,9 +306,10 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
-			setConnections(conData);
+			setConnections(conData)
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			updateConnectionCounts()
+			udpateUnreadMessages()
 			console.log('SSE', event.event, conData);
 			break;
 		case sse.rooms:
@@ -365,6 +388,7 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
+			udpateUnreadMessages()
 			console.log('SSE', event.event, friends)
 			break;
 
@@ -423,18 +447,31 @@ export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key })
 }
 
-export async function getDmHistory(con: Connection, dmReq: DMRequest) {
+export async function getDmHistory(dmReq: DMRequest) {
 	const result = await POST(apiRoute.dmHistory, { body: JSON.stringify(dmReq) })
 	const messages = await result.json() as DM[]
+	const key = await getSharedKey(dmReq.conId)
+	return await decryptMessages(key, messages);
+}
 
-	const key = await getSharedKey(con.id)
+export async function getUnreadDms(dmReq: DMRequest) {
+	const result = await POST(apiRoute.dmUnread, { body: JSON.stringify(dmReq) })
+	const messages = await result.json() as DM[]
+	const key = await getSharedKey(dmReq.conId);
+	return await decryptMessages(key, messages);
+}
 
+async function decryptMessages(sharedKey: CryptoKey, messages: DM[]) {
 	for (const m of messages) {
-		const decrypted = await decryptMessage(JSON.parse(m.message as string), key)
-		m.message = decrypted
+		try {
+			const decrypted = await decryptMessage(JSON.parse(m.message as string), sharedKey);
+			m.message = decrypted;
+		} catch (err) {
+			console.warn(err)
+		}
 	}
 
-	return messages
+	return messages;
 }
 
 export async function sendDm(con: Connection, message: string) {

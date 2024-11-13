@@ -57,13 +57,7 @@ const App = () => {
 		}
 	},)
 
-	const shortUserId = () => {
-		const c = server.self()
-		return c?.identity?.id ? `[${c?.identity.id}]` : `[${c?.id?.substring(c?.id.length - 4)}]`
-	}
-
 	const connectedFriends = () => server.connections.filter(c => !isSelf(c) && isFriend(c))
-
 	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
 	const isOnline = (c: Connection) => c.status === 'online'
 	const hasIdentity = (c: Connection) => !!c?.identity
@@ -123,7 +117,8 @@ const App = () => {
 	const showDmConversation = async (con: Connection) => {
 		setDmError(null)
 		setSelectedDmTarget(con)
-		
+
+		if (!con) return
 		if (!con.publicKey) {
 			setDmError(`Cannot enctypt messages to ${con.identity?.name}! They need to sign in to generate a public key.`)
 			return
@@ -132,9 +127,14 @@ const App = () => {
 		let history = dmByConId[con?.id]
 
 		try {
-			const req: DMRequest = { qty: 20, timestamp: Date.now(), conId: con.id }
+			//if we have history, get all messages since the most recent timestamp in the history?
+			// if(history?.length > 0) {
+				
+			// }
+			
+			//if we don't have history, just get the most recent messages
 			if (!history || history.length === 0) {
-				history = await server.getDmHistory(con, req)
+				history = await server.getDmHistory({ qty: 20, timestamp: Date.now(), conId: con.id })
 				dmByConId[con?.id] = history
 				setDmList(con && history)
 			}

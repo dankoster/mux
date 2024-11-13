@@ -99,14 +99,37 @@ const selectDmRange = db.prepare(`SELECT * FROM (
 	ORDER BY id ASC;`
 )
 
+const selectAllDmsAfterTimestamp = db.prepare(`SELECT * FROM (
+		SELECT dm.id as id, 
+		cTo.id as toId, 
+		cFr.id as fromId,
+		iFr.name as fromName,
+		dm.timestamp * 1000 as timestamp, 
+		dm.message
+		FROM directMessage dm
+		JOIN connection cTo on cTo.uuid = dm.toUuid
+		JOIN connection cFr on cFr.uuid = dm.fromUuid
+		LEFT JOIN identity iFr on iFr.id = cfr.identityId
+		WHERE timestamp > :timestamp / 1000
+		AND ((toUuid = :uuid1 AND fromUuid = :uuid2)
+		OR (toUuid = :uuid2 AND fromUuid = :uuid1))
+		ORDER BY dm.timestamp DESC)
+	ORDER BY id ASC;`
+)
+
 export function persistDm(dm: DMInsert) {
-	const result = insertDm.get(dm) as {[key:string]:string}
+	const result = insertDm.get(dm) as { [key: string]: string }
 	const timestamp = Number.parseFloat(result['timestamp'])
 	return timestamp
 }
 
 export function getDirectMessages(uuid1: string, uuid2: string, req: DMRequest) {
 	return selectDmRange.all({ uuid1, uuid2, timestamp: req.timestamp, qty: req.qty })
+}
+
+export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, timestamp: number) {
+	console.log('============', timestamp)
+	return selectAllDmsAfterTimestamp.all({ uuid1, uuid2, timestamp })
 }
 
 db.exec(`CREATE TABLE IF NOT EXISTS log (

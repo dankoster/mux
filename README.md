@@ -5,6 +5,16 @@ https://chatmux.com/
 ![production deploy](https://github.com/dankoster/mux/actions/workflows/Droplet.yml/badge.svg)
 
 ------
+#### iteration 4
+
+I changed my cryptography standard to [ECDH](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey#ecdh)-[AES-GCM](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt#aes-gcm).
+
+Now direct messages are end-to-end encrypted with a securely shared key. This means that the messages can go through the server but only be read by the users. That gives us secure message history and offline messaging capability, which paves the way for push notifications.
+
+Time to clean up the UI
+
+
+------
 #### iteration 3
 
 DenoKV is out. DenoKV is trash. 🤬\
