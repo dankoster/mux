@@ -7,5 +7,13 @@ import "solid-js/web";
 import "solid-primitives/deep";
 
 export default defineConfig({
-  plugins: [solidPlugin()],
-})
+	plugins: [solidPlugin()],
+	build: {
+		minify: false,
+		sourcemap: true,
+		terserOptions: {
+			compress: false,
+			mangle: false,
+		},
+	}
+});
