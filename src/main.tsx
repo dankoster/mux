@@ -1,16 +1,20 @@
 import "./main.css"
 
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { trackStore } from "@solid-primitives/deep";
 import { render } from "solid-js/web";
-import * as server from "./data";
+
+import * as server from "./data/data";
+import * as directMessages from "./data/directMessages";
+
 import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";
-import { trackStore } from "@solid-primitives/deep";
 
-import type { Connection, DM, DMRequest } from "../server/types"
+import type { Connection, DM } from "../server/types"
 import { GitHubSvg } from "./GitHubSvg";
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
+type UnreadCountByConId = { [key: string]: number }
 
 const App = () => {
 
@@ -92,27 +96,46 @@ const App = () => {
 		}
 	}
 
-	const dmByConId: { [key: string]: DM[] } = {}
 	function saveLocalDm(dm: DM, conId: string) {
-		if (!dmByConId[conId])
-			dmByConId[conId] = [dm];
+		console.log('saveLocalDm', dm)
+		if (!directMessages.byConId.has(conId))
+			directMessages.byConId.set(conId,[dm])
 		else
-			dmByConId[conId].push(dm);
+			directMessages.byConId.get(conId).push(dm)
+
+		const length = directMessages.byConId.get(conId).length
+		const counts = unreadCountByConId()
+		counts[conId] = length
+		setUnreadCountByConId(counts)
+		console.log(conId, length)
 
 		if (conId === selectedDmTarget()?.id)
-			setDmList([...dmByConId[conId]])
+			setDmList([...directMessages.byConId.get(conId)])
 	}
-
-	server.onDM((dm: DM) => {
-		if (!selectedDmTarget())
-			setSelectedDmTarget(server.connections.find(c => c.id === dm.fromId))
-
-		saveLocalDm(dm, dm.fromId)
-	})
 
 	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
 	const [dmList, setDmList] = createSignal<DM[]>()
 	const [dmError, setDmError] = createSignal("")
+	const [unreadCountByConId, setUnreadCountByConId] = createSignal<UnreadCountByConId>({}, { equals: false })
+
+
+	directMessages.onDMEvent('unreadMessges', (messages) => {
+		messages?.forEach((val, key) => {
+			const counts = unreadCountByConId()
+			counts[key] = val.length
+			setUnreadCountByConId(counts)
+			console.log(unreadCountByConId())
+		})
+	})
+
+	directMessages.onNewMessage((dm: DM) => {
+		saveLocalDm(dm, dm.fromId)
+	})
+
+	const unreadLabel = (c: Connection) => {
+		const value = unreadCountByConId()[c.id]
+		return value ? `${value} unread` : ''
+	}
 
 	const showDmConversation = async (con: Connection) => {
 		setDmError(null)
@@ -123,21 +146,16 @@ const App = () => {
 			setDmError(`Cannot enctypt messages to ${con.identity?.name}! They need to sign in to generate a public key.`)
 			return
 		}
-
-		let history = dmByConId[con?.id]
-
 		try {
-			//if we have history, get all messages since the most recent timestamp in the history?
-			// if(history?.length > 0) {
-				
-			// }
-			
-			//if we don't have history, just get the most recent messages
-			if (!history || history.length === 0) {
-				history = await server.getDmHistory({ qty: 20, timestamp: Date.now(), conId: con.id })
-				dmByConId[con?.id] = history
-				setDmList(con && history)
-			}
+
+			let history = directMessages.byConId.get(con?.id)
+			setDmList(history)
+
+			//TODO: get last read timestamp
+			//TODO: visually mark each message after the timestamp as unread
+			//TODO: update the timestamp
+			console.log(directMessages.lastReadDmByConId)
+
 		} catch (err) {
 			setDmError(err.message)
 		}
@@ -243,9 +261,7 @@ const App = () => {
 								{c.identity?.name || `guest`} ({c.kind})
 
 								<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
-								<Show when={isOnline(c)}>
-									online!
-								</Show>
+								<div>{unreadLabel(c)}</div>
 							</div>}
 						</For>
 					</div>

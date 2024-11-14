@@ -517,10 +517,10 @@ api.post(`/${apiRoute.dmUnread}`, async (ctx) => {
 
 	const dmRequest = await ctx.request.body.json() as DMRequest
 
-	//a null timestamp converts to 1970-01-01T00:00:00.000Z
-	const timestamp = new Date(dmRequest.timestamp)
+	//a null timestamp converts to 0 which is 1970-01-01T00:00:00.000Z
+	const timestamp = new Date(dmRequest.timestamp ?? null).valueOf()
 
-	console.log('DM UNREAD', timestamp, dmRequest)
+	console.log('DM UNREAD', timestamp, dmRequest, dmRequest.timestamp)
 
 	if (!dmRequest || dmRequest.qty) {
 		ctx.response.status = 400 //bad request
@@ -533,7 +533,8 @@ api.post(`/${apiRoute.dmUnread}`, async (ctx) => {
 		return
 	}
 
-	const messages = db.getDriectMessagesAfterTimestamp(uuid, otherUuid, timestamp.valueOf())
+	console.log('+++++++++', {uuid, otherUuid, timestamp})
+	const messages = db.getDriectMessagesAfterTimestamp(uuid, otherUuid, timestamp)
 	ctx.response.body = messages
 })
 

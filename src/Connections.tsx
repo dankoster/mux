@@ -5,7 +5,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm"
 
 import { trackStore } from "@solid-primitives/deep"
 import { createEffect, onCleanup, onMount } from "solid-js"
-import * as server from "./data"
+import * as server from "./data/data"
 
 import type { Connection } from "../server/types"
 

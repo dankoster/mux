@@ -87,6 +87,7 @@ export type FriendRequest = {
 }
 
 export type DM = { 
+	id?: number,
 	toId: string, 
 	fromId: string,
 	fromName?: string,

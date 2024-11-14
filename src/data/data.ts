@@ -1,27 +1,10 @@
-import { API_URI } from "./API_URI";
+import { API_URI } from "../API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { ApiRoute, SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../server/types";
-import { computeSharedKey, decryptMessage, encryptMessage, exportJWK, getLocalKeyPair, jwkToCryptoKey } from "./crypto_ecdh_aes";
-
-const apiRoute: { [Property in ApiRoute]: Property } = {
-	sse: "sse",
-	webRTC: "webRTC",
-	setColor: "setColor",
-	setText: "setText",
-	clear: "clear",
-	discardKey: "discardKey",
-	room: "room",
-	"room/join": "room/join",
-	becomeAnonymous: "becomeAnonymous",
-	log: "log",
-	friendRequest: "friendRequest",
-	acceptFriendRequest: "acceptFriendRequest",
-	dm: "dm",
-	publicKey: "publicKey",
-	dmHistory: "dmHistory",
-	dmUnread: "dmUnread"
-};
+import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
+import { apiRoute, DELETE, POST } from "./http";
+import { DirectMessageEvents, getSharedKey, udpateUnreadMessages } from "./directMessages";
+import { decryptMessage, encryptMessage } from "../crypto_ecdh_aes";
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
@@ -43,23 +26,12 @@ const sse: { [Property in SSEvent]: Property } = {
 	dm: "dm"
 }
 
-const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
+export const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 type Stats = {
 	online: number;
 	offline: number;
 }
-
-console.log('GETTING CRYPTO KEYS')
-let myPrivateKey: CryptoKey
-const sharedKeyByConnectionId = new Map<string, CryptoKey>()
-getLocalKeyPair().then(async keypair => {
-	const jwk = await exportJWK(keypair.publicKey)
-	myPrivateKey = keypair.privateKey
-	broadcastPublicKey(jwk)
-}).catch((error) => {
-	console.error(error)
-})
 
 
 const [rooms, setRooms] = createStore<Room[]>([])
@@ -76,30 +48,6 @@ export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
 
-const LAST_CHECKED_DMS = 'lastCheckedDms'
-const directMessagesByConId = new Map<string, DM[]>()
-const lastCheckedDms: number = Number.parseInt(localStorage.getItem(LAST_CHECKED_DMS))
-
-async function udpateUnreadMessages() {
-	//wait for both friedns AND connections to load
-	if (!friends?.length || !connections?.length) {
-		console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
-		return
-	}
-	console.log('getting unread messages...')
-	const friendConId = connections
-		.filter(c => friends.some(f => f.friendId === c.identity?.id))
-		.map(c => c.id)
-
-	for (const conId of friendConId) {
-		const unread = await getUnreadDms({ timestamp: lastCheckedDms, conId })
-		if (unread?.length > 0)
-			directMessagesByConId.set(conId, unread)
-	}
-	//TODO: have a separate timestamp for each friend/connection
-	localStorage.setItem(LAST_CHECKED_DMS, Date.now().toString())
-	console.log('unread DMs', directMessagesByConId)
-}
 
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
@@ -174,12 +122,12 @@ type SSEventPayload = {
 	id?: string;
 	retry?: string;
 }
-const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
-	id: "id",
-	data: "data",
-	retry: "retry",
-	event: "event"
-}
+// const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
+// 	id: "id",
+// 	data: "data",
+// 	retry: "retry",
+// 	event: "event"
+// }
 
 export function githubAuthUrl() {
 	//https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
@@ -262,13 +210,13 @@ export function onWebRtcMessage(callback: (message: { senderId: string, message:
 	return ac
 }
 
-export function onDM(callback: (dm: DM) => void) {
-	const ac = new AbortController()
-	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
-		callback(e.detail)
-	}, { signal: ac.signal })
-	return ac
-}
+// export function onDM(callback: (dm: DM) => void) {
+// 	const ac = new AbortController()
+// 	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
+// 		callback(e.detail)
+// 	}, { signal: ac.signal })
+// 	return ac
+// }
 
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
@@ -309,7 +257,7 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections(conData)
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			updateConnectionCounts()
-			udpateUnreadMessages()
+			udpateUnreadMessages(friends, connections)
 			console.log('SSE', event.event, conData);
 			break;
 		case sse.rooms:
@@ -388,15 +336,16 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
-			udpateUnreadMessages()
+			udpateUnreadMessages(friends, connections)
 			console.log('SSE', event.event, friends)
 			break;
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			getSharedKey(dm.fromId).then(async key => {
+			const con = connections.find(c => c.id === dm.fromId)
+			getSharedKey(dm.fromId, con.publicKey).then(async key => {
 				dm.message = await decryptMessage(dm.message as EncryptedMessage, key)
-				SSEvents.onSseEvent(sse.dm, dm)
+				DirectMessageEvents.NewMessage(dm)
 			})
 			break;
 
@@ -410,21 +359,6 @@ function handleSseEvent(event: SSEventPayload) {
 			nope(event.event) //this will prevent unhandled cases
 			break;
 	}
-}
-
-async function getSharedKey(conId: string) {
-	if (!sharedKeyByConnectionId.has(conId)) {
-		const con = connections.find(c => c.id === conId)
-
-		if (!con.publicKey)
-			return
-
-		const pubKey = await jwkToCryptoKey(JSON.parse(con.publicKey))
-		const key = await computeSharedKey(myPrivateKey, pubKey)
-		sharedKeyByConnectionId.set(con.id, key)
-	}
-
-	return sharedKeyByConnectionId.get(conId)
 }
 
 export function sendWebRtcMessage(userId: string, message: string) {
@@ -443,35 +377,9 @@ function updateConnectionCounts() {
 export async function setColor(color: string, key?: string) {
 	return await POST(apiRoute.setColor, { body: color, authToken: key })
 }
+
 export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key })
-}
-
-export async function getDmHistory(dmReq: DMRequest) {
-	const result = await POST(apiRoute.dmHistory, { body: JSON.stringify(dmReq) })
-	const messages = await result.json() as DM[]
-	const key = await getSharedKey(dmReq.conId)
-	return await decryptMessages(key, messages);
-}
-
-export async function getUnreadDms(dmReq: DMRequest) {
-	const result = await POST(apiRoute.dmUnread, { body: JSON.stringify(dmReq) })
-	const messages = await result.json() as DM[]
-	const key = await getSharedKey(dmReq.conId);
-	return await decryptMessages(key, messages);
-}
-
-async function decryptMessages(sharedKey: CryptoKey, messages: DM[]) {
-	for (const m of messages) {
-		try {
-			const decrypted = await decryptMessage(JSON.parse(m.message as string), sharedKey);
-			m.message = decrypted;
-		} catch (err) {
-			console.warn(err)
-		}
-	}
-
-	return messages;
 }
 
 export async function sendDm(con: Connection, message: string) {
@@ -483,53 +391,14 @@ export async function sendDm(con: Connection, message: string) {
 		message,
 	}
 
-	if (!sharedKeyByConnectionId.has(con.id)) {
-		const jwk = JSON.parse(con.publicKey) as JsonWebKey
-		const theirPublicKey = await jwkToCryptoKey(jwk)
-		const sharedKey = await computeSharedKey(myPrivateKey, theirPublicKey)
-		sharedKeyByConnectionId.set(con.id, sharedKey)
-	}
+	const sharedKey = await getSharedKey(con.id, con.publicKey);
 
 	const encryptedDm = {
 		...dm,
-		message: await encryptMessage(message, sharedKeyByConnectionId.get(con.id))
+		message: await encryptMessage(message, sharedKey)
 	}
 
 	await POST(apiRoute.dm, { body: JSON.stringify(encryptedDm) })
 
 	return dm
-}
-
-export async function broadcastPublicKey(key: JsonWebKey) {
-	return POST(apiRoute.publicKey, { body: JSON.stringify(key) })
-}
-
-async function GET(route: ApiRoute, subRoute?: string) {
-	const headers = {};
-	headers[AUTH_TOKEN_HEADER_NAME] = pk();
-	const url = [API_URI, route, subRoute].filter(s => s).join('/')
-	return await fetch(url, {
-		method: "GET",
-		headers
-	});
-}
-
-type PostOptions = { subRoute?: string, body?: string, authToken?: string }
-async function POST(route: ApiRoute, options?: PostOptions) {
-	const headers = {};
-	headers[AUTH_TOKEN_HEADER_NAME] = options?.authToken ?? pk();
-	if (!route) throw new Error(`invalid route: ${route}`)
-	const url = [API_URI, route, options?.subRoute].filter(s => s).join('/')
-	return await fetch(url, {
-		method: "POST",
-		body: options?.body,
-		headers
-	});
-}
-
-async function DELETE(route: ApiRoute, subRoute: string) {
-	const headers = {};
-	headers[AUTH_TOKEN_HEADER_NAME] = pk();
-	const url = [API_URI, route, subRoute].join('/')
-	return await fetch(url, { method: "DELETE", headers });
 }
