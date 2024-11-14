@@ -498,12 +498,17 @@ api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
 
 	if (!dmRequest || !dmRequest.qty || dmRequest.qty <= 0 || !timestamp.valueOf()) {
 		ctx.response.status = 400 //bad request
+		const message = []
+		if(!dmRequest.qty) message.push('invalid qty')
+		if(!timestamp.valueOf()) message.push('invalid timestamp')
+		ctx.response.body = message.join()
 		return
 	}
 
 	const otherUuid = getUUID(dmRequest.conId)
 	if (!otherUuid) {
 		ctx.response.status = 404 //not found
+		ctx.response.body = 'invalid conId'
 		return
 	}
 
@@ -533,7 +538,6 @@ api.post(`/${apiRoute.dmUnread}`, async (ctx) => {
 		return
 	}
 
-	console.log('+++++++++', {uuid, otherUuid, timestamp})
 	const messages = db.getDriectMessagesAfterTimestamp(uuid, otherUuid, timestamp)
 	ctx.response.body = messages
 })
@@ -563,19 +567,21 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
-		const timestamp = db.persistDm({
+		const persistedDm = db.persistDm({
 			toUuid: toUuid,
 			fromUuid: uuid,
 			message: message.message
 		})
 
 		//overwrite any data from the sender that they should not control
+		message.id = persistedDm.id
 		message.fromId = con.id
 		message.fromName = con.identity?.name
-		message.timestamp = timestamp * 1000 //we don't need a subsecond timestamp on the frontend
+		message.timestamp = (persistedDm.timestamp ?? 0) * 1000 //we don't need a subsecond timestamp on the frontend
 		// console.log('DM SAVED', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
-
+		
 		ctx.response.status = 200
+		ctx.response.body = message
 
 		//TODO: send push notification (perhaps have an updater that does this?)
 

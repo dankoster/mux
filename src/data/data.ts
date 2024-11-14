@@ -3,8 +3,7 @@ import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
 import { apiRoute, DELETE, POST } from "./http";
-import { DirectMessageEvents, getSharedKey, udpateUnreadMessages } from "./directMessages";
-import { decryptMessage, encryptMessage } from "../crypto_ecdh_aes";
+import { handleNewDirectMessage, getAllUnread } from "./directMessages";
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
@@ -257,7 +256,7 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections(conData)
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			updateConnectionCounts()
-			udpateUnreadMessages(friends, connections)
+			getAllUnread(friends, connections)
 			console.log('SSE', event.event, conData);
 			break;
 		case sse.rooms:
@@ -336,17 +335,14 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
-			udpateUnreadMessages(friends, connections)
+			getAllUnread(friends, connections)
 			console.log('SSE', event.event, friends)
 			break;
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
 			const con = connections.find(c => c.id === dm.fromId)
-			getSharedKey(dm.fromId, con.publicKey).then(async key => {
-				dm.message = await decryptMessage(dm.message as EncryptedMessage, key)
-				DirectMessageEvents.NewMessage(dm)
-			})
+			handleNewDirectMessage(con, dm);
 			break;
 
 		default:
@@ -382,23 +378,3 @@ export async function setText(text: string, key?: string) {
 	return await POST(apiRoute.setText, { body: text, authToken: key })
 }
 
-export async function sendDm(con: Connection, message: string) {
-	const dm: DM = {
-		toId: con.id,
-		fromId: self().id,
-		fromName: self().identity?.name,
-		timestamp: Date.now(),
-		message,
-	}
-
-	const sharedKey = await getSharedKey(con.id, con.publicKey);
-
-	const encryptedDm = {
-		...dm,
-		message: await encryptMessage(message, sharedKey)
-	}
-
-	await POST(apiRoute.dm, { body: JSON.stringify(encryptedDm) })
-
-	return dm
-}

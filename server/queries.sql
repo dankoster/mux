@@ -42,9 +42,17 @@ ORDER BY dm.timestamp DESC
 LIMIT 10)
 ORDER BY id ASC;
 
-SELECT 1731366798944.0, 1731366798944.0/1000
-
-SELECT * 
---DELETE
-FROM directMessage 
-WHERE id <= 27
+SELECT dm.id as id, 
+		cTo.id as toId, 
+		cFr.id as fromId,
+		iFr.name as fromName,
+		dm.timestamp as timestamp, 
+		dm.message
+		FROM directMessage dm
+		JOIN connection cTo on cTo.uuid = dm.toUuid
+		JOIN connection cFr on cFr.uuid = dm.fromUuid
+		LEFT JOIN identity iFr on iFr.id = cfr.identityId
+		WHERE timestamp > 1731622837.836
+		-- AND ((toUuid = :uuid1 AND fromUuid = :uuid2)
+		-- OR (toUuid = :uuid2 AND fromUuid = :uuid1))
+		ORDER BY dm.timestamp DESC
