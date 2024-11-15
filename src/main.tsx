@@ -147,6 +147,11 @@ const App = () => {
 		}
 	}
 
+	const logout = () => {
+		showDmConversation(null)
+		server.becomeAnonymous()
+	}
+
 	return <>
 		<meta name="theme-color" content="#1f0e3c"></meta>
 		<Show when={!server.serverOnline()}>
@@ -178,7 +183,7 @@ const App = () => {
 						</a>
 					</Show>
 					<Show when={server.self()?.identity}>
-						<div class="avatar button" onclick={() => server.becomeAnonymous()}>
+						<div class="avatar button" onclick={logout}>
 							<div class="name">{server.self()?.identity.name}</div>
 							<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} />
 						</div>
