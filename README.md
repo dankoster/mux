@@ -4,18 +4,40 @@ https://chatmux.com/
 
 ![production deploy](https://github.com/dankoster/mux/actions/workflows/Droplet.yml/badge.svg)
 
+I'm working toward a group chat service similar to [Discord](https://discord.com/) but with cooperative game world concepts such as proximity chat similar to [Gather](https://www.gather.town/).
+
+All from scratch. No dependencies. No AI.\
+Because building stuff is fun.
+
+Here's where we're at:
+- Peer-to-peer video chat using [webRTC](https://webrtc.org/)
+- Friends with request/accept mechanics
+- Direct messages between friends with end-to-end [AES-GCM encryption](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
+- D3 [disjoint force directed graph](https://d3js.org/d3-force) visualization of online users (this is a temporary placeholder for a more robust game-like world)
+- A touch of [SolidJS](https://www.solidjs.com/), [Typescript](https://www.typescriptlang.org/), [D3](https://d3js.org), and [CSS](https://www.kevinpowell.co/resources/#css) on the frontend
+- [SQLite](https://sqlite.org/) and [Deno](https://deno.com/) on the backend
+- Hosted in a tiny droplet of the [Digital Ocean](https://www.digitalocean.com/) 
+
 ------
-#### iteration 4
+
+
+### iteration 4 [WIP]
+> Good end-to-end encryption, offline messages, and... WIP
 
 I changed my cryptography standard to [ECDH](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey#ecdh)-[AES-GCM](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt#aes-gcm).
 
-Now direct messages are end-to-end encrypted with a securely shared key. This means that the messages can go through the server but only be read by the users. That gives us secure message history and offline messaging capability, which paves the way for push notifications.
+Implemented fairly robust direct message functionality
+- Direct messages are now end-to-end encrypted with a securely shared key. This means that the messages can go through the server but only be read by the users. 
+- unread messages from friends are automatically fetched when loading
+- Unread message counts are displayed for each friend
+- When opening a chat with unread messages, get all unread PLUS additional history if the number of unread messages is below a minimum threshold. 
 
-Time to clean up the UI
-
+Time to clean up the UI\
+Then push notifications
 
 ------
-#### iteration 3
+### iteration 3
+> SQLite, Github Actions, friends, and direct messages
 
 DenoKV is out. DenoKV is trash. 🤬\
 SQLite is in. SQLite is awesome! 🤩
@@ -35,7 +57,9 @@ For the encryption, I'm currently using RSA asymmetric keys. That's super ineffi
 In the meantime... I have long list of other things I want to work on. 
 
 ------
-#### iteration 2
+### iteration 2
+> Oauth, D3, and Devops. \
+> I did a linux, and I liked it!
 
 Added github login to let users identify themselves with a name and avatar image. I just implemented [GitHub OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) from scratch for this. It's a very simple [protocol](https://datatracker.ietf.org/doc/html/rfc6749) to follow. 
 
@@ -43,6 +67,7 @@ Added d3 visualization of chat rooms using [pack enclose](https://observablehq.c
 
 <img width="400" alt="Screenshot 2024-10-26 at 1 31 57 PM" src="https://github.com/user-attachments/assets/1863085b-8375-42a9-a22c-c16b45c8beb5">
 
+\
 Then a friend went to Japan. I thought, 'What a great opportunity to test with someone very geographically distant!" That turned into an epic troubleshooting adventure. I learned a lot about how Deno Deploy works. I tried so hard to get this thing working reliably on Deno Deploy which is not really set up to handle long-running servers. It will spin up V8 isolates geographically close to users and then terminate them with no warning. DenoKV proved to be unreliable in general and a massive pain in practice for synchronizing state between the isolates. This is not the work I'm interested in doing. I've wasted a week on this. Ugh.
 
 ...sooo, I moved everything to a Digital Ocean droplet and learned a lot about Linux in the process. That only took a few hours to figure out and now I have one always-on server with HTTPS that should be good for as many users as I'm likely to ever have for this thing, but will be easy to scale vertically if necessary. 
@@ -51,7 +76,8 @@ That's enough devops for now. Moving on to more fun stuff.
 
 
 ------
-#### iteration 1 
+### iteration 1 
+> Excited but failrly aimless tinkering
 
 This started out as a quick exploration of [server sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Then I got super curious about [webRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API). All the connections flying around needed a fun visualization, so let's learn [D3](https://d3js.org/)! Oh, I also wanted to try [SolidJS](https://www.solidjs.com/). And [Deno](https://deno.com/). Then I was having enough fun that I put it on [deno deploy](https://deno.com/deploy) and got a [domain](https://chatmux.com/). 
 
