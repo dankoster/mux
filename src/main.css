@@ -200,15 +200,55 @@ body {
 .dm-chat {
 	border-top: 1px solid var(--separator-color);
 	padding: 2rem;
+
+	.dm-list {
+		.dm {
+			display: grid;
+            column-gap: 1rem;
+			margin-block: 1rem;
+			align-items: center;
+            grid-template-columns: min-content min-content 1fr;
+			grid-template-areas:
+				"avatar sender timestamp"
+				"avatar message message";
+
+
+			.dm-avatar {
+				grid-area: avatar;
+
+				img {
+					width: 1.8rem;
+					border-radius: 25%;
+				}
+			}
+
+			.dm-timestamp {
+				grid-area: timestamp;
+				font-size: x-small;
+                filter: brightness(0.5);
+			}
+
+			.dm-sender {
+				grid-area: sender;
+				white-space: nowrap;
+				font-weight: bold;
+			}
+
+			.dm-message {
+				grid-area: message;
+			}
+		}
+	}
 }
 
 .connections {
 	border-top: 1px solid var(--separator-color);
-	.connection-list {	
+
+	.connection-list {
 		margin-top: 0.5rem;
 	}
 }
-	
+
 .avatar {
 	display: flex;
 	align-items: center;
@@ -248,8 +288,8 @@ body {
 		}
 
 		.avatar-image {
-			width: 1rem;
-			height: 1rem;
+			width: 1.4rem;
+			height: 1.4rem;
 			border-radius: 25%;
 		}
 	}

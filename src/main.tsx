@@ -121,6 +121,11 @@ const App = () => {
 		return value ? `${value} unread` : ''
 	}
 
+	const avatarUrl = (conId: string) => {
+		const con = server.connections.find(c => c.id === conId)
+		return con?.identity?.avatar_url
+	}
+
 	const showDmConversation = async (con: Connection) => {
 		setDmError(null)
 		setSelectedDmTarget(con)
@@ -133,11 +138,11 @@ const App = () => {
 		try {
 			let history = await directMessages.getRecentHistory(con.id, con.publicKey)
 			const lastRead = directMessages.lastReadTimestamp(con.id)
-			
-			console.log('showDmConversation', {lastRead, history})
-			
+
+			console.log('showDmConversation', { lastRead, history })
+
 			//TODO: visually mark each message after the timestamp as unread
-			
+
 			setDmList(history)
 			directMessages.setLastReadNow(con.id)
 
@@ -214,9 +219,22 @@ const App = () => {
 					<Show when={dmError()}>ERROR: {dmError()}</Show>
 					<Show when={!dmError()}>
 						<span onclick={() => showDmConversation(null)}>close</span>
-						<div class="dm-messages">
+						<div class="dm-list">
 							<For each={dmList()}>
-								{dm => <div>[{new Date(dm.timestamp).toLocaleTimeString()}] {dm.fromName || dm.fromId}: {dm.message as string}</div>}
+								{dm => <div class="dm">
+									<div class="dm-avatar">
+										<img alt={dm.fromName} src={avatarUrl(dm.fromId)} />
+									</div>
+									<div class="dm-sender">
+										{dm.fromName || dm.fromId}
+									</div>
+									<div class="dm-timestamp">
+										{new Date(dm.timestamp).toLocaleTimeString()}
+									</div>
+									<div class="dm-message">
+										{dm.message as string}
+									</div>
+								</div>}
 							</For>
 						</div>
 						<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
