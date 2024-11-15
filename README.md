@@ -11,9 +11,10 @@ Because building stuff is fun.
 
 Here's where we're at:
 - Peer-to-peer video chat using [webRTC](https://webrtc.org/)
-- Friends with request/accept mechanics
-- Direct messages between friends with end-to-end [AES-GCM encryption](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
-- D3 [disjoint force directed graph](https://d3js.org/d3-force) visualization of online users (this is a temporary placeholder for a more robust game-like world)
+- [GitHub Oauth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) integration for user identity (more to come later)
+- Friends with request/accept mechanics (for authenticated uesrs)
+- Direct messages and offline messages between friends with end-to-end [AES-GCM encryption](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
+- D3 [force](https://d3js.org/d3-force) visualization of online users (a placeholder for a more robust game-like world in [three.js](https://threejs.org/))
 - A touch of [SolidJS](https://www.solidjs.com/), [Typescript](https://www.typescriptlang.org/), [D3](https://d3js.org), and [CSS](https://www.kevinpowell.co/resources/#css) on the frontend
 - [SQLite](https://sqlite.org/) and [Deno](https://deno.com/) on the backend
 - Hosted in a tiny droplet of the [Digital Ocean](https://www.digitalocean.com/) 
@@ -32,8 +33,8 @@ Implemented fairly robust direct message functionality
 - Unread message counts are displayed for each friend
 - When opening a chat with unread messages, get all unread PLUS additional history if the number of unread messages is below a minimum threshold. 
 
-Time to clean up the UI\
-Then push notifications
+Time to clean up the UI...\
+Then [push notifications](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)! 
 
 ------
 ### iteration 3
