@@ -494,13 +494,14 @@ api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
 	db.log({ action: event(ctx.request), uuid, identityId: con.identity?.id, roomId: con.roomId })
 
 	const dmRequest = await ctx.request.body.json() as DMRequest
-	const timestamp = new Date(dmRequest.timestamp)
+	//a null timestamp converts to 0 which is 1970-01-01T00:00:00.000Z
+	dmRequest.timestamp = new Date(dmRequest.timestamp ?? null).valueOf()
 
-	if (!dmRequest || !dmRequest.qty || dmRequest.qty <= 0 || !timestamp.valueOf()) {
+	if (!dmRequest || !dmRequest.qty || dmRequest.qty <= 0 || !(dmRequest.timestamp >= 0)) {
 		ctx.response.status = 400 //bad request
 		const message = []
 		if(!dmRequest.qty) message.push('invalid qty')
-		if(!timestamp.valueOf()) message.push('invalid timestamp')
+		if(!(dmRequest.timestamp >= 0)) message.push('invalid timestamp')
 		ctx.response.body = message.join()
 		return
 	}
