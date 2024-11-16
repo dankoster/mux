@@ -12,6 +12,7 @@ import ConnectionsGraph from "./Connections";
 
 import type { Connection, DM } from "../server/types"
 import { GitHubSvg } from "./GitHubSvg";
+import { ageTimestamp, shortTime } from "./time";
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
 
@@ -19,7 +20,7 @@ const App = () => {
 
 	const [callState, setCallState] = createSignal<CallState>("no_call")
 	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
-	const [dmList, setDmList] = createSignal<DM[]>([], { equals: false })
+	const [dmList, setDmList] = createSignal<DM[][]>([], { equals: false })
 	const [dmError, setDmError] = createSignal("")
 
 
@@ -111,7 +112,8 @@ const App = () => {
 		if (con.id === selectedDmTarget()?.id) {
 			const messages = await directMessages.getRecentHistory(con.id, con.publicKey)
 			const latestMessage = messages[messages.length - 1]
-			setDmList(messages)
+			const groupedBySender = groupBySender(messages)
+			setDmList(groupedBySender)
 			directMessages.setLastReadTimestamp(con.id, latestMessage.timestamp)
 		}
 	}
@@ -143,7 +145,8 @@ const App = () => {
 
 			//TODO: visually mark each message after the timestamp as unread
 
-			setDmList(history)
+			const groupedBySender = groupBySender(history)
+			setDmList(groupedBySender)
 			directMessages.setLastReadNow(con.id)
 
 			console.log('lastReadDmByConId', lastRead)
@@ -151,6 +154,17 @@ const App = () => {
 			setDmError(err.message)
 		}
 	}
+
+
+	function groupBySender(history: DM[]) {
+		return history.reduce((acc: DM[][], cur: DM) => {
+			const prev = acc[acc.length - 1];
+			if (!prev || prev[0].fromName !== cur.fromName) acc.push([cur]);
+			else prev.push(cur);
+			return acc;
+		}, []);
+	}
+
 
 	const logout = () => {
 		showDmConversation(null)
@@ -221,20 +235,30 @@ const App = () => {
 						<span onclick={() => showDmConversation(null)}>close</span>
 						<div class="dm-list">
 							<For each={dmList()}>
-								{dm => <div class="dm">
-									<div class="dm-avatar">
-										<img alt={dm.fromName} src={avatarUrl(dm.fromId)} />
+								{dmGroup => {
+									const firstMessage = dmGroup[0]
+									const moreMessages = dmGroup.slice(1)
+									return <div class="dm">
+										<div class="dm-avatar">
+											<img alt={firstMessage.fromName} src={avatarUrl(firstMessage.fromId)} />
+										</div>
+										<div class="dm-first-message">
+											<div class="dm-sender">
+												{firstMessage.fromName || firstMessage.fromId}
+											</div>
+											<div class="dm-timestamp">
+												{ageTimestamp(firstMessage.timestamp)}
+											</div>
+											<div class="dm-content">{firstMessage.message as string}</div>
+										</div>
+										<For each={moreMessages}>{(dm) =>
+											<div class="dm-message">
+												<span class="dm-timestamp">{shortTime(dm.timestamp)}</span>
+												<span class="dm-content">{dm.message as string}</span>
+											</div>
+										}</For>
 									</div>
-									<div class="dm-sender">
-										{dm.fromName || dm.fromId}
-									</div>
-									<div class="dm-timestamp">
-										{new Date(dm.timestamp).toLocaleTimeString()}
-									</div>
-									<div class="dm-message">
-										{dm.message as string}
-									</div>
-								</div>}
+								}}
 							</For>
 						</div>
 						<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
@@ -319,6 +343,4 @@ const App = () => {
 	</>
 };
 
-
 render(() => <App />, document.body)
-
