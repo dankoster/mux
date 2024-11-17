@@ -165,6 +165,8 @@ export async function getAllUnread(friends: Friend[], connections: Connection[])
 }
 
 export async function sendDm(fromId: string, fromName: string, con: Connection, message: string) {
+	if(!message) throw new Error('cannot send an empty message')
+
 	const dm: DM = {
 		toId: con.id,
 		fromId,

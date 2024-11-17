@@ -88,19 +88,31 @@ const App = () => {
 
 	const onMessageKeyDown = async (e: KeyboardEvent, con: Connection) => {
 		const input = e.target as HTMLTextAreaElement
-		if (e.key === 'Enter') {
-			const value = input.value
-			input.value = ''
-
-			try {
-				const self = server.self()
-				await directMessages.sendDm(self.id, self.identity?.name, con, value)
-				updateDmDisplay(con)
-			} catch (err) {
-				setDmError(err.message)
-			}
+		const value = input.value?.trim()
+		if (e.key === 'Enter' && value) {
+			input.value = '';
+			sendDm(con, value);
 		}
 	}
+
+	const onSendButtonClick = async (input: HTMLTextAreaElement, con: Connection) => {
+		const value = input.value?.trim()
+		if (value) {
+			input.value = '';
+			sendDm(con, value);
+		}
+	}
+
+	async function sendDm(con: Connection, value: string) {
+		try {
+			const self = server.self();
+			await directMessages.sendDm(self.id, self.identity?.name, con, value);
+			updateDmDisplay(con);
+		} catch (err) {
+			setDmError(err.message);
+		}
+	}
+
 
 	directMessages.onNewMessage((dm: DM) => {
 		const con = server.connections.find(c => c.id === dm.fromId)
@@ -229,7 +241,7 @@ const App = () => {
 			</div>
 			<Show when={selectedDmTarget()}>
 				<div class="dm-chat">
-					<h2>dm with {selectedDmTarget().identity?.name}</h2>
+					<h2>Chat with {selectedDmTarget().identity?.name}</h2>
 					<Show when={dmError()}>ERROR: {dmError()}</Show>
 					<Show when={!dmError()}>
 						<span onclick={() => showDmConversation(null)}>close</span>
@@ -261,7 +273,14 @@ const App = () => {
 								}}
 							</For>
 						</div>
-						<input type="text" onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
+						<div class="dm-send">
+							<input
+								class='dm-send-input'
+								type="text"
+								placeholder={`Message ${selectedDmTarget().identity?.name}...`}
+								onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
+							<button class='dm-send-button' onclick={(e) => onSendButtonClick(e.target.previousElementSibling as HTMLTextAreaElement, selectedDmTarget())}>⏎</button>
+						</div>
 						<span class='latest-dm' id={`con${selectedDmTarget().id}`}></span>
 					</Show>
 				</div>
