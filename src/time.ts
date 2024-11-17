@@ -54,11 +54,26 @@ export function ageTimestamp(timestamp: number) {
 		month: "short",
 		day: "numeric",
 	})} (${pluralize`${ageInDays} day`} ago)`
-
-
 }
 
 export function shortTime(timestamp: number) {
 	return new Date(timestamp).toLocaleTimeString([], { timeStyle: 'short' })
 }
 
+export function diffTime(timestamp: number, prevTimestamp: number, minimumMinutes: number = 5) {
+	const ms = timestamp - prevTimestamp
+	const min = ms / (1000 * 60)
+
+	if(!min || min < minimumMinutes)
+		return 
+
+	if(min < 60) 
+		return pluralize`${Math.round(min)} minute`
+
+	const hr = min / 60
+	if(hr < 24)
+		return pluralize`${Math.round(hr)} hour`
+
+	const days = hr / 24
+	return pluralize`${Math.round(days)} day`
+}

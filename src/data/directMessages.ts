@@ -245,3 +245,14 @@ export async function handleNewDirectMessage(con: Connection, dm: DM) {
 	incrementUnreadCount(con.id)
 	DirectMessageEvents.DispatchNewMessage(dm);
 }
+
+export type groupedDM = DM & { prevTimestamp?: number }
+export function groupBySender(history: groupedDM[]) {
+	return history.reduce((acc: groupedDM[][], cur: groupedDM) => {
+		const prev = acc[acc.length - 1];
+		cur.prevTimestamp = prev && prev[prev.length - 1]?.timestamp
+		if (!prev || prev[0].fromName !== cur.fromName) acc.push([cur]);
+		else prev.push(cur);
+		return acc;
+	}, []);
+}
