@@ -247,11 +247,14 @@ export async function handleNewDirectMessage(con: Connection, dm: DM) {
 }
 
 export type groupedDM = DM & { prevTimestamp?: number }
-export function groupBySender(history: groupedDM[]) {
+export function groupBySender(history: groupedDM[], minHoursSameSender = 24) {
 	return history.reduce((acc: groupedDM[][], cur: groupedDM) => {
 		const prev = acc[acc.length - 1];
 		cur.prevTimestamp = prev && prev[prev.length - 1]?.timestamp
-		if (!prev || prev[0].fromName !== cur.fromName) acc.push([cur]);
+		if (!prev 
+			|| prev[0].fromName !== cur.fromName
+			|| (cur.prevTimestamp && (cur.timestamp - cur.prevTimestamp > (1000 * 60 * 60 * minHoursSameSender)))
+		) acc.push([cur]);
 		else prev.push(cur);
 		return acc;
 	}, []);
