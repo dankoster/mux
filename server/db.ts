@@ -80,23 +80,41 @@ const insertDm = db.prepare(`INSERT INTO directMessage
 	RETURNING *;`
 )
 
-const selectDmRange = db.prepare(`SELECT * FROM (
-		SELECT dm.id as id, 
-		cTo.id as toId, 
-		cFr.id as fromId,
-		iFr.name as fromName,
-		dm.timestamp * 1000 as timestamp, 
-		dm.message
-		FROM directMessage dm
-		JOIN connection cTo on cTo.uuid = dm.toUuid
-		JOIN connection cFr on cFr.uuid = dm.fromUuid
-		LEFT JOIN identity iFr on iFr.id = cfr.identityId
-		WHERE timestamp <= :timestamp
-		AND ((toUuid = :uuid1 AND fromUuid = :uuid2)
-		OR (toUuid = :uuid2 AND fromUuid = :uuid1))
-		ORDER BY dm.timestamp DESC
-		LIMIT :qty)
-	ORDER BY id ASC;`
+const selectDmRange = db.prepare(`
+	WITH UUID1 AS (
+		SELECT uuid FROM connection
+		WHERE identityId in (
+			SELECT identityId FROM connection
+			WHERE uuid = :uuid1
+		)
+	),
+	UUID2 AS (
+		SELECT uuid FROM connection
+		WHERE identityId in (
+			SELECT identityId FROM connection
+			WHERE uuid = :uuid2
+		)
+	)
+	SELECT * FROM (
+			SELECT dm.id as id, 
+			cTo.id as toId, 
+			cFr.id as fromId,
+			iFr.name as fromName,
+			dm.timestamp * 1000 as timestamp, 
+			dm.message
+			FROM directMessage dm
+			JOIN connection cTo on cTo.uuid = dm.toUuid
+			JOIN connection cFr on cFr.uuid = dm.fromUuid
+			LEFT JOIN identity iFr on iFr.id = cfr.identityId
+			WHERE timestamp <= :timestamp
+			AND (
+				(toUuid IN UUID1 AND fromUuid IN UUID2)
+				OR 
+				(toUuid IN UUID2 AND fromUuid IN UUID1)
+			)
+			ORDER BY dm.timestamp DESC
+			LIMIT :qty)
+		ORDER BY id ASC;`
 )
 
 const selectAllDmsAfterTimestamp = db.prepare(`SELECT * FROM (
