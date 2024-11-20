@@ -80,7 +80,7 @@ const insertDm = db.prepare(`INSERT INTO directMessage
 	RETURNING *;`
 )
 
-const selectDmRange = db.prepare(`
+const selectDmRangeBeforeTimestamp = db.prepare(`
 	WITH UUID1 AS (
 		SELECT uuid FROM connection
 		WHERE identityId in (
@@ -106,7 +106,7 @@ const selectDmRange = db.prepare(`
 			JOIN connection cTo on cTo.uuid = dm.toUuid
 			JOIN connection cFr on cFr.uuid = dm.fromUuid
 			LEFT JOIN identity iFr on iFr.id = cfr.identityId
-			WHERE timestamp <= :timestamp
+			WHERE timestamp <= :timestamp * 0.001
 			AND (
 				(toUuid IN UUID1 AND fromUuid IN UUID2)
 				OR 
@@ -139,8 +139,8 @@ export function persistDm(dm: DMInsert) {
 	return insertDm.get(dm) as DM
 }
 
-export function getDirectMessages(uuid1: string, uuid2: string, req: DMRequest) {
-	return selectDmRange.all({ uuid1, uuid2, timestamp: req.timestamp, qty: req.qty })
+export function getDirectMessagesBeforeTimestamp(uuid1: string, uuid2: string, req: DMRequest) {
+	return selectDmRangeBeforeTimestamp.all({ uuid1, uuid2, timestamp: req.timestamp, qty: req.qty })
 }
 
 export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, timestamp: number) {

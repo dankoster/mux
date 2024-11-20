@@ -76,6 +76,8 @@ SELECT * FROM (
 		cTo.id as toId, 
 		cFr.id as fromId,
 		iFr.name as fromName,
+		1732046702197 * 0.001 as asdf,
+		dm.timestamp,
 		dm.timestamp * 1000 as timestamp, 
 		dm.message
 		FROM directMessage dm
@@ -83,7 +85,8 @@ SELECT * FROM (
 		JOIN connection cFr on cFr.uuid = dm.fromUuid
 		LEFT JOIN identity iFr on iFr.id = cfr.identityId
 		--WHERE timestamp <= :timestamp
-		WHERE (
+		WHERE timestamp > 1732046702197 * 0.001
+		AND (
 			(toUuid IN UUID1 AND fromUuid IN UUID2)
 			OR 
 			(toUuid IN UUID2 AND fromUuid IN UUID1)
@@ -91,3 +94,10 @@ SELECT * FROM (
 		ORDER BY dm.timestamp DESC
 		LIMIT 20)
 	ORDER BY id ASC;
+
+
+SELECT * 
+--DELETE
+FROM connection
+WHERE identityId = 1
+AND status IS NULL

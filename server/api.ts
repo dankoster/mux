@@ -42,9 +42,9 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	friendRequest: "friendRequest",
 	acceptFriendRequest: "acceptFriendRequest",
 	dm: "dm",
-	publicKey: "publicKey",
 	dmHistory: "dmHistory",
-	dmUnread: "dmUnread"
+	dmUnread: "dmUnread",
+	publicKey: "publicKey",
 }
 
 const updateFunctionByUUID = new Map<string, {
@@ -500,8 +500,8 @@ api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
 	if (!dmRequest || !dmRequest.qty || dmRequest.qty <= 0 || !(dmRequest.timestamp >= 0)) {
 		ctx.response.status = 400 //bad request
 		const message = []
-		if(!dmRequest.qty) message.push('invalid qty')
-		if(!(dmRequest.timestamp >= 0)) message.push('invalid timestamp')
+		if (!dmRequest.qty) message.push('invalid qty')
+		if (!(dmRequest.timestamp >= 0)) message.push('invalid timestamp')
 		ctx.response.body = message.join()
 		return
 	}
@@ -513,7 +513,7 @@ api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
 		return
 	}
 
-	const messages = db.getDirectMessages(uuid, otherUuid, dmRequest)
+	const messages = db.getDirectMessagesBeforeTimestamp(uuid, otherUuid, dmRequest)
 	ctx.response.body = messages
 })
 
@@ -547,8 +547,8 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 	try {
 		const action = event(ctx.request)
 		console.log(action)
-		const { uuid, con } = getConnection(ctx.request)
-		db.log({ action, uuid, identityId: con.identity?.id, roomId: con.roomId })
+		const { uuid: fromUuid, con: fromCon } = getConnection(ctx.request)
+		db.log({ action, uuid: fromUuid, identityId: fromCon.identity?.id, roomId: fromCon.roomId })
 
 		const message = await ctx.request.body.json() as DM
 
@@ -560,6 +560,19 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
+		//extra checks for key sharing
+		if (message.kind === 'key-share') {
+			//does the identity match?
+			if (!toCon.identity
+				|| !fromCon.identity
+				|| toCon.identity.source !== fromCon.identity.source
+				|| toCon.identity.id !== fromCon.identity.id
+			) {
+				ctx.response.status = 403 //forbidden
+				return
+			}
+		}
+
 		const toUuid = getUUID(toCon.id)
 		if (!toUuid) {
 			ctx.response.status = 500
@@ -569,28 +582,53 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		}
 
 		const persistedDm = db.persistDm({
-			toUuid: toUuid,
-			fromUuid: uuid,
+			toUuid,
+			fromUuid,
 			message: message.message
 		})
 
 		//overwrite any data from the sender that they should not control
 		message.id = persistedDm.id
-		message.fromId = con.id
-		message.fromName = con.identity?.name
+		message.fromId = fromCon.id
+		message.fromName = fromCon.identity?.name
 		message.timestamp = (persistedDm.timestamp ?? 0) * 1000 //we don't need a subsecond timestamp on the frontend
 		// console.log('DM SAVED', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
-		
+
 		ctx.response.status = 200
 		ctx.response.body = message
 
 		//TODO: send push notification (perhaps have an updater that does this?)
 
-		const updater = updateFunctionByUUID.get(toUuid)
-		if (updater) {
-			updater.update(sseEvent.dm, JSON.stringify(message))
-			// console.log('DM SENT', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
-		}
+		// const updater = updateFunctionByUUID.get(toUuid)
+		// if (updater) {
+		// 	console.log('DM updating', toCon.identity?.name, toCon.kind)
+		// 	updater.update(sseEvent.dm, JSON.stringify(message))
+		// 	// console.log('DM SENT', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
+		// }
+
+		// connectionByUUID.forEach((con2, uuid2) => {
+		// 	if(fromCon.id !== con2.id
+		// 		&& con2.identity 
+		// 		&& con2.identity?.id === fromCon.identity?.id) {
+		// 			console.log('DM also updating', con2.identity?.name, con2.kind)
+		// 			updateFunctionByUUID.get(uuid2)?.update(sseEvent.dm, JSON.stringify(message))
+		// 	}
+		// })
+
+		//update all connections owned by the sender or the receiver, except the intitial sender.
+		const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
+		connectionByUUID.forEach((con, uuid) => {
+			if (uuid !== fromUuid
+				&& con.identity?.id 
+				&& identitiesToUpdate.includes(con.identity.id)) {
+				
+				const updateFn = updateFunctionByUUID.get(uuid)
+				if(updateFn) {
+					updateFn.update(sseEvent.dm, JSON.stringify(message))
+					console.log('DM updating', con.identity?.name, con.kind)
+				}
+			}
+		})
 
 	} catch (err) {
 		console.error(err, ctx.request)

@@ -13,6 +13,7 @@ import ConnectionsGraph from "./Connections";
 import type { Connection, DM } from "../server/types"
 import { GitHubSvg } from "./GitHubSvg";
 import { ageTimestamp, diffTime, shortTime } from "./time";
+import { isSelf } from "./data/data";
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
 
@@ -66,48 +67,55 @@ const App = () => {
 		}
 	},)
 
-	const connectedFriends = () => server.connections.filter(c => !isSelf(c) && isFriend(c))
+	const connectedFriends = () => server.connections.filter(c => !hasSelfIdentity(c) && isFriend(c))
 	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
 	const isOnline = (c: Connection) => c.status === 'online'
 	const hasIdentity = (c: Connection) => !!c?.identity
 	const hasPendingFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.toId === c.identity?.id)
 	const hasFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.fromId === c.identity?.id)
 	const isFriend = (c: Connection) => server.friends.some(f => f.friendId === c.identity?.id)
-	const isUnknown = (c: Connection) => !isSelf(c) && !hasSameIdentity(c, server.self()) && !isFriend(c) && (hasIdentity(c) || isOnline(c))
-	const isSelf = (c: Connection) => c.id === server.self()?.id
+	const isUnknown = (c: Connection) => !hasSelfIdentity(c) && !hasSameIdentity(c, server.self()) && !isFriend(c) && (hasIdentity(c) || isOnline(c))
+	const hasSelfIdentity = (c: Connection) => c.id === server.self()?.id
 	const hasSameIdentity = (c1: Connection, c2: Connection) => c1?.identity && c2?.identity && c1?.identity?.id === c2?.identity?.id
 	const hasUnknownConnections = () => server.connections.some(c => isUnknown(c))
 	const canFriendRequest = (c: Connection) =>
 		hasIdentity(server.self())
 		&& hasIdentity(c)
 		&& !hasSameIdentity(c, server.self())
-		&& !isSelf(c)
+		&& !hasSelfIdentity(c)
 		&& !isFriend(c)
 		&& !hasFriendRequest(c)
 		&& !hasPendingFriendRequest(c)
 
 	const onMessageKeyDown = async (e: KeyboardEvent, con: Connection) => {
 		const input = e.target as HTMLTextAreaElement
-		const value = input.value?.trim()
-		if (e.key === 'Enter' && value) {
+		const message = input.value?.trim()
+		if (e.key === 'Enter' && message) {
 			input.value = '';
-			sendDm(con, value);
+			sendDm(con, message);
 		}
 	}
 
 	const onSendButtonClick = async (input: HTMLTextAreaElement, con: Connection) => {
-		const value = input.value?.trim()
-		if (value) {
+		const message = input.value?.trim()
+		if (message) {
 			input.value = '';
-			sendDm(con, value);
+			sendDm(con, message);
 		}
 	}
 
-	async function sendDm(con: Connection, value: string) {
+	async function sendDm(con: Connection, message: string) {
 		try {
 			const self = server.self();
-			await directMessages.sendDm(self.id, self.identity?.name, con, value);
-			updateDmDisplay(con);
+			const dm: DM = {
+				toId: con.id,
+				fromId: self.id,
+				fromName: self.identity?.name,
+				message,
+				kind: "text"
+			}
+			await directMessages.sendDm(dm, con.publicKey);
+			updateDmDisplay(dm);
 		} catch (err) {
 			setDmError(err.message);
 		}
@@ -115,13 +123,21 @@ const App = () => {
 
 
 	directMessages.onNewMessage((dm: DM) => {
-		const con = server.connections.find(c => c.id === dm.fromId)
-		updateDmDisplay(con)
+		updateDmDisplay(dm)
 	})
 
-	async function updateDmDisplay(con: Connection) {
+	async function updateDmDisplay(dm: DM) {
+
+		const fromCon = server.connections.find(c => c.id === dm.fromId)
+		const toCon = server.connections.find(c => c.id === dm.toId)
+		
+		//handle messages from self on a different connection
+		const con = isSelf(fromCon) ? toCon : fromCon
+
 		//update our local display of messages
-		if (con.id === selectedDmTarget()?.id) {
+		const targetId = selectedDmTarget()?.id
+		console.log({ conId: con.id, targetId })
+		if (con.id === targetId) {
 			const messages = await directMessages.getRecentHistory(con.id, con.publicKey)
 			const latestMessage = messages[messages.length - 1]
 			const groupedBySender = directMessages.groupBySender(messages)
@@ -258,11 +274,11 @@ const App = () => {
 											<For each={moreMessages}>{(dm) => {
 												const diff2 = diffTime(dm.timestamp, dm.prevTimestamp)
 												return <>
-												<Show when={diff2}><div class="dm-diffTime">{diff2}</div></Show>
-												<div class="dm-message">
-													<span class="dm-timestamp">{shortTime(dm.timestamp)}</span>
-													<span class="dm-content">{dm.message as string}</span>
-												</div>
+													<Show when={diff2}><div class="dm-diffTime">{diff2}</div></Show>
+													<div class="dm-message">
+														<span class="dm-timestamp">{shortTime(dm.timestamp)}</span>
+														<span class="dm-content">{dm.message as string}</span>
+													</div>
 												</>
 											}
 											}</For>
@@ -284,10 +300,10 @@ const App = () => {
 				</div>
 			</Show>
 			<div class="connections">
-				<Show when={server.connections.some(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+				<Show when={server.connections.some(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
 					<div class='connection-list'>
 						also me
-						<For each={server.connections.filter(c => !isSelf(c) && hasSameIdentity(c, server.self()))}>
+						<For each={server.connections.filter(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
 							{(c) => <div class={`avatar list-item ${c.status}`}>
 								<Show when={c.identity}>
 									<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />

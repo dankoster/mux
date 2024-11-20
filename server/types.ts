@@ -93,6 +93,7 @@ export type DM = {
 	fromName?: string,
 	timestamp?: number,
 	message: string | EncryptedMessage, 
+	kind: 'key-share'|'text'
 }
 
 export type EncryptedMessage = { iv: string, data: string }
@@ -108,4 +109,9 @@ export type DMRequest = {
 	qty?: number,
 	timestamp: number,
 	conId: string
+}
+
+export type JwkPair = {
+	privateJwk: JsonWebKey,
+	publicJwk: JsonWebKey
 }

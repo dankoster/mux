@@ -3,7 +3,7 @@ import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
 import { apiRoute, DELETE, POST } from "./http";
-import { handleNewDirectMessage, getAllUnread } from "./directMessages";
+import { handleNewDirectMessage, getAllUnread, sendDm, sharePrivateKey } from "./directMessages";
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
@@ -47,7 +47,9 @@ export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
 
-
+export function isSelf(con: Connection) {
+	return con.identity && con.identity?.id === self().identity?.id
+}
 
 initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 
@@ -121,12 +123,6 @@ type SSEventPayload = {
 	id?: string;
 	retry?: string;
 }
-// const payload: { [Property in Required<keyof SSEventPayload>]: Property } = {
-// 	id: "id",
-// 	data: "data",
-// 	retry: "retry",
-// 	event: "event"
-// }
 
 export function githubAuthUrl() {
 	//https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
@@ -209,14 +205,6 @@ export function onWebRtcMessage(callback: (message: { senderId: string, message:
 	return ac
 }
 
-// export function onDM(callback: (dm: DM) => void) {
-// 	const ac = new AbortController()
-// 	SSEvents.addEventListener(sse.dm, async (e: CustomEvent) => {
-// 		callback(e.detail)
-// 	}, { signal: ac.signal })
-// 	return ac
-// }
-
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.pk:
@@ -255,7 +243,7 @@ function handleSseEvent(event: SSEventPayload) {
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData)
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
-			updateConnectionCounts()
+			onConnectionsChanged()
 			getAllUnread(friends, connections)
 			console.log('SSE', event.event, conData);
 			break;
@@ -267,7 +255,10 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.reconnect:
 			throw "reconnect requested by server"
 		case sse.refresh:
-			location.reload()
+			console.log("REFRESH")
+			setTimeout(() => {
+				location.reload()
+			}, 100);
 			break;
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
@@ -280,7 +271,7 @@ function handleSseEvent(event: SSEventPayload) {
 			if (!(index >= 0)) throw new Error(`${update.connectionId} not found in connections`)
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
-			updateConnectionCounts()
+			onConnectionsChanged()
 			break;
 		case sse.new_room:
 			const newRoom = JSON.parse(event.data) as Room
@@ -305,14 +296,14 @@ function handleSseEvent(event: SSEventPayload) {
 			const newCon = JSON.parse(event.data) as Connection
 			console.log('SSE', event.event, newCon)
 			setConnections(connections.length, newCon)
-			updateConnectionCounts()
+			onConnectionsChanged()
 			console.log(connections)
 			break;
 		case sse.delete_connection:
 			const conId = event.data
 			console.log('SSE', event.event, conId)
 			setConnections(connections.filter(con => con.id !== conId))
-			updateConnectionCounts()
+			onConnectionsChanged()
 			break;
 		case sse.friendRequest:
 			const frenReq = JSON.parse(event.data)
@@ -341,8 +332,7 @@ function handleSseEvent(event: SSEventPayload) {
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			const con = connections.find(c => c.id === dm.fromId)
-			handleNewDirectMessage(con, dm);
+			handleNewDirectMessage(dm);
 			break;
 
 		default:
@@ -363,7 +353,24 @@ export function sendWebRtcMessage(userId: string, message: string) {
 	return POST(apiRoute.webRTC, { subRoute: userId, body: message })
 }
 
-function updateConnectionCounts() {
+function onConnectionsChanged() {
+	//do we have another connection with the same identity as myself?
+	connections.forEach(con => {
+		const me = self()
+		if (me.identity &&
+			con.id !== me.id &&
+			con.status === 'online' &&
+			con.identity &&
+			con.identity.source === me.identity.source &&
+			con.identity.id === me.identity.id
+		) {
+			const dateCreated = new Date(Number.parseInt(con.id))
+			const kind = con.id === me.id ? "myself" : con.kind
+			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()} ${con.publicKey ? 'YES key' : 'NO key'}`)
+			sharePrivateKey(me.id, con)
+		}
+	})
+
 	setStats({
 		online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
 		offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
