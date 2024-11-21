@@ -9,32 +9,50 @@ I'm working toward a group chat service similar to [Discord](https://discord.com
 All from scratch. No dependencies. No AI.\
 Because building stuff is fun.
 
-Here's where we're at:
+Currently workign on: 
+- Learning [three.js](https://threejs.org/) to make [something fun](https://dgreenheck.github.io/threejs-procedural-planets/)
+
+---
+
+New-to-me learning for this project:
 - Peer-to-peer video chat using [webRTC](https://webrtc.org/)
 - [GitHub Oauth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps) integration for user identity (more to come later)
 - Friends with request/accept mechanics (for authenticated uesrs)
 - Direct messages and offline messages between friends with end-to-end [AES-GCM encryption](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
-- D3 [force](https://d3js.org/d3-force) visualization of online users (a placeholder for a more robust game-like world in [three.js](https://threejs.org/))
-- A touch of [SolidJS](https://www.solidjs.com/), [Typescript](https://www.typescriptlang.org/), [D3](https://d3js.org), and [CSS](https://www.kevinpowell.co/resources/#css) on the frontend
-- [SQLite](https://sqlite.org/) and [Deno](https://deno.com/) on the backend
+- [D3 force](https://d3js.org/d3-force) visualization of online users 
+- [SolidJS](https://www.solidjs.com/) (vanilla JS would actually have been easier)
+- [SQLite](https://sqlite.org/) (There is a LOT of [T-SQL](https://en.wikipedia.org/wiki/Transact-SQL) in my past)
+- [Deno](https://deno.com/)... `"node".split('').sort().join('')`
 - Hosted in a tiny droplet of the [Digital Ocean](https://www.digitalocean.com/) 
+
+
 
 ------
 
 
-### iteration 4 [WIP]
-> Good end-to-end encryption, offline messages, and... WIP
+### iteration 5 [WIP]
+> UI work and 3D experimentation
 
-I changed my cryptography standard to [ECDH](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey#ecdh)-[AES-GCM](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt#aes-gcm).
+I have figured out a bunch of foundational pieces like hosting, video calling, and e2e encryption. 
 
-Implemented fairly robust direct message functionality
-- Direct messages are now end-to-end encrypted with a securely shared key. This means that the messages can go through the server but only be read by the users. 
-- unread messages from friends are automatically fetched when loading
+Now I want to do some UI work and have some fun with 3D stuff. 
+
+------
+
+
+### iteration 4
+> Good end-to-end encryption, offline messages, and private key sharing
+
+I changed my cryptography standard to [ECDH](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey#ecdh)-[AES-GCM](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt#aes-gcm) and implemented fairly robust direct message functionality.
+- Private keys are securely shared between connections that authenticate as the same identity.
+- Direct messages are now end-to-end encrypted with a securely shared key.
+- Unread messages from friends are automatically fetched when loading
 - Unread message counts are displayed for each friend
-- When opening a chat with unread messages, get all unread PLUS additional history if the number of unread messages is below a minimum threshold. 
+- When opening a chat with unread messages, get all unread PLUS additional history if the number of unread messages is below a minimum threshold.
+- I also added a discord-like UI layout that looks pretty good.
 
-Time to clean up the UI...\
-Then [push notifications](https://developer.mozilla.org/en-US/docs/Web/API/Push_API)! 
+Implemented private key sharing for when you connect to the server from multiple devices that have authenticated as the same identity. All connections by the same identity end up with the same private key, allowing for end-to-end encrypted direct messages between users when the users switch devices. This implementation is a bit hacky right now because direct messages are stored on the server by connection, not by identity... but should be fairly easy to clean up in the future. 
+
 
 ------
 ### iteration 3

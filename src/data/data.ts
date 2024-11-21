@@ -256,9 +256,7 @@ function handleSseEvent(event: SSEventPayload) {
 			throw "reconnect requested by server"
 		case sse.refresh:
 			console.log("REFRESH")
-			setTimeout(() => {
-				location.reload()
-			}, 100);
+			location.reload()
 			break;
 		case sse.update:
 			const update = JSON.parse(event.data) as Update

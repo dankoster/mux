@@ -4,7 +4,8 @@
     "@std/assert": "jsr:@std/assert@^1.0.6",
     "solid-js": "npm:solid-js@^1.8.23",
     "solid-primitives/deep": "npm:@solid-primitives/deep@^0.2.9",
-    "d3": "npm:@types/d3"
+    "d3": "npm:@types/d3",
+    "three": "npm:@types/three"
   },
   "compilerOptions": {
     "lib": [

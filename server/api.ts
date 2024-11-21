@@ -64,7 +64,7 @@ console.log('got connections', connectionByUUID)
 
 if (Deno.env.get('ENVIRONMENT') === 'local') {
 	console.log('LOCAL BUILD watching for frontend changes...')
-	onLocalBuild('./dist', () => {
+	onLocalBuild('./dist', 1000, () => {
 		console.log('LOCAL BUILD! Tell all connections to refresh...')
 		//tell all connections to reload the page
 		updateFunctionByUUID.forEach(updater => updater.update(sseEvent.refresh))
@@ -598,22 +598,6 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		ctx.response.body = message
 
 		//TODO: send push notification (perhaps have an updater that does this?)
-
-		// const updater = updateFunctionByUUID.get(toUuid)
-		// if (updater) {
-		// 	console.log('DM updating', toCon.identity?.name, toCon.kind)
-		// 	updater.update(sseEvent.dm, JSON.stringify(message))
-		// 	// console.log('DM SENT', `${message.timestamp}: ${message.fromId} -> ${message.toId}`)
-		// }
-
-		// connectionByUUID.forEach((con2, uuid2) => {
-		// 	if(fromCon.id !== con2.id
-		// 		&& con2.identity 
-		// 		&& con2.identity?.id === fromCon.identity?.id) {
-		// 			console.log('DM also updating', con2.identity?.name, con2.kind)
-		// 			updateFunctionByUUID.get(uuid2)?.update(sseEvent.dm, JSON.stringify(message))
-		// 	}
-		// })
 
 		//update all connections owned by the sender or the receiver, except the intitial sender.
 		const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
