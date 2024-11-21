@@ -17,7 +17,7 @@ import { isSelf } from "./data/data";
 import { Planet } from "./planet";
 
 type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
-type SelectedView = 'people' | 'chat' | 'call' | '3d' | 'graph'
+type SelectedView = 'chat' | 'call' | '3d' | 'graph'
 
 const App = () => {
 
@@ -51,6 +51,12 @@ const App = () => {
 		console.log('Call started!')
 		setCallState("call_ready")
 	}
+
+	createEffect(() => {
+		if(selectedView() === 'chat') {
+			scrollLatestMessageIntoView()
+		}
+	})
 
 	createEffect(() => {
 		trackStore(server.connections)
@@ -146,6 +152,7 @@ const App = () => {
 			const latestMessage = messages[messages.length - 1]
 			const groupedBySender = directMessages.groupBySender(messages)
 			setDmList(groupedBySender)
+			scrollLatestMessageIntoView()
 			directMessages.setLastReadTimestamp(con.id, latestMessage.timestamp)
 		}
 	}
@@ -179,6 +186,7 @@ const App = () => {
 
 			const groupedBySender = directMessages.groupBySender(history)
 			setDmList(groupedBySender)
+			scrollLatestMessageIntoView()
 			directMessages.setLastReadNow(con.id)
 
 			console.log('lastReadDmByConId', lastRead)
@@ -186,6 +194,12 @@ const App = () => {
 			setDmError(err.message)
 		}
 	}
+
+	const scrollLatestMessageIntoView = () => {
+		const dmElements = Array.from(document.getElementsByClassName('dm'));
+		dmElements[dmElements.length - 1]?.scrollIntoView({ behavior: "smooth", block: "end", inline: "nearest" });
+	}
+		
 
 	const logout = () => {
 		showDmConversation(null)
@@ -240,63 +254,123 @@ const App = () => {
 				<Show when={selectedView() === 'graph'}>
 					<ConnectionsGraph self={server.self()} connections={server.connections} />
 				</Show>
-				<Show when={selectedView() === 'people'}>
-					<div class="connections">
-						<Show when={server.connections.some(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
-							<div class='connection-list'>
-								also me
-								<For each={server.connections.filter(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={c.identity}>
-											<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
+				<Show when={selectedView() === 'chat'}>
+					<div class="chat">
+						<Show when={!selectedDmTarget()}>
+							<div class="connections">
+								<Show when={server.connections.some(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
+									<div class='connection-list'>
+										also me
+										<For each={server.connections.filter(c => !hasSelfIdentity(c) && hasSameIdentity(c, server.self()))}>
+											{(c) => <div class={`avatar list-item ${c.status}`}>
+												<Show when={c.identity}>
+													<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
+												</Show>
+												{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+												{c.identity?.name || `guest`} ({c.kind})
+											</div>
+											}
+										</For>
 									</div>
-									}
-								</For>
-							</div>
-						</Show>
-						<Show when={connectedFriends().length > 0}>
-							<div class='connection-list'>
-								friends
-								<For each={connectedFriends()}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={c.identity}>
-											<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
+								</Show>
+								<Show when={connectedFriends().length > 0}>
+									<div class='connection-list'>
+										friends
+										<For each={connectedFriends()}>
+											{(c) => <div class={`avatar list-item ${c.status}`}>
+												<Show when={c.identity}>
+													<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
+												</Show>
+												{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+												{c.identity?.name || `guest`} ({c.kind})
 
-										<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
-										<div>{unreadLabel(c)}</div>
-									</div>}
-								</For>
+												<button class="dm-button" onclick={() => showDmConversation(c)}>💬</button>
+												<div>{unreadLabel(c)}</div>
+											</div>}
+										</For>
+									</div>
+								</Show>
+								<Show when={hasUnknownConnections()}>
+									<div class='connection-list'>
+										others
+										<For each={server.connections.filter(c => isUnknown(c))}>
+											{(c) => <div class={`avatar list-item ${c.status}`}>
+												<Show when={!c.identity}>
+													<div class="avatar-color" style={{ "background-color": c.color }}></div>
+												</Show>
+												<Show when={c.identity}>
+													<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
+												</Show>
+												{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
+												{c.identity?.name || `guest`} ({c.kind})
+												<Show when={hasPendingFriendRequest(c)}><span>👋</span></Show>
+												<Show when={canFriendRequest(c)}>
+													<button onClick={() => server.sendFriendRequest(c)}>friend request</button>
+												</Show>
+												<Show when={hasFriendRequest(c)}>
+													<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
+												</Show>
+											</div>
+											}
+										</For>
+									</div>
+								</Show>
 							</div>
 						</Show>
-						<Show when={hasUnknownConnections()}>
-							<div class='connection-list'>
-								others
-								<For each={server.connections.filter(c => isUnknown(c))}>
-									{(c) => <div class={`avatar list-item ${c.status}`}>
-										<Show when={!c.identity}>
-											<div class="avatar-color" style={{ "background-color": c.color }}></div>
-										</Show>
-										<Show when={c.identity}>
-											<img alt={c.identity?.name} class="avatar-image" src={c?.identity?.avatar_url} />
-										</Show>
-										{/* {c.identity?.id ? `[${c.identity.id}] ` : `[${c.id?.substring(c.id.length - 4)}] `} */}
-										{c.identity?.name || `guest`} ({c.kind})
-										<Show when={hasPendingFriendRequest(c)}><span>👋</span></Show>
-										<Show when={canFriendRequest(c)}>
-											<button onClick={() => server.sendFriendRequest(c)}>friend request</button>
-										</Show>
-										<Show when={hasFriendRequest(c)}>
-											<button onClick={() => server.acceptFriendRequest(c)}>accept friend request</button>
-										</Show>
+						<Show when={selectedDmTarget()}>
+							<div class="dm-chat">
+								<div class="dm-header">
+									<span>Chat with {selectedDmTarget()?.identity?.name}</span>
+									<button onclick={() => showDmConversation(null)}>close</button>
+								</div>
+								<Show when={dmError()}>ERROR: {dmError()}</Show>
+								<Show when={!dmError()}>
+									<div class="dm-list">
+										<For each={dmList()}>
+											{dmGroup => {
+												const firstMessage = dmGroup[0]
+												const diff = diffTime(firstMessage.timestamp, firstMessage.prevTimestamp)
+												const moreMessages = dmGroup.slice(1)
+												return <>
+													<Show when={diff}><div class="dm-diffTime">{diff}</div></Show>
+													<div class="dm">
+														<div class="dm-avatar">
+															<img alt={firstMessage.fromName} src={avatarUrl(firstMessage.fromId)} />
+														</div>
+														<div class="dm-first-message">
+															<div class="dm-sender">
+																{firstMessage.fromName || firstMessage.fromId}
+															</div>
+															<div class="dm-timestamp">
+																{ageTimestamp(firstMessage.timestamp)}
+															</div>
+															<div class="dm-content">{firstMessage.message as string}</div>
+														</div>
+														<For each={moreMessages}>{(dm) => {
+															const diff2 = diffTime(dm.timestamp, dm.prevTimestamp)
+															return <>
+																<Show when={diff2}><div class="dm-diffTime">{diff2}</div></Show>
+																<div class="dm-message">
+																	<span class="dm-timestamp">{shortTime(dm.timestamp)}</span>
+																	<span class="dm-content">{dm.message as string}</span>
+																</div>
+															</>
+														}
+														}</For>
+													</div>
+												</>
+											}}
+										</For>
 									</div>
-									}
-								</For>
+									<div class="dm-send">
+										<input
+											class='dm-send-input'
+											type="text"
+											placeholder={`Message ${selectedDmTarget()?.identity?.name}...`}
+											onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
+										<button class='dm-send-button' onclick={(e) => onSendButtonClick(e.target.previousElementSibling as HTMLTextAreaElement, selectedDmTarget())}>⏎</button>
+									</div>
+								</Show>
 							</div>
 						</Show>
 					</div>
@@ -322,61 +396,6 @@ const App = () => {
 						room={room()}
 						connections={connectionsInRoom()} />
 				</Show>
-				<Show when={selectedView() === 'chat'}>
-					<div class="dm-chat">
-						<h2>Chat with {selectedDmTarget().identity?.name}</h2>
-						<Show when={dmError()}>ERROR: {dmError()}</Show>
-						<Show when={!dmError()}>
-							<span onclick={() => showDmConversation(null)}>close</span>
-							<div class="dm-list">
-								<For each={dmList()}>
-									{dmGroup => {
-										const firstMessage = dmGroup[0]
-										const diff = diffTime(firstMessage.timestamp, firstMessage.prevTimestamp)
-										const moreMessages = dmGroup.slice(1)
-										return <>
-											<Show when={diff}><div class="dm-diffTime">{diff}</div></Show>
-											<div class="dm">
-												<div class="dm-avatar">
-													<img alt={firstMessage.fromName} src={avatarUrl(firstMessage.fromId)} />
-												</div>
-												<div class="dm-first-message">
-													<div class="dm-sender">
-														{firstMessage.fromName || firstMessage.fromId}
-													</div>
-													<div class="dm-timestamp">
-														{ageTimestamp(firstMessage.timestamp)}
-													</div>
-													<div class="dm-content">{firstMessage.message as string}</div>
-												</div>
-												<For each={moreMessages}>{(dm) => {
-													const diff2 = diffTime(dm.timestamp, dm.prevTimestamp)
-													return <>
-														<Show when={diff2}><div class="dm-diffTime">{diff2}</div></Show>
-														<div class="dm-message">
-															<span class="dm-timestamp">{shortTime(dm.timestamp)}</span>
-															<span class="dm-content">{dm.message as string}</span>
-														</div>
-													</>
-												}
-												}</For>
-											</div>
-										</>
-									}}
-								</For>
-							</div>
-							<div class="dm-send">
-								<input
-									class='dm-send-input'
-									type="text"
-									placeholder={`Message ${selectedDmTarget().identity?.name}...`}
-									onKeyDown={(e) => onMessageKeyDown(e, selectedDmTarget())} />
-								<button class='dm-send-button' onclick={(e) => onSendButtonClick(e.target.previousElementSibling as HTMLTextAreaElement, selectedDmTarget())}>⏎</button>
-							</div>
-							<span class='latest-dm' id={`con${selectedDmTarget().id}`}></span>
-						</Show>
-					</div>
-				</Show>
 			</div>
 
 
@@ -390,7 +409,7 @@ const App = () => {
 					{!server.self()?.roomId &&
 						<button class="room-button" onclick={() => setSelectedView('call')}>call</button>
 					}
-					<button class="room-button" onclick={() => setSelectedView('people')}>people</button>
+					<button class="room-button" onclick={() => setSelectedView('chat')}>chat</button>
 					<button class="room-button" onclick={() => setSelectedView('3d')}>3D</button>
 					<button class="room-button" onclick={() => setSelectedView('graph')}>graph</button>
 				</div>
