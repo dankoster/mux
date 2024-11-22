@@ -1,13 +1,11 @@
 import "./main.css"
 
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
-import { trackStore } from "@solid-primitives/deep";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { render } from "solid-js/web";
 
 import * as server from "./data/data";
 import * as directMessages from "./data/directMessages";
 
-import VideoCall from "./VideoCall";
 import ConnectionsGraph from "./Connections";
 
 import type { Connection, DM } from "../server/types"
@@ -15,70 +13,41 @@ import { GitHubSvg } from "./GitHubSvg";
 import { ageTimestamp, diffTime, shortTime } from "./time";
 import { isSelf } from "./data/data";
 import { Planet } from "./planet";
+import { JSX } from "solid-js/jsx-runtime";
+import { Call } from "./Call";
 
-type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "call_connected"
-type SelectedView = 'chat' | 'call' | '3d' | 'graph'
+type SelectedView = 'people' | 'call' | 'planet' | 'graph'
 
-const App = () => {
+render(() => <App />, document.body)
 
-	const [callState, setCallState] = createSignal<CallState>("no_call")
+function App() {
+
 	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
 	const [dmList, setDmList] = createSignal<directMessages.groupedDM[][]>([], { equals: false })
 	const [dmError, setDmError] = createSignal("")
-	const [selectedView, setSelectedView] = createSignal<SelectedView>()
+	const [selectedView, setSelectedView] = createSignal<SelectedView>("people")
 
-
-	const exitRoom = async (roomId: string) => {
-		console.log('exit room...')
-		const response = await server.exitRoom(roomId)
-		console.log('...exit room', response.ok)
-
-		setCallState("no_call")
-	}
-
-	const room = createMemo(() => server.rooms.find(r => r.id === server.self()?.roomId))
-
-	const startCall = async () => {
-		setCallState("server_wait")
-		const room = await server.createRoom()
-
-		if (!room.id) {
-			console.error("error creating room!", room)
-			setCallState("server_error")
-			return
-		}
-
-		console.log('Call started!')
-		setCallState("call_ready")
+	const primaryView: Record<SelectedView, () => JSX.Element> = {
+		people: undefined,
+		call: () => <Call />,
+		planet: () => <Planet />,
+		graph: () => <ConnectionsGraph self={server.self()} connections={server.connections} />
 	}
 
 	createEffect(() => {
-		if(selectedView() === 'chat') {
+		if (selectedView() === 'people') {
 			scrollLatestMessageIntoView()
 		}
 	})
 
 	createEffect(() => {
-		trackStore(server.connections)
-
-		// get raw connection objects out of the SolidJS Signal where they are proxies
-		const connections = server.self()?.roomId && server.connections
-			.map(node => Object.assign({}, node))
-			.filter(node => node.roomId === server.self()?.roomId)
-
-		//figure out how many connections are in the user's room
-		if (!connections) {
-			setCallState("no_call")
-		} else if (connections?.length === 1) {
-			setCallState("call_ready")
-		} else if (connections?.length > 1) {
-			setCallState("call_connected")
+		if (server.self()?.roomId) {
+			setSelectedView('call')
 		}
-	},)
+	})
 
-	const connectionsInRoom = () => server.connections.filter(sc => server.self()?.roomId && sc.id != server.self()?.id && sc.roomId === server.self()?.roomId)
+
 	const connectedFriends = () => server.connections.filter(c => !hasSelfIdentity(c) && isFriend(c))
-	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
 	const isOnline = (c: Connection) => c.status === 'online'
 	const hasIdentity = (c: Connection) => !!c?.identity
 	const hasPendingFriendRequest = (c: Connection) => server.friendRequests.some(fr => fr.toId === c.identity?.id)
@@ -199,7 +168,7 @@ const App = () => {
 		const dmElements = Array.from(document.getElementsByClassName('dm'));
 		dmElements[dmElements.length - 1]?.scrollIntoView({ behavior: "smooth", block: "end", inline: "nearest" });
 	}
-		
+
 
 	const logout = () => {
 		showDmConversation(null)
@@ -247,14 +216,11 @@ const App = () => {
 			</div>
 
 
-			<div class={`middle ${callState()}`}>
-				<Show when={selectedView() === '3d'}>
-					<Planet />
+			<div class={`middle`}>
+				<Show when={selectedView() !== 'people'}>
+					{primaryView[selectedView()]()}
 				</Show>
-				<Show when={selectedView() === 'graph'}>
-					<ConnectionsGraph self={server.self()} connections={server.connections} />
-				</Show>
-				<Show when={selectedView() === 'chat'}>
+				<Show when={selectedView() === 'people'}>
 					<div class="chat">
 						<Show when={!selectedDmTarget()}>
 							<div class="connections">
@@ -375,42 +341,14 @@ const App = () => {
 						</Show>
 					</div>
 				</Show>
-				<Show when={selectedView() === 'call'}>
-
-					<Show when={callState() === "no_call"}>
-						<div class="centered-content">
-							<button class="room-button" onclick={startCall}>start a public call</button>
-						</div>
-					</Show>
-					<Show when={callState() === "server_wait"}>
-						<div class="call_state_message">waiting for server... hit [start call] to retry.</div>
-					</Show>
-					<Show when={callState() === "server_error"}>
-						<div class="call_state_message">the server is unhappy... please refresh!</div>
-					</Show>
-					<Show when={callState() === "call_ready"}>
-						<div class="call_state_message">waiting for someone else to join...</div>
-					</Show>
-					<VideoCall
-						user={server.self()}
-						room={room()}
-						connections={connectionsInRoom()} />
-				</Show>
 			</div>
 
 
 			<div class="toolbar">
 				<div class="buttons">
-					{server.self()?.roomId &&
-						<button class="room-button" onclick={() => exitRoom(server.self()?.roomId)}>
-							{isRoomOwner(server.self()) ? "End" : "Leave"} call
-						</button>
-					}
-					{!server.self()?.roomId &&
-						<button class="room-button" onclick={() => setSelectedView('call')}>call</button>
-					}
-					<button class="room-button" onclick={() => setSelectedView('chat')}>chat</button>
-					<button class="room-button" onclick={() => setSelectedView('3d')}>3D</button>
+					<button class="room-button" onclick={() => setSelectedView('call')}>call</button>
+					<button class="room-button" onclick={() => setSelectedView('people')}>people</button>
+					<button class="room-button" onclick={() => setSelectedView('planet')}>3D</button>
 					<button class="room-button" onclick={() => setSelectedView('graph')}>graph</button>
 				</div>
 			</div>
@@ -419,4 +357,3 @@ const App = () => {
 	</>
 };
 
-render(() => <App />, document.body)

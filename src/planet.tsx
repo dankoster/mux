@@ -1,4 +1,4 @@
-import { onMount } from 'solid-js';
+import { onCleanup, onMount } from 'solid-js';
 import * as THREE from 'three';
 import './planet.css'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -27,38 +27,44 @@ export function Planet() {
 		scene.add(cube);
 
 		const twoPi = Math.PI * 2;
-		const sphere = {
+		const sphereParams = {
 			radius: 8,
-			widthSegments: 32,
-			heightSegments: 16,
+			widthSegments: 36,
+			heightSegments: 18,
 			phiStart: 0,
 			phiLength: twoPi,
 			thetaStart: 0,
 			thetaLength: Math.PI
 		};
 		const sphereGeo = new THREE.SphereGeometry(
-			sphere.radius,
-			sphere.widthSegments,
-			sphere.heightSegments,
-			sphere.phiStart,
-			sphere.phiLength,
-			sphere.thetaStart,
-			sphere.thetaLength
+			sphereParams.radius,
+			sphereParams.widthSegments,
+			sphereParams.heightSegments,
+			sphereParams.phiStart,
+			sphereParams.phiLength,
+			sphereParams.thetaStart,
+			sphereParams.thetaLength
 		)
-		const sphereWireGeo = new THREE.WireframeGeometry(sphereGeo);
+		const sphereWireGeo = new THREE.EdgesGeometry(sphereGeo);
+		const sphereLineMat = new THREE.LineBasicMaterial({
+			color: 0xffffff,
+			transparent: true,
+			opacity: 0.5
+		});
+		const meshMaterial = new THREE.MeshPhongMaterial({
+			color: 0x156289,
+			emissive: 0x072534,
+			side: THREE.DoubleSide,
+			flatShading: true
+		});
+
+		const sphere = new THREE.Group();
+		sphere.add(new THREE.LineSegments(sphereWireGeo, sphereLineMat));
+		sphere.add(new THREE.Mesh(sphereGeo, meshMaterial));
+		scene.add(sphere);
 
 
-		const group = new THREE.Group();
-
-		// const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-		const meshMaterial = new THREE.MeshPhongMaterial({ color: 0x156289, emissive: 0x072534, side: THREE.DoubleSide, flatShading: true });
-
-		// group.add(new THREE.LineSegments(sphereWireGeo, lineMaterial));
-		group.add(new THREE.Mesh(sphereGeo, meshMaterial));
-		scene.add(group);
-
-
-		const orbit = new OrbitControls( camera, renderer.domElement );
+		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
 
 		const lights = [];
@@ -78,8 +84,8 @@ export function Planet() {
 			// cube.rotation.x = time / 2000;
 			// cube.rotation.y = time / 1000;
 
-			group.rotation.x += 0.005;
-			group.rotation.y += 0.005;
+			//sphere.rotation.x += 0.005;
+			sphere.rotation.y += 0.0005;
 
 
 			renderer.render(scene, camera);
@@ -94,8 +100,15 @@ export function Planet() {
 		}
 
 		updateSize()
+		
+		resizeUpdateFn = updateSize
+		window.addEventListener('resize', resizeUpdateFn)
+	})
 
-		window.addEventListener('resize', (e) => { updateSize() })
+	let resizeUpdateFn: () => void
+	
+	onCleanup(() => {
+		window.removeEventListener('resize', resizeUpdateFn)
 	})
 
 	return <div class="planet" ref={planetDiv}>
