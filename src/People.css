@@ -1,0 +1,5 @@
+.people {
+	display: grid;
+	grid-template-columns: min-content 1fr;
+	overflow: auto;
+}
