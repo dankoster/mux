@@ -20,7 +20,7 @@ render(() => <App />, document.body)
 
 function App() {
 
-	const [selectedView, setSelectedView] = createSignal<SelectedView>("people")
+	const [selectedView, setSelectedView] = createSignal<SelectedView>("planet")
 	const [selectedSecondaryView, setSelectedSecondaryView] = createSignal<JSX.Element>()
 
 	const primaryView: Record<SelectedView, () => JSX.Element> = {

@@ -3,66 +3,69 @@ import * as THREE from 'three';
 import './planet.css'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
+
+function makeCube(size: number, color: number, x: number) {
+	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
+	const boxGeometry = new THREE.BoxGeometry(size, size, size);
+	const cube = new THREE.Mesh(boxGeometry, material);
+	cube.position.x = x;
+	return cube;
+}
+
+function makeSphere(radius: number, color: number) {
+	const sphereParams = {
+		radius: radius,
+		widthSegments: 36,
+		heightSegments: 18,
+		phiStart: 0,
+		phiLength: Math.PI * 2,
+		thetaStart: 0,
+		thetaLength: Math.PI
+	};
+	const sphereGeo = new THREE.SphereGeometry(
+		sphereParams.radius,
+		sphereParams.widthSegments,
+		sphereParams.heightSegments,
+		sphereParams.phiStart,
+		sphereParams.phiLength,
+		sphereParams.thetaStart,
+		sphereParams.thetaLength
+	)
+	const sphereWireGeo = new THREE.EdgesGeometry(sphereGeo);
+	const sphereLineMat = new THREE.LineBasicMaterial({
+		color: 0xffffff,
+		transparent: true,
+		opacity: 0.5
+	});
+	const meshMaterial = new THREE.MeshPhongMaterial({
+		color,
+		emissive: 0x072534,
+		side: THREE.DoubleSide,
+		flatShading: true
+	});
+
+	const sphere = new THREE.Group();
+	sphere.add(new THREE.LineSegments(sphereWireGeo, sphereLineMat));
+	sphere.add(new THREE.Mesh(sphereGeo, meshMaterial));
+
+	return sphere
+}
+
 export function Planet() {
 
-	let planetDiv: HTMLDivElement
+	let planetCanvas: HTMLCanvasElement
 
 	onMount(() => {
-
-
-
-		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-		renderer.setSize(window.innerWidth, planetDiv.offsetHeight);
-		renderer.setAnimationLoop(animate);
-		planetDiv.appendChild(renderer.domElement);
-
+		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
 		const scene = new THREE.Scene();
-
-		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetDiv.offsetHeight, 0.01, 1000);
+		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
 		camera.position.z = 20;
 
-		const boxGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-		const material = new THREE.MeshNormalMaterial();
-		const cube = new THREE.Mesh(boxGeometry, material);
+		const cube = makeCube(0.2, 0x44aa88, 0)
 		scene.add(cube);
 
-		const twoPi = Math.PI * 2;
-		const sphereParams = {
-			radius: 8,
-			widthSegments: 36,
-			heightSegments: 18,
-			phiStart: 0,
-			phiLength: twoPi,
-			thetaStart: 0,
-			thetaLength: Math.PI
-		};
-		const sphereGeo = new THREE.SphereGeometry(
-			sphereParams.radius,
-			sphereParams.widthSegments,
-			sphereParams.heightSegments,
-			sphereParams.phiStart,
-			sphereParams.phiLength,
-			sphereParams.thetaStart,
-			sphereParams.thetaLength
-		)
-		const sphereWireGeo = new THREE.EdgesGeometry(sphereGeo);
-		const sphereLineMat = new THREE.LineBasicMaterial({
-			color: 0xffffff,
-			transparent: true,
-			opacity: 0.5
-		});
-		const meshMaterial = new THREE.MeshPhongMaterial({
-			color: 0x156289,
-			emissive: 0x072534,
-			side: THREE.DoubleSide,
-			flatShading: true
-		});
-
-		const sphere = new THREE.Group();
-		sphere.add(new THREE.LineSegments(sphereWireGeo, sphereLineMat));
-		sphere.add(new THREE.Mesh(sphereGeo, meshMaterial));
+		const sphere = makeSphere(8, 0x156289)
 		scene.add(sphere);
-
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
@@ -76,41 +79,42 @@ export function Planet() {
 		lights[1].position.set(100, 200, 100);
 		lights[2].position.set(- 100, - 200, - 100);
 
-		scene.add(lights[0]);
-		scene.add(lights[1]);
-		scene.add(lights[2]);
+		for (const light of lights) {
+			scene.add(light)
+		}
 
-		function animate(time) {
-			// cube.rotation.x = time / 2000;
-			// cube.rotation.y = time / 1000;
+		function render(time: number) {
+			time *= 0.001;  // convert time to seconds
 
-			//sphere.rotation.x += 0.005;
+			cube.rotation.x = time;
+			cube.rotation.y = time;
 			sphere.rotation.y += 0.0005;
 
+			const resized = resizeRendererToDisplaySize()
+			if (resized) {
+				const canvas = renderer.domElement;
+				camera.aspect = canvas.clientWidth / canvas.clientHeight;
+				camera.updateProjectionMatrix();
+			}
 
 			renderer.render(scene, camera);
-		}
 
-		function updateSize() {
-			const width = document.getElementsByTagName("html")[0].clientWidth
-			const height = planetDiv.offsetHeight - 1
-			camera.aspect = width / height
-			camera.updateProjectionMatrix()
-			renderer.setSize(width, height);
+			requestAnimationFrame(render);
 		}
+		requestAnimationFrame(render);
 
-		updateSize()
-		
-		resizeUpdateFn = updateSize
-		window.addEventListener('resize', resizeUpdateFn)
+		function resizeRendererToDisplaySize() {
+			const canvas = renderer.domElement;
+			const width = canvas.parentElement.clientWidth;
+			const height = canvas.parentElement.clientHeight;
+			const needResize = canvas.width !== width || canvas.height !== height;
+			if (needResize) {
+				console.log('setSize', width - canvas.width, height - canvas.height)
+				renderer.setSize(width, height, false);
+			}
+			return needResize;
+		}
 	})
 
-	let resizeUpdateFn: () => void
-	
-	onCleanup(() => {
-		window.removeEventListener('resize', resizeUpdateFn)
-	})
-
-	return <div class="planet" ref={planetDiv}>
-	</div>
+	return <canvas id="planet" class="planet" ref={planetCanvas}></canvas>
 }
