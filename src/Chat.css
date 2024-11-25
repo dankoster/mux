@@ -1,12 +1,24 @@
+.connections {
+	border-right: 1px solid var(--separator-color);
+
+	@media (max-width: 700px) {
+		overflow: auto;
+		border-right: initial;
+	}
+
+	.connection-list {
+		margin-top: 0.5rem;
+	}
+
+}
+
 .chat {
 	display: grid;
 	overflow: auto;
 
-	.connections {
-
-		.connection-list {
-			margin-top: 0.5rem;
-		}
+	@media (max-width: 700px) {
+		border-top: 1px solid var(--separator-color);
+		margin-top: 1rem;
 	}
 
 }
@@ -15,8 +27,11 @@
 .dm-chat {
 	display: grid;
 	grid-template-rows: min-content 1fr min-content;
-	padding: 0.5rem;
 	overflow: auto;
+
+	.dm-scrolling {
+		overflow: auto;
+	}
 
 	.dm-header {
 		display: flex;
@@ -30,6 +45,7 @@
 	.dm-list {
 		display: grid;
 		grid-template-columns: min-content 1fr;
+		place-content: end;
 		overflow: auto;
 
 		.dm-diffTime {
@@ -147,4 +163,3 @@
 		}
 	}
 }
-

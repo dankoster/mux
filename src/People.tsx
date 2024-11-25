@@ -97,7 +97,7 @@ export const People = () => {
 			</Show>
 		</div>
 		<Show when={selectedConnection()}>
-			<Chat connection={selectedConnection()} />
+			<Chat connection={selectedConnection()} onClose={() => setSelectedConnection(null)} />
 		</Show>
 	</div>
 }

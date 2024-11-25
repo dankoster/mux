@@ -23,7 +23,6 @@ function App() {
 	const [selectedView, setSelectedView] = createSignal<SelectedView>("people")
 	const [selectedSecondaryView, setSelectedSecondaryView] = createSignal<JSX.Element>()
 
-
 	const primaryView: Record<SelectedView, () => JSX.Element> = {
 		people: () => <People />,
 		call: () => <Call />,
@@ -43,13 +42,8 @@ function App() {
 		}
 	})
 
-
-
-
-
-
 	const logout = () => {
-		//showDmConversation(null)
+		//TODO: showDmConversation(null)
 		server.becomeAnonymous()
 	}
 
@@ -114,4 +108,3 @@ function App() {
 		</Show>
 	</>
 };
-
