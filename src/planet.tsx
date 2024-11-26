@@ -105,8 +105,12 @@ export function Planet() {
 
 		function resizeRendererToDisplaySize() {
 			const canvas = renderer.domElement;
-			const width = canvas.parentElement.clientWidth;
-			const height = canvas.parentElement.clientHeight;
+			const width = canvas.parentElement?.clientWidth;
+			const height = canvas.parentElement?.clientHeight;
+
+			if(!width || !height)
+				return false
+
 			const needResize = canvas.width !== width || canvas.height !== height;
 			if (needResize) {
 				console.log('setSize', width - canvas.width, height - canvas.height)
