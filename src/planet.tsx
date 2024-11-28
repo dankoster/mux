@@ -1,8 +1,8 @@
-import { onCleanup, onMount } from 'solid-js';
+import { onMount } from 'solid-js';
 import * as THREE from 'three';
-import './planet.css'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
+import './planet.css'
 
 function makeCube(size: number, color: number, x: number) {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -41,7 +41,7 @@ function makeSphere(radius: number, color: number) {
 		color,
 		emissive: 0x072534,
 		side: THREE.DoubleSide,
-		flatShading: true
+		flatShading: false //false = smooth, true = facets
 	});
 
 	const sphere = new THREE.Group();
@@ -58,10 +58,11 @@ export function Planet() {
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
 		const scene = new THREE.Scene();
+
 		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
 		camera.position.z = 20;
 
-		const cube = makeCube(0.2, 0x44aa88, 0)
+		const cube = makeCube(1, 0x44aa88, 0)
 		scene.add(cube);
 
 		const sphere = makeSphere(8, 0x156289)
@@ -69,6 +70,15 @@ export function Planet() {
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
+		// orbit.addEventListener('change', (e) => {
+		// 	const sphereRadius = 8
+		// 	const distanceToSphere = camera.position.distanceTo(sphere.position) - sphereRadius
+		// 	console.log('orbit change', distanceToSphere, camera.rotation)
+
+		// 	const rad = degToRad(45 -  3 * distanceToSphere)
+		// 	camera.rotateX(rad)
+
+		// })
 
 		const lights = [];
 		lights[0] = new THREE.DirectionalLight(0xffffff, 3);
@@ -83,12 +93,50 @@ export function Planet() {
 			scene.add(light)
 		}
 
-		function render(time: number) {
-			time *= 0.001;  // convert time to seconds
+		const raycaster = new THREE.Raycaster();
+		var direction = new THREE.Vector3();
 
-			cube.rotation.x = time;
-			cube.rotation.y = time;
-			sphere.rotation.y += 0.0005;
+		let _currentPosition: THREE.Vector3
+		let _currentLookat: THREE.Vector3
+		let _prevTime: number
+		let _elapsedTime: number
+		let _elapsedSec: number
+
+		function render(time: number) {
+
+			_elapsedTime = time - _prevTime
+			_elapsedSec = _elapsedTime *= 0.001;  // convert time to seconds
+			_prevTime = time
+
+			//direction vector from camera to sphere
+			direction.subVectors(sphere.position, camera.position).normalize();
+
+			//find intersection point(s) on surface of sphere
+			raycaster.set(camera.position, direction)
+			const intersections = raycaster.intersectObject(sphere)
+
+			//put the cube on the surface of the sphere
+			//@ts-expect-error Property 'geometry' does not exist on type 'Object3D<Object3DEventMap>'.
+			const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry')
+			if (firstIntersectedSphereGeometry) {
+
+				const t = 1.0 - Math.pow(0.001, _elapsedSec);
+
+				const idealPosition = firstIntersectedSphereGeometry?.point
+				const idealLookat = firstIntersectedSphereGeometry.normal
+
+				if (_currentPosition && _currentLookat) {
+					_currentPosition?.lerp(idealPosition, t);
+					_currentLookat?.lerp(idealLookat, t);
+				}
+				else {
+					_currentPosition = idealPosition
+					_currentLookat = idealLookat
+				}
+
+				cube.position.copy(_currentPosition)
+				cube.lookAt(_currentLookat)
+			}
 
 			const resized = resizeRendererToDisplaySize()
 			if (resized) {
@@ -108,12 +156,11 @@ export function Planet() {
 			const width = canvas.parentElement?.clientWidth;
 			const height = canvas.parentElement?.clientHeight;
 
-			if(!width || !height)
+			if (!width || !height)
 				return false
 
 			const needResize = canvas.width !== width || canvas.height !== height;
 			if (needResize) {
-				console.log('setSize', width - canvas.width, height - canvas.height)
 				renderer.setSize(width, height, false);
 			}
 			return needResize;

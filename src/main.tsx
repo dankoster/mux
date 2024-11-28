@@ -55,7 +55,7 @@ function App() {
 		<Show when={server.serverOnline()}>
 			<div class="header">
 				<div class="header-left">
-					<h3 class="logo">⨳ chatMUX</h3>
+					<h2 class="logo">⨳</h2>
 					<div class="stats">
 						<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
 						<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
