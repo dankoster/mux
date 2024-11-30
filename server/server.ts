@@ -63,7 +63,7 @@ if (certPath && keyPath) {
 		console.log('starting server with certificate')
 		await app.listen({ port: PORT, secure: true, cert, key });
 	} catch (error) {
-		console.log(error.message)
+		console.log(error)
 	}
 }
 else {

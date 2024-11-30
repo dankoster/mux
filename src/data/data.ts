@@ -47,6 +47,20 @@ export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
 
+export function connectWS() {
+	const ws = new WebSocket(`${API_URI}/${apiRoute.ws}`);
+	ws.onopen = () => {
+		ws.send(pk()) //auth by sending UUID as first message
+		console.log("WS - Connected to server")
+	}
+	ws.onmessage = (m) => {
+		console.log("WS - Got message from server: ", m.data);
+	};
+	ws.onclose = () => console.log("WS - Disconnected from server");
+
+	return ws;
+}
+
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
 }

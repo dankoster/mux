@@ -45,19 +45,19 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmHistory: "dmHistory",
 	dmUnread: "dmUnread",
 	publicKey: "publicKey",
+	ws: "ws"
 }
-
-const updateFunctionByUUID = new Map<string, {
-	isLocal: boolean,
-	update: (event: SSEvent, value?: string) => void,
-}>()
-
 
 
 //server is starting up... cleanup and then get persisted data
 db.serverInitAndCleanup()
 const roomByUUID = db.getRoomsByUUID() ?? new Map<string, Room>()
 const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection>()
+const wsByUUID = new Map<string, WebSocket>()
+const updateFunctionByUUID = new Map<string, {
+	isLocal: boolean,
+	update: (event: SSEvent, value?: string) => void,
+}>()
 
 console.log('got rooms', roomByUUID)
 console.log('got connections', connectionByUUID)
@@ -174,6 +174,52 @@ function event(req: Request) {
 }
 
 const api = new Router();
+
+api.get(`/${apiRoute.ws}`, async (ctx) => {
+
+	if (!ctx.isUpgradable) {
+		ctx.throw(501);
+	}
+	const socket = ctx.upgrade();
+	socket.onopen = () => {
+		console.log("WS - Connected to client");
+		// socket.send("Hello from server!");
+	};
+
+	let uuid: string
+	let validSender: boolean
+	socket.onmessage = (m) => {
+		if (!uuid) {
+			uuid = m.data as string;
+			if (!connectionByUUID.has(uuid)) {
+				socket.close(1011, 'first message must be auth token')
+				console.log("WS - first message was not UUID")
+				return
+			}
+			wsByUUID.set(uuid, socket)
+			socket.send('CONNECTED')
+			console.log("WS - connected to client", m.data);
+			return
+		}
+
+		console.log("WS - Got message from client: ", m.data);
+
+		//broadcast the message to all other connected clients
+		wsByUUID.forEach((ws, ws_uuid) => {
+			const con = connectionByUUID.get(ws_uuid)
+			if (ws_uuid !== uuid)
+				ws.send(JSON.stringify({ conId: con?.id, data: m.data }))
+		})
+	};
+	socket.onclose = () => {
+		wsByUUID.delete(uuid)
+		console.log("WS - Disconncted from client", uuid);
+	}
+
+
+
+	ctx.response.status = 200
+})
 
 //we just need to relay webRTC signaling messages between users so they can
 //negotiate their own peer-to-peer connection. We don't care about
@@ -603,11 +649,11 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
 		connectionByUUID.forEach((con, uuid) => {
 			if (uuid !== fromUuid
-				&& con.identity?.id 
+				&& con.identity?.id
 				&& identitiesToUpdate.includes(con.identity.id)) {
-				
+
 				const updateFn = updateFunctionByUUID.get(uuid)
-				if(updateFn) {
+				if (updateFn) {
 					updateFn.update(sseEvent.dm, JSON.stringify(message))
 					console.log('DM updating', con.identity?.name, con.kind)
 				}

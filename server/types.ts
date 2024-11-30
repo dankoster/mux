@@ -15,7 +15,8 @@ export type ApiRoute = "sse" |
 	"dm" |
 	"dmHistory" |
 	"dmUnread" |
-	"publicKey";
+	"publicKey" |
+	"ws";
 
 //is there a way to have the RoomRoute be nested under ApiRoute
 // like this { setColor: "setColor", room: { join: "room/join"}}

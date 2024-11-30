@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import './planet.css'
+import { connectWS } from './data/data';
+
+const ws = connectWS()
 
 function makeCube(size: number, color: number, x: number) {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -102,6 +105,9 @@ export function Planet() {
 		let _elapsedTime: number
 		let _elapsedSec: number
 
+		let _lastMessageTime: number = 0
+		let _lastMessageString: string
+
 		function render(time: number) {
 
 			_elapsedTime = time - _prevTime
@@ -123,6 +129,7 @@ export function Planet() {
 				const t = 1.0 - Math.pow(0.001, _elapsedSec);
 
 				const idealPosition = firstIntersectedSphereGeometry?.point
+					.addScaledVector(firstIntersectedSphereGeometry.normal, 2) //move away from the sphere origin by 2 units
 				const idealLookat = firstIntersectedSphereGeometry.normal
 
 				if (_currentPosition && _currentLookat) {
@@ -136,6 +143,16 @@ export function Planet() {
 
 				cube.position.copy(_currentPosition)
 				cube.lookAt(_currentLookat)
+
+				//send my position to the server
+				if (time - _lastMessageTime > 400) {
+					_lastMessageTime = time
+					const message = JSON.stringify(_currentPosition)
+					if (message != _lastMessageString) {
+						ws.send(message)
+						_lastMessageString = message
+					}
+				}
 			}
 
 			const resized = resizeRendererToDisplaySize()
