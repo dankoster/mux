@@ -59,8 +59,8 @@ const updateFunctionByUUID = new Map<string, {
 	update: (event: SSEvent, value?: string) => void,
 }>()
 
-console.log('got rooms', roomByUUID)
-console.log('got connections', connectionByUUID)
+// console.log('got rooms', roomByUUID)
+// console.log('got connections', connectionByUUID)
 
 if (Deno.env.get('ENVIRONMENT') === 'local') {
 	console.log('LOCAL BUILD watching for frontend changes...')
@@ -181,13 +181,7 @@ api.get(`/${apiRoute.ws}`, async (ctx) => {
 		ctx.throw(501);
 	}
 	const socket = ctx.upgrade();
-	socket.onopen = () => {
-		console.log("WS - Connected to client");
-		// socket.send("Hello from server!");
-	};
-
 	let uuid: string
-	let validSender: boolean
 	socket.onmessage = (m) => {
 		if (!uuid) {
 			uuid = m.data as string;
@@ -197,26 +191,18 @@ api.get(`/${apiRoute.ws}`, async (ctx) => {
 				return
 			}
 			wsByUUID.set(uuid, socket)
-			socket.send('CONNECTED')
-			console.log("WS - connected to client", m.data);
 			return
 		}
 
-		console.log("WS - Got message from client: ", m.data);
-
 		//broadcast the message to all other connected clients
 		wsByUUID.forEach((ws, ws_uuid) => {
-			const con = connectionByUUID.get(ws_uuid)
-			if (ws_uuid !== uuid)
-				ws.send(JSON.stringify({ conId: con?.id, data: m.data }))
+			if (ws_uuid !== uuid){
+				ws.send(m.data)}
 		})
 	};
 	socket.onclose = () => {
 		wsByUUID.delete(uuid)
-		console.log("WS - Disconncted from client", uuid);
 	}
-
-
 
 	ctx.response.status = 200
 })
@@ -718,7 +704,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			})
 
 			//The user has connected!  Send them a bunch of stuff!
-			console.log("SSE connection   ", uuid, connection)
+			//console.log("SSE connection   ", uuid, connection)
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
@@ -779,7 +765,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 				})
 			}
 
-			console.log("SSE Disconnect   ", uuid, connection)
+			//console.log("SSE Disconnect   ", uuid, connection)
 			connection.status = ""
 
 			notifyAllConnections(sseEvent.update, {

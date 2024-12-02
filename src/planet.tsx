@@ -3,11 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import './planet.css'
-import { connectWS } from './data/data';
+import { broadcastPosition, onGotPosition } from './data/positionSocket';
 
-const ws = connectWS()
-
-function makeCube(size: number, color: number, x: number) {
+function makeCube(size: number, color?: number, x: number = 0) {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
 	const boxGeometry = new THREE.BoxGeometry(size, size, size);
 	const cube = new THREE.Mesh(boxGeometry, material);
@@ -58,6 +56,8 @@ export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
 
+	const avatars = new Map<string, THREE.Mesh>()
+
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
 		const scene = new THREE.Scene();
@@ -73,6 +73,8 @@ export function Planet() {
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
+
+		////tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {
 		// 	const sphereRadius = 8
 		// 	const distanceToSphere = camera.position.distanceTo(sphere.position) - sphereRadius
@@ -96,6 +98,26 @@ export function Planet() {
 			scene.add(light)
 		}
 
+		onGotPosition((message) => {
+			//console.log("GotPosition", message)
+
+			let avatar: THREE.Mesh
+			if(!avatars.has(message.id)) {
+				avatar = makeCube(1)
+				scene.add(avatar);	
+				avatars.set(message.id, avatar)	
+			}
+
+			avatar = avatars.get(message.id)
+			avatar.position.fromArray([
+				message.position.x,
+				message.position.y,
+				message.position.z
+			])
+			avatar.lookAt(sphere.position)
+		})
+		
+
 		const raycaster = new THREE.Raycaster();
 		var direction = new THREE.Vector3();
 
@@ -105,8 +127,8 @@ export function Planet() {
 		let _elapsedTime: number
 		let _elapsedSec: number
 
-		let _lastMessageTime: number = 0
-		let _lastMessageString: string
+		let _lastBroadcastTime: number = 0
+		let _lastBroadcastPosition = new THREE.Vector3()
 
 		function render(time: number) {
 
@@ -127,9 +149,8 @@ export function Planet() {
 			if (firstIntersectedSphereGeometry) {
 
 				const t = 1.0 - Math.pow(0.001, _elapsedSec);
-
 				const idealPosition = firstIntersectedSphereGeometry?.point
-					.addScaledVector(firstIntersectedSphereGeometry.normal, 2) //move away from the sphere origin by 2 units
+					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5) //move away from the sphere origin
 				const idealLookat = firstIntersectedSphereGeometry.normal
 
 				if (_currentPosition && _currentLookat) {
@@ -144,13 +165,12 @@ export function Planet() {
 				cube.position.copy(_currentPosition)
 				cube.lookAt(_currentLookat)
 
-				//send my position to the server
-				if (time - _lastMessageTime > 400) {
-					_lastMessageTime = time
-					const message = JSON.stringify(_currentPosition)
-					if (message != _lastMessageString) {
-						ws.send(message)
-						_lastMessageString = message
+				if (time - _lastBroadcastTime > 25) {
+					_lastBroadcastTime = time
+					if (_currentPosition.distanceTo(_lastBroadcastPosition) > 0.25) {
+						const broadcasted = broadcastPosition(_currentPosition)
+						if(broadcasted)
+							_lastBroadcastPosition.copy(_currentPosition)
 					}
 				}
 			}
