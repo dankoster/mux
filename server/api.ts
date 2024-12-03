@@ -175,33 +175,47 @@ function event(req: Request) {
 
 const api = new Router();
 
+
+const lastWsMessageByUUID = new Map<string, string>()
+
 api.get(`/${apiRoute.ws}`, async (ctx) => {
 
 	if (!ctx.isUpgradable) {
 		ctx.throw(501);
 	}
-	const socket = ctx.upgrade();
-	let uuid: string
+	const socket = ctx.upgrade()
+	let socketUuid: string
 	socket.onmessage = (m) => {
-		if (!uuid) {
-			uuid = m.data as string;
-			if (!connectionByUUID.has(uuid)) {
+		if (!socketUuid) {
+			socketUuid = m.data as string;
+			if (!connectionByUUID.has(socketUuid)) {
 				socket.close(1011, 'first message must be auth token')
 				console.log("WS - first message was not UUID")
 				return
 			}
-			wsByUUID.set(uuid, socket)
+			wsByUUID.set(socketUuid, socket)
+
+			lastWsMessageByUUID.forEach((message, uuid) => {
+				if (uuid !== socketUuid) {
+					//console.log('WS', message)
+					socket.send(message)
+				}
+			})
 			return
 		}
 
+		//TODO: add a message header here so the client doesn't get to control the "from" address
+
 		//broadcast the message to all other connected clients
-		wsByUUID.forEach((ws, ws_uuid) => {
-			if (ws_uuid !== uuid){
-				ws.send(m.data)}
+		wsByUUID.forEach((ws, uuid) => {
+			lastWsMessageByUUID.set(socketUuid, m.data)
+			if (uuid !== socketUuid) {
+				ws.send(m.data)
+			}
 		})
 	};
 	socket.onclose = () => {
-		wsByUUID.delete(uuid)
+		wsByUUID.delete(socketUuid)
 	}
 
 	ctx.response.status = 200
