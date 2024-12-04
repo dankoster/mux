@@ -195,11 +195,9 @@ api.get(`/${apiRoute.ws}`, async (ctx) => {
 			}
 			wsByUUID.set(socketUuid, socket)
 
-			lastWsMessageByUUID.forEach((message, uuid) => {
-				if (uuid !== socketUuid) {
-					//console.log('WS', message)
-					socket.send(message)
-				}
+			//send current state (even to self, so we remember our position)
+			lastWsMessageByUUID.forEach((message) => {
+				socket.send(message)
 			})
 			return
 		}

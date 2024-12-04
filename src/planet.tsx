@@ -4,6 +4,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import './planet.css'
 import { broadcastPosition, onGotPosition } from './data/positionSocket';
+import { getSelf } from './data/data';
+import { Connection } from '../server/types';
 
 function makeCube(size: number, color?: number, x: number = 0) {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -55,6 +57,7 @@ function makeSphere(radius: number, color: number) {
 export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
+	let self: Connection
 
 	const avatars = new Map<string, THREE.Mesh>()
 
@@ -67,6 +70,11 @@ export function Planet() {
 
 		const cube = makeCube(1, 0x44aa88, 0)
 		scene.add(cube);
+		getSelf.then((con) => {
+			avatars.set(con.id, cube)
+			self = con
+			console.log('--- set self avatar', con.id)
+		})
 
 		const sphere = makeSphere(8, 0x156289)
 		scene.add(sphere);
@@ -99,13 +107,11 @@ export function Planet() {
 		}
 
 		onGotPosition((message) => {
-			//console.log("GotPosition", message)
-
 			let avatar: THREE.Mesh
-			if(!avatars.has(message.id)) {
+			if (!avatars.has(message.id)) {
 				avatar = makeCube(1)
-				scene.add(avatar);	
-				avatars.set(message.id, avatar)	
+				scene.add(avatar);
+				avatars.set(message.id, avatar)
 			}
 
 			avatar = avatars.get(message.id)
@@ -115,8 +121,20 @@ export function Planet() {
 				message.position.z
 			])
 			avatar.lookAt(sphere.position)
+
+			if (message.id === self.id) {
+				//make camera move to the new avatar position from the server
+				//calculate camera direction relative to avatar position and distance from sphere
+				direction
+					.subVectors(avatar.position, sphere.position)
+					.normalize()
+					.multiplyScalar(camera.position.distanceTo(sphere.position));
+
+				camera.position.copy(direction)
+				camera.lookAt(sphere.position)
+			}
 		})
-		
+
 
 		const raycaster = new THREE.Raycaster();
 		var direction = new THREE.Vector3();
@@ -148,11 +166,11 @@ export function Planet() {
 			const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry')
 			if (firstIntersectedSphereGeometry) {
 
-				const t = 1.0 - Math.pow(0.001, _elapsedSec);
 				const idealPosition = firstIntersectedSphereGeometry?.point
 					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5) //move away from the sphere origin
 				const idealLookat = firstIntersectedSphereGeometry.normal
 
+				const t = 1.0 - Math.pow(0.001, _elapsedSec);
 				if (_currentPosition && _currentLookat) {
 					_currentPosition?.lerp(idealPosition, t);
 					_currentLookat?.lerp(idealLookat, t);
@@ -162,14 +180,16 @@ export function Planet() {
 					_currentLookat = idealLookat
 				}
 
+				//set position
 				cube.position.copy(_currentPosition)
 				cube.lookAt(_currentLookat)
 
+				//broadcast position
 				if (time - _lastBroadcastTime > 25) {
 					_lastBroadcastTime = time
 					if (_currentPosition.distanceTo(_lastBroadcastPosition) > 0.25) {
 						const broadcasted = broadcastPosition(_currentPosition)
-						if(broadcasted)
+						if (broadcasted)
 							_lastBroadcastPosition.copy(_currentPosition)
 					}
 				}

@@ -1,5 +1,5 @@
 import { API_URI } from "../API_URI";
-import { createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
 import { apiRoute, DELETE, POST } from "./http";
@@ -46,6 +46,13 @@ const [stats, setStats] = createSignal<Stats>()
 export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
+
+let selfPromiseResolver: (con: Connection)=>void
+export const getSelf = new Promise<Connection>((resolve) => selfPromiseResolver = resolve)
+createEffect(() => {
+	const value = self()
+	if(value) selfPromiseResolver(value)
+})
 
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
