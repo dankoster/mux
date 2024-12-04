@@ -35,5 +35,8 @@ jobs:
       - name: Get latest source
         run: ssh prod 'cd /mux && git fetch && git pull'
 
-      - name: Rebuild and start the server
+      - name: Rebuild the server
+        run: ssh prod 'deno task build'
+
+      - name: Restart the server
         run: ssh prod 'systemctl restart chatmux'
