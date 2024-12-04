@@ -96,14 +96,14 @@ function App() {
 			</div>
 
 
-			<div class="toolbar">
+			{/* <div class="toolbar">
 				<div class="buttons">
 					<button class="room-button" onclick={() => setSelectedView('call')}>call</button>
 					<button class="room-button" onclick={() => setSelectedView('people')}>people</button>
 					<button class="room-button" onclick={() => setSelectedView('planet')}>3D</button>
 					<button class="room-button" onclick={() => setSelectedView('graph')}>graph</button>
 				</div>
-			</div>
+			</div> */}
 
 		</Show>
 	</>
