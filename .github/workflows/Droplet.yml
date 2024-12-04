@@ -36,7 +36,10 @@ jobs:
         run: ssh prod 'systemctl stop chatmux'
 
       - name: Get latest source
-        run: ssh prod 'cd /mux && git fetch && git pull && /home/githubaction/.deno/bin/deno task build'
+        run: ssh prod 'cd /mux && git fetch && git pull'
+
+      - name: Rebuild the server
+        run: ssh prod 'cd /mux && /home/githubaction/.deno/bin/deno task build'
 
       - name: Restart the server
         run: ssh prod 'systemctl restart chatmux'
