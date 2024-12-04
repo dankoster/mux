@@ -32,8 +32,11 @@ jobs:
           SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
 
+      - name: Stop the server
+        run: ssh prod 'systemctl stop chatmux'
+
       - name: Get latest source
-        run: ssh prod 'cd /mux && git fetch && git pull'
+        run: ssh prod 'cd /mux && git fetch && git pull && deno task build'
 
       - name: Restart the server
         run: ssh prod 'systemctl restart chatmux'
