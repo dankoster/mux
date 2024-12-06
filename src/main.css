@@ -95,17 +95,17 @@ body {
 			text-wrap: nowrap;
 		}
 	}
+}
 
-	.user {
+.user {
+	overflow: hidden;
+	display: flex;
+	column-gap: 1rem;
+
+	.name {
 		overflow: hidden;
-		display: flex;
-		column-gap: 1rem;
-
-		.name {
-			overflow: hidden;
-			text-overflow: ellipsis;
-			padding-inline-start: 1rem;
-		}
+		text-overflow: ellipsis;
+		padding-inline-start: 1rem;
 	}
 }
 

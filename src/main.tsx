@@ -1,5 +1,5 @@
 
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { GitHubSvg } from "./GitHubSvg";
 import { Planet } from "./planet";
@@ -13,6 +13,7 @@ import ConnectionsGraph from "./Connections";
 import * as server from "./data/data";
 
 import "./main.css"
+import { FigmentMenu, MenuItem } from "./Menu";
 
 type SelectedView = 'people' | 'call' | 'planet' | 'graph'
 
@@ -42,15 +43,44 @@ function App() {
 		}
 	})
 
-	const logout = () => {
+	const userClicked = (e: MouseEvent) => {
 		//TODO: showDmConversation(null)
-		server.becomeAnonymous()
+
+		menu.Clear()
+		menu.AddItem(new MenuItem({
+			text: `call`,
+			onTextClick: () => setSelectedView('call'),
+		}))
+		menu.AddItem(new MenuItem({
+			text: `3d`,
+			onTextClick: () => setSelectedView('planet'),
+		}))
+		menu.AddItem(new MenuItem({
+			text: `people`,
+			onTextClick: () => setSelectedView('people'),
+		}))
+		menu.AddItem(new MenuItem({
+			text: `graph`,
+			onTextClick: () => setSelectedView('graph'),
+		}))
+
+		menu.AddSeparator()
+		menu.AddItem(new MenuItem({
+			text: `Logout ${server.self().identity.name}`,
+			onTextClick: () => server.becomeAnonymous(),
+		}))
+		menu.ShowFor((e.target as HTMLElement).parentElement)
 	}
+
+	let menu: FigmentMenu
+	onMount(() => {
+		menu = FigmentMenu.Create({ extraClasses: 'menu-keep-open' }) as FigmentMenu
+	})
 
 	return <>
 		<meta name="theme-color" content="#1f0e3c"></meta>
 		<Show when={!server.serverOnline()}>
-			<div class="offlineMessage">connecting...</div>
+			<div class="offlineMessage">⨳ connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
 			<div class="header">
@@ -60,30 +90,6 @@ function App() {
 						<div class="userCount"><b>{server.stats()?.online ?? "?"}</b> online 👀</div>
 						<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
 					</div>
-				</div>
-				<div class="user">
-					<Show when={!server.self()?.identity}>
-						<div class="color-picker">
-							<input
-								class="color-input"
-								type="color"
-								oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
-								onchange={(e) => server.setColor(e.target.value)}
-								value={server.self()?.color ?? 'transparent'} />
-						</div>
-					</Show>
-					<Show when={!server.self()?.identity}>
-						<a class="room-button" href={server.githubAuthUrl()?.toString()}>
-							<GitHubSvg />login
-						</a>
-					</Show>
-					<Show when={server.self()?.identity}>
-						<div class="avatar button" onclick={logout}>
-							<div class="name">{server.self()?.identity.name}</div>
-							<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} />
-						</div>
-					</Show>
-
 				</div>
 			</div>
 
@@ -96,14 +102,37 @@ function App() {
 			</div>
 
 
-			{/* <div class="toolbar">
-				<div class="buttons">
+			<div class="toolbar">
+				<div class="user">
+
+					<div class="color-picker">
+						<input
+							class="color-input"
+							type="color"
+							oninput={(e) => e.target.parentElement.style.backgroundColor = e.target.value}
+							onchange={(e) => server.setColor(e.target.value)}
+							value={server.self()?.color ?? 'transparent'} />
+					</div>
+					<Show when={!server.self()?.identity}>
+						<a class="room-button" href={server.githubAuthUrl()?.toString()}>
+							<GitHubSvg />login
+						</a>
+					</Show>
+					<Show when={server.self()?.identity}>
+						<div class="avatar button" onclick={userClicked}>
+							<div class="name">{server.self()?.identity.name}</div>
+							<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} />
+						</div>
+					</Show>
+
+				</div>
+				{/* <div class="buttons">
 					<button class="room-button" onclick={() => setSelectedView('call')}>call</button>
 					<button class="room-button" onclick={() => setSelectedView('people')}>people</button>
 					<button class="room-button" onclick={() => setSelectedView('planet')}>3D</button>
 					<button class="room-button" onclick={() => setSelectedView('graph')}>graph</button>
-				</div>
-			</div> */}
+				</div> */}
+			</div>
 
 		</Show>
 	</>
