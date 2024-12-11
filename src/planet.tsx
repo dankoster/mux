@@ -113,7 +113,8 @@ export function Planet() {
 		const labelRenderer = new CSS2DRenderer();
 		labelRenderer.setSize(window.innerWidth, window.innerHeight);
 		labelRenderer.domElement.style.position = 'absolute';
-		labelRenderer.domElement.style.top = '0px';
+		const rect = renderer.domElement.getBoundingClientRect()
+		labelRenderer.domElement.style.top = rect && `${rect.top}px`
 		labelRenderer.domElement.style.pointerEvents = "none";
 		document.body.appendChild(labelRenderer.domElement);
 
@@ -294,6 +295,9 @@ export function Planet() {
 			const needResize = canvas.width !== width || canvas.height !== height;
 			if (needResize) {
 				renderer.setSize(width, height, false);
+				labelRenderer.setSize(width, height);
+				const rect = renderer.domElement.getBoundingClientRect()
+				labelRenderer.domElement.style.top = rect && `${rect.top}px`
 			}
 			return needResize;
 		}
