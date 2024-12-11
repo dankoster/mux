@@ -221,79 +221,82 @@ class PeerConnection extends EventTarget {
 	}
 }
 
-export default function VideoCall(props: { room: Room, user: Connection, connections: Connection[] }) {
-
-	// if (!props.user) {
-	// 	return "no user"
-	// }
-
-	let localVideo: HTMLVideoElement
-
-	const peersById = new Map<string, PeerConnection>()
-	const videosById = new Map<string, HTMLVideoElement>()
-
-	function createPeer(polite: boolean, con: Connection, remoteVideo: HTMLVideoElement) {
-		const pc = new PeerConnection({
-			polite,
-			sendMessage: (message: {}) => {
-				return server.sendWebRtcMessage(con.id, JSON.stringify(message))
-			},
-			onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
-				if (localVideo) {
-					localVideo.srcObject = localStream;
-					localVideo.muted = true;
-				}
-
-				if (remoteVideo) {
-					remoteVideo.srcObject = remoteStream;
-				}
-			},
-			onDisconnect: () => {
-				remoteVideo.srcObject = null
+function createPeer(polite: boolean, con: Connection, localVideo: HTMLVideoElement, remoteVideo: HTMLVideoElement) {
+	const pc = new PeerConnection({
+		polite,
+		sendMessage: (message: {}) => {
+			return server.sendWebRtcMessage(con.id, JSON.stringify(message))
+		},
+		onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
+			if (localVideo) {
+				localVideo.srcObject = localStream;
+				localVideo.muted = true;
 			}
-		})
-		const ac = server.onWebRtcMessage((message) => {
-			const { description, candidate } = JSON.parse(message.message);
 
-			//only handle messages from this peer
-			if (message.senderId === con.id)
-				pc.handleMessage({ description, candidate })
-		})
+			if (remoteVideo) {
+				remoteVideo.srcObject = remoteStream;
+			}
+		},
+		onDisconnect: () => {
+			remoteVideo.srcObject = null
+		}
+	})
+	const ac = server.onWebRtcMessage((message) => {
+		const { description, candidate } = JSON.parse(message.message);
 
-		//cleanup the onDM evnet handler when we're done
-		pc.addAbortController(ac)
+		//only handle messages from this peer
+		if (message.senderId === con.id)
+			pc.handleMessage({ description, candidate })
+	})
 
-		return pc
+	//cleanup the onDM evnet handler when we're done
+	pc.addAbortController(ac)
+
+	return pc
+}
+
+export function ConnectVideo(con: Connection, polite: boolean = true) {
+	//both sides need to call this funciton
+	const localVideo = document.getElementById('local-video') as HTMLVideoElement
+	if (!peersById.has(con.id)) {
+		const remoteVideo = document.createElement('video')
+		remoteVideo.className = "remote"
+		remoteVideo.setAttribute('autoplay', '')
+		remoteVideo.setAttribute('playsinline', '')
+		remoteVideo.setAttribute('id', con.id)
+		videosById.set(con.id, remoteVideo)
+		document.getElementById('remote-videos')?.appendChild(remoteVideo)
+		const peer = createPeer(polite, con, localVideo, remoteVideo)
+		peersById.set(con.id, peer)
+		peer.startCall()
 	}
+}
+
+export function DisconnectVideo(conId: string) {
+	peersById.get(conId)?.endCall()
+	peersById.delete(conId)
+
+	const video = videosById.get(conId)
+	document.getElementById('remote-videos')?.removeChild(video)
+	videosById.delete(conId)
+}
+
+const peersById = new Map<string, PeerConnection>()
+const videosById = new Map<string, HTMLVideoElement>()
+
+export default function VideoCall(props: { room: Room, user: Connection, connections: Connection[] }) {
+	let localVideo: HTMLVideoElement
 
 	createEffect(() => {
 		//create new peer connections as necessary
 		const polite = props.user?.id === props.room?.ownerId
-		props.connections.forEach(con => {
-			if (!peersById.has(con.id)) {
-				const video = document.createElement('video')
-				video.className = "remote"
-				video.setAttribute('autoplay', '')
-				video.setAttribute('playsinline', '')
-				video.setAttribute('id', con.id)
-				videosById.set(con.id, video)
-				document.getElementById('remote-videos')?.appendChild(video)
-				const peer = createPeer(polite, con, video)
-				peersById.set(con.id, peer)
-				peer.startCall()
-			}
-		})
+		props.connections.forEach(con => ConnectVideo(con, polite))
 
 		//remove old peer connections
 		const conIds = props.connections.map(con => con.id)
 		peersById.forEach((value, key) => {
 			if (!conIds.includes(key)) {
-				peersById.get(key)?.endCall()
-				peersById.delete(key)
-
-				const video = videosById.get(key)
-				document.getElementById('remote-videos')?.removeChild(video)
-				videosById.delete(key)
+				DisconnectVideo(key)
 			}
 		})
 	})
@@ -303,11 +306,9 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 	})
 
 	return <div class="video-call">
-		<Show when={props.connections?.length > 0}>
-			<div class="local-video-container">
-				<video class="local" ref={localVideo} autoplay playsinline></video>
-			</div>
-			<div id="remote-videos" class="remote-video-container" />
-		</Show>
+		<div class="local-video-container">
+			<video id="local-video" class="local" ref={localVideo} autoplay playsinline></video>
+		</div>
+		<div id="remote-videos" class="remote-video-container" />
 	</div>
 }
