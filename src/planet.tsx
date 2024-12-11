@@ -255,8 +255,8 @@ export function Planet() {
 				}
 
 				//set position
-				selfAvatar.mesh.position.copy(_currentPosition)
-				selfAvatar.mesh.lookAt(_currentLookat)
+				selfAvatar?.mesh?.position.copy(_currentPosition)
+				selfAvatar?.mesh?.lookAt(_currentLookat)
 
 				//broadcast position
 				if (time - _lastBroadcastTime > 25) {
