@@ -5,7 +5,7 @@ import { createSignal } from "solid-js";
 import { localStorage_GetMap, localStorage_SetMap } from "./localStore";
 import { connections, isSelf, self } from "./data";
 
-type DMEventType = 'unreadMessges' | 'newMessage'
+type DMEventType = 'unreadMessges' | 'newMessage' | 'call'
 type UnreadCountByConId = { [key: string]: number }
 type LastReadTimestamp = { [key: string]: number }
 const LAST_READ_DMS = 'lastCheckedDms'
@@ -64,13 +64,20 @@ async function handleKeyShare(dm: DM) {
 	}
 }
 
-
+async function handleCallMessage(dm: DM) {
+	if (dm.kind !== 'call') throw new Error(`${dm.kind} is not valid in handleCallMessage`)
+		DirectMessageEvents.DispatchCallMessage(dm)
+}
 
 
 
 class DMEventEmitter extends EventTarget {
 	Dispatch(event: DMEventType, messagesByConId: Map<string, Map<number, DM>>) {
 		this.dispatchEvent(new CustomEvent(event, { detail: messagesByConId }))
+	}
+	DispatchCallMessage(dm: DM) {
+		const event: DMEventType = 'call'
+		this.dispatchEvent(new CustomEvent(event, { detail: dm }))
 	}
 	DispatchNewMessage(dm: DM) {
 		const event: DMEventType = 'newMessage'
@@ -144,9 +151,10 @@ export function setLastReadTimestamp(conId: string, timestamp: number) {
 	clearUnreadCount(conId)
 }
 
-export function onDMEvent(eventType: DMEventType, callback: (messagesByConId: Map<string, DM[]>) => void) {
+export function onCallEvent(callback: (message: DM) => void) {
 	const ac = new AbortController()
-	DirectMessageEvents.addEventListener(eventType, async (e: CustomEvent) => {
+	const event: DMEventType = 'call'
+	DirectMessageEvents.addEventListener(event, async (e: CustomEvent) => {
 		callback(e.detail)
 	}, { signal: ac.signal })
 	return ac
@@ -256,6 +264,11 @@ export async function handleNewDirectMessage(dm: DM) {
 async function decryptAndSaveMessage(dm: DM) {
 	if (dm.kind === 'key-share') {
 		await handleKeyShare(dm)
+		return
+	}
+
+	if(dm.kind === "call") {
+		await handleCallMessage(dm)
 		return
 	}
 

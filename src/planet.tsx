@@ -6,7 +6,10 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import './planet.css'
 import { broadcastPosition, onGotPosition } from './data/positionSocket';
 import { connections, getSelf } from './data/data';
-import { Connection } from '../server/types';
+import { Connection, DM } from '../server/types';
+import { ConnectVideo, DisconnectVideo } from './VideoCall';
+import * as server from "./data/data"
+import { onCallEvent, sendDm } from './data/directMessages';
 
 function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -124,6 +127,7 @@ export function Planet() {
 		let selfAvatar: Avatar
 		getSelf.then((con) => {
 			selfAvatar = makeAvatar(1, 0x44aa88, 0)
+			selfAvatar.label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
 			scene.add(selfAvatar.mesh);
 			avatars.set(con.id, selfAvatar)
 			self = con
@@ -143,13 +147,32 @@ export function Planet() {
 
 				const prevDistance = avatar.distance
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
-				if (prevDistance > proxRange && avatar.distance < proxRange)
+				if (prevDistance > proxRange && avatar.distance < proxRange) {
 					console.log('IN RANGE OF', avatar)
-				else if (prevDistance < proxRange && avatar.distance > proxRange)
+					ConnectVideo(avatar.connection, false)
+					const self = server.self();
+					const dm: DM = {
+						toId: avatar.connection?.id,
+						fromId: self.id,
+						fromName: self.identity?.name,
+						message: "start",
+						kind: "call"
+					}
+					sendDm(dm, avatar.connection.publicKey);
+				}
+				else if (prevDistance < proxRange && avatar.distance > proxRange) {
 					console.log('LEFT RANGE OF', avatar)
-
+					DisconnectVideo(avatar.connection?.id)
+				}
 			})
 		})
+
+		onCallEvent(dm => {
+			console.log('CALL FROM', dm)
+			const con = connections.find(c => c.id === dm.fromId)
+			ConnectVideo(con, true)
+		})
+
 
 		////tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {

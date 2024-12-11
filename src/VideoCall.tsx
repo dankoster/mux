@@ -265,7 +265,7 @@ export function ConnectVideo(con: Connection, polite: boolean = true) {
 		remoteVideo.setAttribute('playsinline', '')
 		remoteVideo.setAttribute('id', con.id)
 		videosById.set(con.id, remoteVideo)
-		document.getElementById('remote-videos')?.appendChild(remoteVideo)
+		document.getElementById('videos-container')?.appendChild(remoteVideo)
 		const peer = createPeer(polite, con, localVideo, remoteVideo)
 		peersById.set(con.id, peer)
 		peer.startCall()
@@ -277,7 +277,7 @@ export function DisconnectVideo(conId: string) {
 	peersById.delete(conId)
 
 	const video = videosById.get(conId)
-	document.getElementById('remote-videos')?.removeChild(video)
+	document.getElementById('videos-container')?.removeChild(video)
 	videosById.delete(conId)
 }
 
@@ -305,10 +305,7 @@ export default function VideoCall(props: { room: Room, user: Connection, connect
 		peersById.forEach(peer => peer.endCall())
 	})
 
-	return <div class="video-call">
-		<div class="local-video-container">
+	return <div id="videos-container" class="video-call">
 			<video id="local-video" class="local" ref={localVideo} autoplay playsinline></video>
-		</div>
-		<div id="remote-videos" class="remote-video-container" />
 	</div>
 }

@@ -94,7 +94,7 @@ export type DM = {
 	fromName?: string,
 	timestamp?: number,
 	message: string | EncryptedMessage, 
-	kind: 'key-share'|'text'
+	kind: 'key-share'|'text'|'call'
 }
 
 export type EncryptedMessage = { iv: string, data: string }

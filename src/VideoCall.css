@@ -1,29 +1,21 @@
 .video-call {
-	align-self: center;
-	justify-self: center;
-
-	.local-video-container {
-		position: relative;
-	}
-	.remote-video-container {
-		position: relative;
-	}
+	position: absolute;
+    width: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    top: 80px;
 
 	video {
-		box-shadow: 0px 0px 15px #00000087;
 		border-radius: 15px;
+		max-width: 150px;
+		max-height: 150px;
+		z-index: 1;
 	}
 
 	.local {
 		transform: scaleX(-1);
-		max-width: 100px;
-		z-index: 1;
-		position: fixed;
-		top: 0.5rem;
-		right: 0.5rem;
-	}
-
-	.remote {
-		max-width: 100%;
 	}
 }
