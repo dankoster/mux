@@ -1,18 +1,32 @@
 import { onMount } from 'solid-js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import './planet.css'
 import { broadcastPosition, onGotPosition } from './data/positionSocket';
-import { getSelf } from './data/data';
+import { connections, getSelf } from './data/data';
 import { Connection } from '../server/types';
 
-function makeCube(size: number, color?: number, x: number = 0) {
+function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
 	const boxGeometry = new THREE.BoxGeometry(size, size, size);
-	const cube = new THREE.Mesh(boxGeometry, material);
-	cube.position.x = x;
-	return cube;
+	const mesh = new THREE.Mesh(boxGeometry, material);
+	mesh.position.x = x;
+
+	const labelDiv = document.createElement('div');
+	labelDiv.className = 'label';
+	labelDiv.textContent = '';
+	labelDiv.style.backgroundColor = 'transparent';
+	labelDiv.style.pointerEvents = 'none';
+
+	const label = new CSS2DObject(labelDiv);
+	label.position.set(1.5 * size, 0, 0);
+	label.center.set(0, 1);
+	mesh.add(label);
+	label.layers.set(0);
+
+	return new Avatar(labelDiv, mesh)
 }
 
 function makeSphere(radius: number, color: number) {
@@ -54,24 +68,63 @@ function makeSphere(radius: number, color: number) {
 	return sphere
 }
 
+class Avatar {
+	mesh: THREE.Mesh
+	connection?: Connection
+	_distance: number = 0
+	private div: HTMLDivElement
+
+	constructor(label: HTMLDivElement, mesh: THREE.Mesh) {
+		this.div = label
+		this.mesh = mesh
+	}
+
+	set label(value: string) {
+		this.div.textContent = value
+	}
+
+	set distance(value: number) {
+		this._distance = value
+		this.div.style.opacity = `${100 - (this._distance * 10)}%`
+	}
+
+	get distance() {
+		return this._distance
+	}
+
+	setPosition() {
+
+	}
+}
+
+
+
 export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
 	let self: Connection
 
-	const avatars = new Map<string, THREE.Mesh>()
+	const avatars = new Map<string, Avatar>()
 
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
 		const scene = new THREE.Scene();
 
+		const labelRenderer = new CSS2DRenderer();
+		labelRenderer.setSize(window.innerWidth, window.innerHeight);
+		labelRenderer.domElement.style.position = 'absolute';
+		labelRenderer.domElement.style.top = '0px';
+		labelRenderer.domElement.style.pointerEvents = "none";
+		document.body.appendChild(labelRenderer.domElement);
+
 		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
 		camera.position.z = 20;
 
-		const cube = makeCube(1, 0x44aa88, 0)
-		scene.add(cube);
+		let selfAvatar: Avatar
 		getSelf.then((con) => {
-			avatars.set(con.id, cube)
+			selfAvatar = makeAvatar(1, 0x44aa88, 0)
+			scene.add(selfAvatar.mesh);
+			avatars.set(con.id, selfAvatar)
 			self = con
 			console.log('--- set self avatar', con.id)
 		})
@@ -81,6 +134,21 @@ export function Planet() {
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
+
+		const proxRange = 2
+		orbit.addEventListener('change', (e) => {
+			avatars.forEach(avatar => {
+				if (avatar == selfAvatar) return
+
+				const prevDistance = avatar.distance
+				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+				if (prevDistance > proxRange && avatar.distance < proxRange)
+					console.log('IN RANGE OF', avatar)
+				else if (prevDistance < proxRange && avatar.distance > proxRange)
+					console.log('LEFT RANGE OF', avatar)
+
+			})
+		})
 
 		////tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {
@@ -107,26 +175,32 @@ export function Planet() {
 		}
 
 		onGotPosition((message) => {
-			let avatar: THREE.Mesh
+			let avatar: Avatar
 			if (!avatars.has(message.id)) {
-				avatar = makeCube(1)
-				scene.add(avatar);
+				const con = connections.find(con => con.id === message.id)
+				const label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
+				avatar = makeAvatar(1)
+				scene.add(avatar.mesh);
+				avatar.connection = con
+				avatar.label = label || message.id
 				avatars.set(message.id, avatar)
 			}
 
 			avatar = avatars.get(message.id)
-			avatar.position.fromArray([
+			avatar.mesh.position.fromArray([
 				message.position.x,
 				message.position.y,
 				message.position.z
 			])
-			avatar.lookAt(sphere.position)
+			avatar.mesh.lookAt(sphere.position)
+			if (selfAvatar && avatar != selfAvatar)
+				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 
 			if (message.id === self.id) {
 				//make camera move to the new avatar position from the server
 				//calculate camera direction relative to avatar position and distance from sphere
 				direction
-					.subVectors(avatar.position, sphere.position)
+					.subVectors(avatar.mesh.position, sphere.position)
 					.normalize()
 					.multiplyScalar(camera.position.distanceTo(sphere.position));
 
@@ -181,8 +255,8 @@ export function Planet() {
 				}
 
 				//set position
-				cube.position.copy(_currentPosition)
-				cube.lookAt(_currentLookat)
+				selfAvatar.mesh.position.copy(_currentPosition)
+				selfAvatar.mesh.lookAt(_currentLookat)
 
 				//broadcast position
 				if (time - _lastBroadcastTime > 25) {
@@ -203,6 +277,7 @@ export function Planet() {
 			}
 
 			renderer.render(scene, camera);
+			labelRenderer.render(scene, camera);
 
 			requestAnimationFrame(render);
 		}
