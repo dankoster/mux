@@ -8,7 +8,6 @@ type CallState = "no_call" | "server_wait" | "server_error" | "call_ready" | "ca
 
 export const Call = () => {
 	const [callState, setCallState] = createSignal<CallState>("no_call")
-	const room = createMemo(() => server.rooms.find(r => r.id === server.self()?.roomId))
 
 	const startCall = async () => {
 		setCallState("server_wait")
@@ -52,12 +51,6 @@ export const Call = () => {
 	},)
 
 	const isRoomOwner = (c: Connection) => server.rooms.find(room => room.id === c.roomId)?.ownerId === c.id;
-	const connectionsInRoom = () => server.connections.filter(
-		con =>
-			server.self()?.roomId
-			&& con.id != server.self()?.id
-			&& con.roomId === server.self()?.roomId
-	)
 
 
 	return <>
@@ -77,8 +70,8 @@ export const Call = () => {
 		</Show>
 		<VideoCall
 			user={server.self()}
-			room={room()}
-			connections={connectionsInRoom()} />
+			room={server.room()}
+			connections={server.connectionsInRoom()} />
 		{
 			server.self()?.roomId &&
 			<div class="centered-content">

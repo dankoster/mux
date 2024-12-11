@@ -1,9 +1,9 @@
 import { API_URI } from "../API_URI";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
 import { apiRoute, DELETE, POST } from "./http";
-import { handleNewDirectMessage, getAllUnread, sendDm, sharePrivateKey } from "./directMessages";
+import { handleNewDirectMessage, getAllUnread, sharePrivateKey } from "./directMessages";
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
@@ -47,12 +47,24 @@ export {
 	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
 }
 
-let selfPromiseResolver: (con: Connection)=>void
+let selfPromiseResolver: (con: Connection) => void
 export const getSelf = new Promise<Connection>((resolve) => selfPromiseResolver = resolve)
 createEffect(() => {
 	const value = self()
-	if(value) selfPromiseResolver(value)
+	if (value) selfPromiseResolver(value)
 })
+
+export function connectionsInRoom() {
+	return connections.filter(
+		con =>
+			self()?.roomId
+			&& con.id != self()?.id
+			&& con.roomId === self()?.roomId
+	)
+}
+
+export const room = createMemo(() => rooms.find(r => r.id === self()?.roomId))
+
 
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
