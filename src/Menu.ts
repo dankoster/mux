@@ -1,10 +1,7 @@
 
 import "./Menu.css"
 
-
-
 type ExtraClasses = string | string[]
-
 
 function AddExtraClasses(target: HTMLElement, extraClasses?: string | string[]) {
 	if (extraClasses) {
@@ -15,11 +12,6 @@ function AddExtraClasses(target: HTMLElement, extraClasses?: string | string[]) 
 
 		extraClasses.forEach(c => target.classList.add(c))
 	}
-}
-
-function removeElementsByTagName(tagName: string) {
-	const elements = document.getElementsByTagName(tagName)
-	Array.from(elements).forEach(element => element.remove())
 }
 
 function stylePxToInt(value: string): number { return Number.parseInt(value.replaceAll('px', '')) }
@@ -88,10 +80,6 @@ export class FigmentMenu extends HTMLElement {
 		this.items.length = 0
 	}
 
-	static removeMenu() {
-		removeElementsByTagName('figment-menu')
-	}
-
 	static Create({ extraClasses }: { extraClasses: ExtraClasses }) {
 		if (!customElements.get('figment-menu'))
 			customElements.define('figment-menu', FigmentMenu)
@@ -104,20 +92,6 @@ export class FigmentMenu extends HTMLElement {
 		return figmentMenu
 	}
 
-	private setLocation(rect: DOMRect) {
-		if (!this.container) throw new Error('no container')
-
-		this.container.style.left = rect.x + 'px'
-		this.container.style.top = rect.y + 'px'
-	}
-
-	static calcPlacement(target: HTMLElement): DOMRect {
-		const x = (target?.parentElement?.offsetLeft ?? 0) + target.offsetLeft + target.offsetWidth
-		const y = (target?.parentElement?.offsetTop ?? 0) + target.clientHeight
-		return new DOMRect(x, y)
-	}
-
-
 	ShowFor(target: HTMLElement, extra?: HTMLElement) {
 		if (!target) throw new Error('invalid target')
 		this.target = target
@@ -128,10 +102,7 @@ export class FigmentMenu extends HTMLElement {
 			this.container.appendChild(extra)
 		}
 
-		this.setLocation(FigmentMenu.calcPlacement(this.target))
-
-		// this.shadowRoot?.appendChild(this.container)
-		this.appendChild(this.container)
+		target.appendChild(this.container)
 
 		const menu = this.container.querySelector('div.figment-menu') as HTMLDivElement
 		FigmentMenu.fixSmallMenuScroll(menu)
@@ -141,7 +112,7 @@ export class FigmentMenu extends HTMLElement {
 		const menuCleanup = (e: MouseEvent) => {
 			if (menu) {
 				const path = getElementPath(e.target)
-	
+
 				//don't close the menu when clicking on it
 				if (!path.some(node => node.classList?.contains('menu-keep-open'))) {
 					this.Clear()
@@ -149,7 +120,7 @@ export class FigmentMenu extends HTMLElement {
 				}
 			}
 		}
-		
+
 		document.addEventListener('mousedown', menuCleanup)
 	}
 
@@ -177,19 +148,20 @@ export class FigmentMenu extends HTMLElement {
 		//move the container to not overflow the viewport
 
 		const computedContainerStyle = getComputedStyle(container)
+		const rect = container.getBoundingClientRect()
+		
 		const top = getTotal(computedContainerStyle, ['top'])
 		const left = getTotal(computedContainerStyle, ['left'])
 		const right = getTotal(computedContainerStyle, ['left', 'width'])
-		const bottom = container.offsetTop + container.offsetHeight
+		const bottom = rect.bottom
 
 		const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
 
 		const overflowX = right - document.documentElement.clientWidth - window.scrollX + scrollbarWidth
 		const overflowY = bottom - document.documentElement.clientHeight - window.scrollY + (2 * scrollbarWidth)
-
+		
 		if (overflowX > 0) {
 			console.log(`Fix overflow X: ${left} - ${overflowX} = ${left - overflowY}px`, container)
-
 			container.style.left = (left - overflowX) + 'px'
 
 			//TODO: handle submenu viewport overflow
@@ -205,7 +177,7 @@ export class FigmentMenu extends HTMLElement {
 		}
 		if (overflowY > 0) {
 			console.log(`Fix overflow Y: ${top} - ${overflowY} = ${top - overflowY}px`)
-			container.style.top = (top - overflowY) + 'px'
+			container.style.top = container.parentElement.offsetTop - container.clientHeight + 'px'
 		}
 	}
 
@@ -285,7 +257,7 @@ export class FigmentMenu extends HTMLElement {
 	}
 
 	AddSeparator() {
-		this.items.push(new MenuItem({extraClasses: 'menu-separator'}))
+		this.items.push(new MenuItem({ extraClasses: 'menu-separator' }))
 	}
 
 	AddScrollingContainer({ extraClasses, maxHeight }: { extraClasses?: ExtraClasses, maxHeight?: string } = {}) {
