@@ -258,7 +258,8 @@ export async function sharePrivateKey(myId: string, con: Connection) {
 
 export async function handleNewDirectMessage(dm: DM) {
 	await decryptAndSaveMessage(dm);
-	DirectMessageEvents.DispatchNewMessage(dm);
+	if (dm.kind === 'text')
+		DirectMessageEvents.DispatchNewMessage(dm);
 }
 
 async function decryptAndSaveMessage(dm: DM) {
