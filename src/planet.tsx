@@ -6,10 +6,8 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import './planet.css'
 import { broadcastPosition, onGotPosition } from './data/positionSocket';
 import { connections, getSelf } from './data/data';
-import { Connection, DM } from '../server/types';
+import { Connection } from '../server/types';
 import { ConnectVideo, DisconnectVideo } from './VideoCall';
-import * as server from "./data/data"
-import { onCallEvent, sendDm } from './data/directMessages';
 
 function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
