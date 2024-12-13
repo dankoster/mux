@@ -64,12 +64,6 @@ async function handleKeyShare(dm: DM) {
 	}
 }
 
-async function handleCallMessage(dm: DM) {
-	if (dm.kind !== 'call') throw new Error(`${dm.kind} is not valid in handleCallMessage`)
-		DirectMessageEvents.DispatchCallMessage(dm)
-}
-
-
 
 class DMEventEmitter extends EventTarget {
 	Dispatch(event: DMEventType, messagesByConId: Map<string, Map<number, DM>>) {
@@ -284,8 +278,8 @@ async function decryptAndSaveMessage(dm: DM) {
 		console.log('could not decrypt', dm)
 	}
 
-	if(dm.kind === "call") {
-		await handleCallMessage(dm)
+	if (dm.kind === "call") {
+		DirectMessageEvents.DispatchCallMessage(dm)
 		return
 	}
 
