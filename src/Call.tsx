@@ -1,5 +1,5 @@
 import { trackStore } from "@solid-primitives/deep"
-import { createEffect, createMemo, createSignal, Show } from "solid-js"
+import { createEffect, createSignal, Show } from "solid-js"
 import VideoCall from "./VideoCall"
 import * as server from "./data/data";
 import { Connection } from "../server/types";
@@ -68,10 +68,7 @@ export const Call = () => {
 		<Show when={callState() === "call_ready"}>
 			<div class="call_state_message">waiting for someone else to join...</div>
 		</Show>
-		<VideoCall
-			user={server.self()}
-			room={server.room()}
-			connections={server.connectionsInRoom()} />
+		<VideoCall />
 		{
 			server.self()?.roomId &&
 			<div class="centered-content">

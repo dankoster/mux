@@ -6,7 +6,8 @@
     align-items: center;
     justify-content: center;
     gap: 2rem;
-    top: 80px;
+    top: 1rem;
+
 
 	video {
 		border-radius: 15px;
@@ -17,5 +18,15 @@
 
 	.local {
 		transform: scaleX(-1);
+		transition: all 0.6s;
+	}
+
+	.alone {
+		transform: scaleX(-1);
+		max-width: 100px;
+		z-index: 1;
+		position: fixed;
+		top: 0.5rem;
+		right: 0.5rem;
 	}
 }

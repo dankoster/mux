@@ -74,10 +74,7 @@ function App() {
 				</div>
 			</div>
 
-			<VideoCall
-				user={server.self()}
-				room={server.room()}
-				connections={server.connectionsInRoom()} />
+			<VideoCall />
 
 			<div class={`middle`}>
 				{primaryView[selectedView()]()}

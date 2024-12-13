@@ -1,8 +1,9 @@
 
-import { createEffect, onCleanup, Show } from "solid-js";
+import { onCleanup, onMount } from "solid-js";
 import "./VideoCall.css"
 import * as server from "./data/data"
-import type { Connection, Room } from "../server/types"
+import type { DM } from "../server/types"
+import { onCallEvent, sendDm } from "./data/directMessages";
 
 //TODO: get this from the TURN server for each client, obviously
 const servers: RTCConfiguration = {
@@ -41,17 +42,15 @@ const servers: RTCConfiguration = {
 type pcInit = {
 	polite: boolean,
 	sendMessage: (message: {}) => Promise<Response>,
-	onConnect: (localStream: MediaStream, remoteStream: MediaStream) => void,
-	onDisconnect: () => void
+	onConnect: (remoteStream: MediaStream) => void,
+	onDisconnect: () => void,
+	onTrack: (track: MediaStreamTrack) => void
 }
 
 class PeerConnection extends EventTarget {
-	localStream: MediaStream | undefined
 	remoteStream = new MediaStream();
 	abortControllers: AbortController[] = []
 	localRTCRtpSenders: RTCRtpSender[] = []
-
-	constraints = { audio: true, video: true }
 
 	pc: RTCPeerConnection
 
@@ -59,15 +58,17 @@ class PeerConnection extends EventTarget {
 	makingOffer = false;
 	ignoreOffer = false;
 
-	onConnect: (localStream: MediaStream, remoteStream: MediaStream) => void
+	onConnect: (remoteStream: MediaStream) => void
+	onTrack: (track: MediaStreamTrack) => void
 	onDisconnect: () => void
 	sendMessage: (message: {}) => Promise<Response>
 
-	constructor({ polite, onConnect, onDisconnect, sendMessage }: pcInit) {
+	constructor({ polite, onConnect, onTrack, onDisconnect, sendMessage }: pcInit) {
 		super()
 
 		this.pc = new RTCPeerConnection(servers)
 		this.onConnect = onConnect
+		this.onTrack = onTrack
 		this.onDisconnect = onDisconnect
 		this.sendMessage = sendMessage
 		this.polite = polite
@@ -75,12 +76,13 @@ class PeerConnection extends EventTarget {
 		// Pull tracks from remote stream, add to video stream
 		this.pc.ontrack = (event) => {
 			const track = event.track
-			// console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
-			track.addEventListener('end', () => this.remoteStream.removeTrack(track))
-			// track.addEventListener('mute', () => this.remoteStream.removeTrack(track))
-			track.addEventListener('unmute', () => this.remoteStream.addTrack(track))
-			//this.remoteStream.addTrack(track);
+			console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label)
+			//track.addEventListener('end', () => this.remoteStream.removeTrack(track))
+			//track.addEventListener('mute', () => this.remoteStream.removeTrack(track))
+			//track.addEventListener('unmute', () => this.remoteStream.addTrack(track))
+			this.remoteStream.addTrack(track);
 			this.logTrackEvents(track, 'remote');
+			this.onTrack(track);
 		};
 
 		this.pc.onnegotiationneeded = async () => {
@@ -120,22 +122,15 @@ class PeerConnection extends EventTarget {
 
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 	//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#adding_tracks_to_multiple_streams
-	async startCall() {
-		try {
-			this.localStream = await navigator.mediaDevices.getUserMedia(this.constraints);
-			if (this.localStream) {
-				// Push tracks from local stream to peer connection
-				this.localStream?.getTracks().forEach((track) => {
-					// console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
-					this.localRTCRtpSenders.push(this.pc?.addTrack(track, this.localStream))
-					this.logTrackEvents(track, 'local');
-				});
+	async startCall(localStream: MediaStream) {
+		// Push tracks from local stream to peer connection
+		localStream.getTracks().forEach((track) => {
+			console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label)
+			this.localRTCRtpSenders.push(this.pc?.addTrack(track, localStream))
+			this.logTrackEvents(track, 'local');
+		});
 
-				this.onConnect(this.localStream, this.remoteStream)
-			}
-		} catch (err) {
-			console.error(err);
-		}
+		this.onConnect(this.remoteStream)
 	}
 
 	endCall() {
@@ -149,19 +144,12 @@ class PeerConnection extends EventTarget {
 			this.pc.removeTrack(t)
 		})
 
-		this.localStream?.getTracks().forEach((track) => {
-			track.stop()
-			this.localStream.removeTrack(track)
-		})
-
 		try {
 			//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
 			this.pc?.close();
 		} catch (err) {
 			console.error(err)
 		}
-
-		this.onDisconnect()
 
 		console.groupEnd()
 	}
@@ -221,91 +209,136 @@ class PeerConnection extends EventTarget {
 	}
 }
 
-function createPeer(polite: boolean, con: Connection, localVideo: HTMLVideoElement, remoteVideo: HTMLVideoElement) {
-	const pc = new PeerConnection({
-		polite,
-		sendMessage: (message: {}) => {
-			return server.sendWebRtcMessage(con.id, JSON.stringify(message))
-		},
-		onConnect: (localStream: MediaStream, remoteStream: MediaStream) => {
-			if (localVideo) {
-				localVideo.srcObject = localStream;
-				localVideo.muted = true;
-			}
+let localStream: MediaStream
 
-			if (remoteVideo) {
-				remoteVideo.srcObject = remoteStream;
-			}
-		},
-		onDisconnect: () => {
-			remoteVideo.srcObject = null
-		}
-	})
-	const ac = server.onWebRtcMessage((message) => {
-		const { description, candidate } = JSON.parse(message.message);
-
-		//only handle messages from this peer
-		if (message.senderId === con.id)
-			pc.handleMessage({ description, candidate })
-	})
-
-	//cleanup the onDM evnet handler when we're done
-	pc.addAbortController(ac)
-
-	return pc
+type ConnectionCommand = 'start' | 'end'
+export function SendVideoCallRequest(conId: string, message: ConnectionCommand) {
+	const con = server.connections.find(c => c.id === conId)
+	const self = server.self();
+	const dm: DM = {
+		toId: con.id,
+		fromId: self.id,
+		fromName: self.identity?.name,
+		message,
+		kind: "call"
+	};
+	sendDm(dm, con.publicKey);
 }
 
-export function ConnectVideo(con: Connection, polite: boolean = true) {
-	//both sides need to call this funciton
-	const localVideo = document.getElementById('local-video') as HTMLVideoElement
-	if (!peersById.has(con.id)) {
-		const remoteVideo = document.createElement('video')
-		remoteVideo.className = "remote"
-		remoteVideo.setAttribute('autoplay', '')
-		remoteVideo.setAttribute('playsinline', '')
-		remoteVideo.setAttribute('id', con.id)
-		videosById.set(con.id, remoteVideo)
-		document.getElementById('videos-container')?.appendChild(remoteVideo)
-		const peer = createPeer(polite, con, localVideo, remoteVideo)
-		peersById.set(con.id, peer)
-		peer.startCall()
+const handleConnectionCommand: { [key in ConnectionCommand]: (conId: string) => void } = {
+	start: (conId) => ConnectVideo(conId, true),
+	end: (conId) => {
+		if (videosById.has(conId) || peersById.has(conId))
+			DisconnectVideo(conId)
 	}
 }
 
+onCallEvent(dm => {
+	console.log('onCallEvent', dm)
+	handleConnectionCommand[dm.message as ConnectionCommand](dm.fromId)
+})
+
+
+//both sides need to call this funciton
+export function ConnectVideo(conId: string, polite: boolean = true) {
+	console.log('ConnectVideo', conId)
+
+	if (!localStream) throw new Error('local stream not ready')
+	if (peersById.has(conId)) return //already connected?
+
+	SendVideoCallRequest(conId, 'start')
+
+	const remoteVideo = document.createElement('video')
+	remoteVideo.className = "remote"
+	remoteVideo.setAttribute('autoplay', '')
+	remoteVideo.setAttribute('playsinline', '')
+	remoteVideo.setAttribute('id', conId)
+	videosById.set(conId, remoteVideo)
+	const videoContainer = document.getElementById('videos-container')
+
+	function handleMuteEvent(track: MediaStreamTrack): any {
+		console.log('handleMuteEvent', track)
+		remoteVideo.classList.toggle(`${track.kind}-muted`, track.muted)
+
+		if (track.kind === 'video') {
+			if (track.muted)
+				remoteVideo.remove()
+			else
+				videoContainer.appendChild(remoteVideo)
+		}
+	}
+
+	const peer = new PeerConnection({
+		polite,
+		sendMessage: (message: {}) => {
+			return server.sendWebRtcMessage(conId, JSON.stringify(message))
+		},
+		onConnect: (remoteStream: MediaStream) => {
+			remoteVideo.srcObject = remoteStream;
+		},
+		onDisconnect: () => {
+			DisconnectVideo(conId)
+		},
+		onTrack: (track: MediaStreamTrack) => {
+			track.addEventListener('mute', () => handleMuteEvent(track))
+			track.addEventListener('unmute', () => handleMuteEvent(track))
+			handleMuteEvent(track)
+		}
+	})
+
+	const abortController = server.onWebRtcMessage((message) => {
+		//only handle messages from this peer
+		if (message.senderId === conId) {
+			const { description, candidate } = JSON.parse(message.message);
+			peer.handleMessage({ description, candidate })
+		}
+	})
+
+	//cleanup the onDM evnet handler when we're done
+	peer.addAbortController(abortController)
+
+	peersById.set(conId, peer)
+	peer.startCall(localStream)
+}
+
 export function DisconnectVideo(conId: string) {
+	console.log('DisconnectVideo', conId)
 	peersById.get(conId)?.endCall()
 	peersById.delete(conId)
 
 	const video = videosById.get(conId)
-	document.getElementById('videos-container')?.removeChild(video)
+	video?.remove()
 	videosById.delete(conId)
+
+	SendVideoCallRequest(conId, 'end')
 }
 
 const peersById = new Map<string, PeerConnection>()
 const videosById = new Map<string, HTMLVideoElement>()
 
-export default function VideoCall(props: { room: Room, user: Connection, connections: Connection[] }) {
+export default function VideoCall() {
 	let localVideo: HTMLVideoElement
+	let videoContainer: HTMLDivElement
+	let observer: MutationObserver
 
-	createEffect(() => {
-		//create new peer connections as necessary
-		const polite = props.user?.id === props.room?.ownerId
-		props.connections.forEach(con => ConnectVideo(con, polite))
+	onMount(async () => {
 
-		//remove old peer connections
-		const conIds = props.connections.map(con => con.id)
-		peersById.forEach((value, key) => {
-			if (!conIds.includes(key)) {
-				DisconnectVideo(key)
-			}
-		})
+		//connect local video
+		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+		localVideo.srcObject = localStream;
+		localVideo.muted = true;
+
+		//handle style changes when videos are added and removed
+		observer = new MutationObserver(() => localVideo?.classList.toggle('alone', videoContainer.childNodes.length === 1))
+		observer.observe(videoContainer, { childList: true })
 	})
 
 	onCleanup(() => {
 		peersById.forEach(peer => peer.endCall())
+		observer?.disconnect()
 	})
 
-	return <div id="videos-container" class="video-call">
-			<video id="local-video" class="local" ref={localVideo} autoplay playsinline></video>
+	return <div id="videos-container" class="video-call" ref={videoContainer}>
+		<video id="local-video" class="local alone" ref={localVideo} autoplay playsinline></video>
 	</div>
 }

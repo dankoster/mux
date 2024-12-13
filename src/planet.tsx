@@ -149,28 +149,13 @@ export function Planet() {
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 				if (prevDistance > proxRange && avatar.distance < proxRange) {
 					console.log('IN RANGE OF', avatar)
-					ConnectVideo(avatar.connection, false)
-					const self = server.self();
-					const dm: DM = {
-						toId: avatar.connection?.id,
-						fromId: self.id,
-						fromName: self.identity?.name,
-						message: "start",
-						kind: "call"
-					}
-					sendDm(dm, avatar.connection.publicKey);
+					ConnectVideo(avatar.connection?.id, false)
 				}
 				else if (prevDistance < proxRange && avatar.distance > proxRange) {
 					console.log('LEFT RANGE OF', avatar)
 					DisconnectVideo(avatar.connection?.id)
 				}
 			})
-		})
-
-		onCallEvent(dm => {
-			console.log('CALL FROM', dm)
-			const con = connections.find(c => c.id === dm.fromId)
-			ConnectVideo(con, true)
 		})
 
 
