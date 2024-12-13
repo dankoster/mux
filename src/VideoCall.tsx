@@ -234,6 +234,13 @@ const handleConnectionCommand: { [key in ConnectionCommand]: (conId: string) => 
 }
 
 onCallEvent(dm => {
+	//messages are broadcast to all connections that share an identity
+	// but we only want to handle call messages for us specifically
+	if(dm.toId !== server.self()?.id) {
+		//console.log('ignoring call message', dm)
+		return
+	}
+
 	console.log('onCallEvent', dm)
 	handleConnectionCommand[dm.message as ConnectionCommand](dm.fromId)
 })
@@ -257,7 +264,6 @@ export function ConnectVideo(conId: string, polite: boolean = true) {
 	const videoContainer = document.getElementById('videos-container')
 
 	function handleMuteEvent(track: MediaStreamTrack): any {
-		console.log('handleMuteEvent', track)
 		remoteVideo.classList.toggle(`${track.kind}-muted`, track.muted)
 
 		if (track.kind === 'video') {
