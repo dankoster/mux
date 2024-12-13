@@ -267,11 +267,6 @@ async function decryptAndSaveMessage(dm: DM) {
 		return
 	}
 
-	if(dm.kind === "call") {
-		await handleCallMessage(dm)
-		return
-	}
-
 	const toCon = connections.find(c => c.id === dm.toId)
 	const fromCon = connections.find(c => c.id === dm.fromId)
 	const sentByMe = isSelf(fromCon);
@@ -286,6 +281,11 @@ async function decryptAndSaveMessage(dm: DM) {
 	} catch (error) {
 		console.warn(error)
 		console.log('could not decrypt', dm)
+	}
+
+	if(dm.kind === "call") {
+		await handleCallMessage(dm)
+		return
 	}
 
 	const conId = sentByMe ? dm.toId : dm.fromId;
