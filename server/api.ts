@@ -224,7 +224,7 @@ api.get(`/${apiRoute.ws}`, async (ctx) => {
 //the actual conent of the messages, only that they are properly routed.
 //https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
-	console.log(event(ctx.request), ctx.params.userId)
+	// console.log(event(ctx.request))
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME);
 	if (!uuid) throw new Error(`Missing ${AUTH_TOKEN_HEADER_NAME} header`);
 
