@@ -1,4 +1,4 @@
-import { onMount } from 'solid-js';
+import { createEffect, onMount } from 'solid-js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -93,8 +93,10 @@ class Avatar {
 		return this._distance
 	}
 
-	setPosition() {
-
+	delete() {
+		console.log('avatar delete!', this.connection.identity?.name)
+		this.mesh.removeFromParent()
+		this.div.remove()
 	}
 }
 
@@ -105,7 +107,20 @@ export function Planet() {
 	let planetCanvas: HTMLCanvasElement
 	let self: Connection
 
-	const avatars = new Map<string, Avatar>()
+	const avatarsById = new Map<string, Avatar>()
+
+	//remove avatars for connections that go offline
+	createEffect(() => {
+		for(const con of connections) {
+			//solid-js wierdness: if the following two conditionals are swapped
+			// this effect does not fire. 
+			if (con.status !== 'online' && avatarsById.has(con.id)) {
+				const avatar = avatarsById.get(con.id)
+				avatar?.delete()
+				avatarsById.delete(con.id)
+			}
+		}
+	})
 
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
@@ -127,7 +142,7 @@ export function Planet() {
 			selfAvatar = makeAvatar(1, 0x44aa88, 0)
 			selfAvatar.label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
 			scene.add(selfAvatar.mesh);
-			avatars.set(con.id, selfAvatar)
+			avatarsById.set(con.id, selfAvatar)
 			self = con
 			console.log('--- set self avatar', con.id)
 		})
@@ -140,7 +155,7 @@ export function Planet() {
 
 		const proxRange = 2
 		orbit.addEventListener('change', (e) => {
-			avatars.forEach(avatar => {
+			avatarsById.forEach(avatar => {
 				if (avatar == selfAvatar) return
 
 				const prevDistance = avatar.distance
@@ -183,17 +198,20 @@ export function Planet() {
 
 		onGotPosition((message) => {
 			let avatar: Avatar
-			if (!avatars.has(message.id)) {
-				const con = connections.find(con => con.id === message.id)
+			const con = connections.find(con => con.id === message.id)
+			if (con.status !== 'online')
+				return
+
+			if (!avatarsById.has(message.id)) {
 				const label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
 				avatar = makeAvatar(1)
 				scene.add(avatar.mesh);
 				avatar.connection = con
 				avatar.label = label || message.id
-				avatars.set(message.id, avatar)
+				avatarsById.set(message.id, avatar)
 			}
 
-			avatar = avatars.get(message.id)
+			avatar = avatarsById.get(message.id)
 			avatar.mesh.position.fromArray([
 				message.position.x,
 				message.position.y,
@@ -203,7 +221,7 @@ export function Planet() {
 			if (selfAvatar && avatar != selfAvatar)
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 
-			if (message.id === self.id) {
+			if (self && message.id === self.id) {
 				//make camera move to the new avatar position from the server
 				//calculate camera direction relative to avatar position and distance from sphere
 				direction
