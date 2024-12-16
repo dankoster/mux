@@ -8,6 +8,7 @@ import { broadcastPosition, onGotPosition } from './data/positionSocket';
 import { connections, getSelf } from './data/data';
 import { Connection } from '../server/types';
 import { ConnectVideo, DisconnectVideo } from './VideoCall';
+import { displayName, shortId } from './helpers';
 
 function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -100,8 +101,6 @@ class Avatar {
 	}
 }
 
-
-
 export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
@@ -140,7 +139,7 @@ export function Planet() {
 		let selfAvatar: Avatar
 		getSelf.then((con) => {
 			selfAvatar = makeAvatar(1, 0x44aa88, 0)
-			selfAvatar.label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
+			selfAvatar.label = displayName(con)
 			scene.add(selfAvatar.mesh);
 			avatarsById.set(con.id, selfAvatar)
 			self = con
@@ -207,7 +206,7 @@ export function Planet() {
 				avatar = makeAvatar(1)
 				scene.add(avatar.mesh);
 				avatar.connection = con
-				avatar.label = label || message.id
+				avatar.label = label || shortId(message.id)
 				avatarsById.set(message.id, avatar)
 			}
 
