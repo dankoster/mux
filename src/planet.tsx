@@ -9,6 +9,7 @@ import { connections, getSelf } from './data/data';
 import { Connection } from '../server/types';
 import { ConnectVideo, DisconnectVideo } from './VideoCall';
 import { displayName, shortId } from './helpers';
+import { degToRad } from 'three/src/math/MathUtils.js';
 
 function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -34,8 +35,8 @@ function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
 function makeSphere(radius: number, color: number) {
 	const sphereParams = {
 		radius: radius,
-		widthSegments: 36,
-		heightSegments: 18,
+		widthSegments: 72,
+		heightSegments: 36,
 		phiStart: 0,
 		phiLength: Math.PI * 2,
 		thetaStart: 0,
@@ -54,7 +55,7 @@ function makeSphere(radius: number, color: number) {
 	const sphereLineMat = new THREE.LineBasicMaterial({
 		color: 0xffffff,
 		transparent: true,
-		opacity: 0.5
+		opacity: 0.2
 	});
 	const meshMaterial = new THREE.MeshPhongMaterial({
 		color,
@@ -74,20 +75,20 @@ class Avatar {
 	mesh: THREE.Mesh
 	connection?: Connection
 	_distance: number = 0
-	private div: HTMLDivElement
+	private labelDiv: HTMLDivElement
 
 	constructor(label: HTMLDivElement, mesh: THREE.Mesh) {
-		this.div = label
+		this.labelDiv = label
 		this.mesh = mesh
 	}
 
 	set label(value: string) {
-		this.div.textContent = value
+		this.labelDiv.textContent = value
 	}
 
 	set distance(value: number) {
 		this._distance = value
-		this.div.style.opacity = `${100 - (this._distance * 10)}%`
+		this.labelDiv.style.opacity = `${100 - (this._distance * 3)}%`
 	}
 
 	get distance() {
@@ -97,7 +98,7 @@ class Avatar {
 	delete() {
 		console.log('avatar delete!', this.connection.identity?.name)
 		this.mesh.removeFromParent()
-		this.div.remove()
+		this.labelDiv.remove()
 	}
 }
 
@@ -134,7 +135,7 @@ export function Planet() {
 		document.body.appendChild(labelRenderer.domElement);
 
 		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
-		camera.position.z = 20;
+		camera.position.z = 60;
 
 		let selfAvatar: Avatar
 		getSelf.then((con) => {
@@ -143,10 +144,9 @@ export function Planet() {
 			scene.add(selfAvatar.mesh);
 			avatarsById.set(con.id, selfAvatar)
 			self = con
-			console.log('--- set self avatar', con.id)
 		})
 
-		const sphere = makeSphere(8, 0x156289)
+		const sphere = makeSphere(30, 0x156289)
 		scene.add(sphere);
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
@@ -171,9 +171,9 @@ export function Planet() {
 		})
 
 
-		////tilt camera as we lose altitude above the sphere
+		// //tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {
-		// 	const sphereRadius = 8
+		// 	const sphereRadius = 30
 		// 	const distanceToSphere = camera.position.distanceTo(sphere.position) - sphereRadius
 		// 	console.log('orbit change', distanceToSphere, camera.rotation)
 

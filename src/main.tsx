@@ -33,16 +33,26 @@ function App() {
 	})
 
 	const userClicked = (e: MouseEvent) => {
-		//TODO: showDmConversation(null)
-
 		menu.Clear()
 		menu.AddItem(new MenuItem({
-			text: `3d`,
-			onTextClick: () => setSelectedView('planet'),
+			text: `Chat`,
+			subtext: 'coming soon...'
 		}))
 		menu.AddItem(new MenuItem({
-			text: `people`,
-			onTextClick: () => setSelectedView('people'),
+			text: `Map`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Build`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Share`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Find`,
+			subtext: 'coming soon...'
 		}))
 
 		menu.AddSeparator()
@@ -64,7 +74,7 @@ function App() {
 			<div class="offlineMessage">⨳ connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
-			<div class="header">
+			{/* <div class="header">
 				<div class="header-left">
 					<h2 class="logo">⨳</h2>
 					<div class="stats">
@@ -72,7 +82,7 @@ function App() {
 						<div class="userCount"><b>{server.stats()?.offline ?? "?"}</b> offline 😴</div>
 					</div>
 				</div>
-			</div>
+			</div> */}
 
 			<VideoCall />
 

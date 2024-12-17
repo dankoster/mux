@@ -52,11 +52,11 @@
 		}
 
 		video {
-			position: fixed;
 			max-width: 150px;
-			top: 0;
-			right: 0;
 			transform: scale(0.5) translateX(10px);
+			/* position: fixed;
+			top: 0;
+			right: 0; */
 		}
 	}
 }
