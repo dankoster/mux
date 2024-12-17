@@ -150,18 +150,40 @@ body {
 	padding: 1rem;
 	/* border-top: 1px solid var(--separator-color); */
 	bottom: 0;
+	position: absolute;
+    width: 100%;
 
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
 
-	gap: 1rem;
+	column-gap: 2rem;
+	row-gap: 0.5rem;
 	justify-content: center;
 	align-items: center;
 	touch-action: none;
 
 	container-type: inline-size;
 	container-name: toolbar;
+
+	.stats {
+		touch-action: none;
+		font-size: small;
+		display: flex;
+		column-gap: 1rem;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+
+		h2 {
+			margin-block: 0;
+		}
+
+		.userCount {
+			text-wrap: nowrap;
+		}
+	}
+
 
 	input[type="text"] {
 		touch-action: none;

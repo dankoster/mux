@@ -53,7 +53,7 @@
 
 		video {
 			max-width: 150px;
-			transform: scale(0.5) translateX(10px);
+			transform: scale(0.5) translateY(-50%);
 			/* position: fixed;
 			top: 0;
 			right: 0; */
