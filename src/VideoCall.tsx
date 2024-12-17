@@ -318,8 +318,9 @@ let peerRemoved: (conId: string) => void
 const peersById = new Map<string, PeerConnection>()
 
 export default function VideoCall() {
-	let localVideo: HTMLVideoElement
 	let videoContainer: HTMLDivElement
+	let localVideo: HTMLVideoElement
+	let localVideoContainer: HTMLDivElement
 	let observer: MutationObserver
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
@@ -361,7 +362,8 @@ export default function VideoCall() {
 		});
 
 		//handle style changes when videos are added and removed
-		observer = new MutationObserver(() => localVideo?.classList.toggle('alone', videoContainer.childNodes.length === 1))
+		observer = new MutationObserver(() => 
+			localVideoContainer?.classList.toggle('alone', videoContainer.children.length === 1))
 		observer.observe(videoContainer, { childList: true })
 	})
 
@@ -378,9 +380,9 @@ export default function VideoCall() {
 	})
 
 	return <div id="videos-container" class="video-call" ref={videoContainer}>
-		<div>
-			<video id="local-video" class="local alone" ref={localVideo} autoplay playsinline />
-			<div>{myName()}</div>
+		<div class="video-ui local alone" ref={localVideoContainer}>
+			<video id="local-video" ref={localVideo} autoplay playsinline />
+			<span class="name">{myName()}</span>
 		</div>
 
 		<For each={peers()}>
@@ -414,8 +416,8 @@ function PeerVideo(props: { peer: PeerConnection }) {
 		}
 	})
 
-	return <div>
+	return <div class="video-ui peer">
 		<video id={props.peer.conId} class="remote" ref={videoElement} autoplay playsinline />
-		<div>{name()}</div>
+		<span class="name">{name()}</span>
 	</div>
 }

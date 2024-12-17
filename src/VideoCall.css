@@ -1,27 +1,62 @@
 .video-call {
 	position: absolute;
-    width: 100%;
-    display: grid;
-    grid-auto-flow: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2rem;
-    top: 1rem;
+	width: 100%;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(80px, max-content));
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	overflow: hidden;
+	z-index: 1;
+	padding: 1rem;
 
-
-	video {
-		border-radius: 15px;
+	.video-ui {
+		justify-items: center;
 		max-width: 150px;
-		max-height: 150px;
-		z-index: 1;
-		transition: all 0.6s;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		position: relative;
+
+		.name {
+			text-overflow: ellipsis;
+            max-width: inherit;
+            overflow: hidden;
+            display: block;
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            backdrop-filter: brightness(0.5);
+            border-radius: 0.5rem;
+            padding-inline: 0.5rem;
+            font-size: x-small;
+		}
+
+		video {
+			border-radius: 10px;
+			max-width: 100%;
+		}
 	}
 
 	.local {
-		transform: scaleX(-1);
+		transition: all 0.6s;
+
+		video {
+			transform: scaleX(-1);
+		}
 	}
 
 	.alone {
-		transform: scaleX(-1) scale(0.5) translateX(10px);
+		.name {
+			display: none;
+		}
+
+		video {
+			position: fixed;
+			max-width: 150px;
+			top: 0;
+			right: 0;
+			transform: scale(0.5) translateX(10px);
+		}
 	}
 }

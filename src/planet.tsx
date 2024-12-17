@@ -202,7 +202,7 @@ export function Planet() {
 				return
 
 			if (!avatarsById.has(message.id)) {
-				const label = con?.identity ? `${con?.identity?.name} (${con.kind})` : null
+				const label = displayName(con)
 				avatar = makeAvatar(1)
 				scene.add(avatar.mesh);
 				avatar.connection = con
