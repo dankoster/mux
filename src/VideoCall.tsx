@@ -42,6 +42,7 @@ onCallEvent(dm => {
 })
 
 //both sides need to call this funciton
+// the callee is polite, the caller is not
 export function ConnectVideo(conId: string, polite: boolean = true) {
 	console.log('ConnectVideo', conId)
 
@@ -51,7 +52,10 @@ export function ConnectVideo(conId: string, polite: boolean = true) {
 		return //already connected?
 	}
 
-	SendVideoCallRequest(conId, 'start')
+	//Caller should send a connection request to the callee
+	//Calee does not need to send a connection request back
+	if (!polite)
+		SendVideoCallRequest(conId, 'start')
 
 	const peer = new PeerConnection({
 		conId,
@@ -69,7 +73,6 @@ export function ConnectVideo(conId: string, polite: boolean = true) {
 	//cleanup the onDM evnet handler when we're done
 	peer.addAbortController(abortController)
 
-	console.log('setPeer', conId)
 	peersById.set(conId, peer)
 	peerAdded(conId)
 	peer.startCall(localStream)
@@ -141,7 +144,7 @@ export default function VideoCall() {
 		});
 
 		//handle style changes when videos are added and removed
-		observer = new MutationObserver(() => 
+		observer = new MutationObserver(() =>
 			localVideoContainer?.classList.toggle('alone', videoContainer.children.length === 1))
 		observer.observe(videoContainer, { childList: true })
 	})
