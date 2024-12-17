@@ -9,8 +9,6 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
-	room: "room",
-	"room/join": "room/join",
 	becomeAnonymous: "becomeAnonymous",
 	log: "log",
 	friendRequest: "friendRequest",

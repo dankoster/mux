@@ -8,8 +8,6 @@ export type ApiRoute = "sse" |
 	"log" |
 	"discardKey" |
 	"webRTC" |
-	"room" |
-	"room/join" |
 	"friendRequest" | 
 	"acceptFriendRequest" | 
 	"dm" |
@@ -18,23 +16,12 @@ export type ApiRoute = "sse" |
 	"publicKey" |
 	"ws";
 
-//is there a way to have the RoomRoute be nested under ApiRoute
-// like this { setColor: "setColor", room: { join: "room/join"}}
-// type FullApi = { 
-// 	[Property in ApiRoute | RoomRoute]: 
-// 	Property extends RoomRoute ? `room/${Property}` : Property 
-// }
-
-
 export type SSEvent = "pk" |
 	"id" |
 	"webRTC" |
 	"connections" |
 	"new_connection" |
-	"rooms" |
-	"new_room" |
 	"delete_connection" |
-	"delete_room" |
 	"update" |
 	"refresh" |
 	"reconnect" |
@@ -43,11 +30,6 @@ export type SSEvent = "pk" |
 	"friendList" | 
 	"friendRequestAccepted" |
 	"dm";
-
-export type Room = {
-	id: string;
-	ownerId: string;
-};
 
 export type Identity = {
 	id?: string;
@@ -62,7 +44,6 @@ export type Connection = {
 	color?: string;
 	text?: string;
 	status?: string | null;
-	roomId?: string;
 	kind?: string;
 	publicKey?: string;
 	identity?: Identity;

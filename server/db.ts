@@ -1,6 +1,6 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, DM, DMInsert, DMRequest, Friend, FriendRequest, Identity, Room } from "./types.ts";
+import type { Connection, DM, DMInsert, DMRequest, Friend, FriendRequest, Identity } from "./types.ts";
 
 const db = new Database("data.db");
 
@@ -44,12 +44,6 @@ db.exec(`CREATE TABLE IF NOT EXISTS friendRequest (
 	);`
 )
 
-db.exec(`CREATE TABLE IF NOT EXISTS room (
-		id TEXT PRIMARY KEY,
-		ownerId TEXT
-	);`
-)
-
 db.exec(`CREATE TABLE IF NOT EXISTS connection (
 		uuid TEXT PRIMARY KEY,
 		id TEXT NOT NULL,
@@ -57,7 +51,6 @@ db.exec(`CREATE TABLE IF NOT EXISTS connection (
 		color TEXT,
 		text TEXT,
 		status TEXT,
-		roomId TEXT,
 		kind TEXT,
 		FOREIGN KEY(identityId) REFERENCES identity(id)
 	);`
@@ -148,19 +141,6 @@ export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, ti
 	return selectAllDmsAfterTimestamp.all({ uuid1, uuid2, timestamp: subsecondTimestamp })
 }
 
-db.exec(`CREATE TABLE IF NOT EXISTS log (
-		id INTEGER PRIMARY KEY,
-		timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
-		action TEXT,
-		ip TEXT,
-		userAgent TEXT,
-		uuid TEXT,
-		identityId TEXT,
-		roomId TEXT,
-		note TEXT
-	);`
-)
-
 AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
 function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableName: string, columnName: string, columnType: "TEXT" }) {
 	const transaction = db.transaction(() => {
@@ -198,47 +178,13 @@ export function persistPublicKey({ uuid, publicKey }: { uuid: string, publicKey:
 	return updatePublicKey.all({ uuid, publicKey })
 }
 
-const insertLog = db.prepare(`INSERT INTO log 
-	(action, ip, userAgent, uuid, identityId, roomId, note)
-	VALUES (:action, :ip, :userAgent, :uuid, :identityId, :roomId, :note);`
-)
-export function log({ action, ip = null, userAgent = null, uuid = null, identityId = null, roomId = null, note = null }
-	: {
-		action: string,
-		ip?: string | null,
-		userAgent?: string | null,
-		uuid?: string | null,
-		identityId?: string | null,
-		roomId?: string | null,
-		note?: string | null,
-	}) {
-	insertLog.run({
-		action
-		, ip
-		, userAgent
-		, uuid
-		, identityId
-		, roomId
-		, note
-	})
-}
 
-const upsertRoom = db.prepare(`INSERT INTO room 
-	( id, ownerId )
-	VALUES ( :id, :ownerId )
-	ON CONFLICT(id)
-	DO UPDATE SET 
-		ownerId = excluded.ownerId
-	RETURNING *;`
-)
 
 const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
-const deleteRoomByIds = db.prepare(`DELETE FROM room WHERE id = :id AND ownerId = :ownerId;`)
-const selectRooms = db.prepare(`SELECT * FROM room;`)
 
 const upsertConnection = db.prepare(`INSERT INTO connection 
-	(uuid, id, identityId, color, text, status, roomId, kind, publicKey) 
-	VALUES (:uuid, :id, :identityId, :color, :text, :status, :roomId, :kind, :publicKey)
+	(uuid, id, identityId, color, text, status, kind, publicKey) 
+	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
 		id = excluded.id,
@@ -246,7 +192,6 @@ const upsertConnection = db.prepare(`INSERT INTO connection
 		color = excluded.color,
 		text = excluded.text,
 		status = excluded.status,
-		roomId = excluded.roomId,
 		kind = excluded.kind,
 		publicKey = excluded.publicKey
 	RETURNING *;`
@@ -341,14 +286,6 @@ export function serverInitAndCleanup() {
 	return db.exec(`UPDATE connection SET status = NULL`)
 }
 
-export function persistRoom(room: Room) {
-	return upsertRoom.get({ ...room })
-}
-
-export function deleteRoom(room: Room) {
-	return deleteRoomByIds.get({ ...room })
-}
-
 export function deleteConnection(uuid: string) {
 	return deleteConnectionByUUID.get({ uuid })
 }
@@ -402,13 +339,6 @@ export function getConnectionsByUUID() {
 		result.set(c.uuid, con as Connection)
 	})
 
-	return result
-}
-
-export function getRoomsByUUID() {
-	const rooms = selectRooms.all()
-	const result = new Map<string, Room>()
-	rooms.forEach(r => result.set(r.id, r as Room))
 	return result
 }
 

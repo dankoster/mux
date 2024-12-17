@@ -255,35 +255,6 @@ body {
 	}
 }
 
-.rooms {
-	display: flex;
-	gap: 1rem;
-	flex-wrap: wrap;
-	border-bottom: 1px solid;
-	padding: 1.5rem;
-	align-content: stretch;
-	touch-action: none;
-	position: relative;
-
-	.userCount {
-		font-size: x-small;
-		text-align: center;
-		margin-bottom: 0.5rem;
-	}
-
-	/* &::before {
-		content: "rooms";
-		top: -1.1rem;
-		position: absolute;
-		color: #ffffff0d;
-		font-size: 50px;
-		font-weight: bolder;
-		z-index: -1;
-		left: -0.1rem;
-		text-transform: uppercase;
-	} */
-}
-
 .room-button {
 	color: white;
 	font-size: x-large;

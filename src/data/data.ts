@@ -1,8 +1,8 @@
 import { API_URI } from "../API_URI";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { SSEvent, AuthTokenName, Room, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
-import { apiRoute, DELETE, POST } from "./http";
+import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
+import { apiRoute, POST } from "./http";
 import { handleNewDirectMessage, getAllUnread, sharePrivateKey } from "./directMessages";
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -15,9 +15,6 @@ const sse: { [Property in SSEvent]: Property } = {
 	update: "update",
 	new_connection: "new_connection",
 	delete_connection: "delete_connection",
-	rooms: "rooms",
-	new_room: "new_room",
-	delete_room: "delete_room",
 	friendRequest: "friendRequest",
 	friendList: "friendList",
 	friendRequests: "friendRequests",
@@ -33,7 +30,6 @@ type Stats = {
 }
 
 
-const [rooms, setRooms] = createStore<Room[]>([])
 const [connections, setConnections] = createStore<Connection[]>([])
 const [friendRequests, setFriendRequests] = createStore<FriendRequest[]>([])
 const [friends, setFriends] = createStore<Friend[]>([])
@@ -44,7 +40,7 @@ const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
 export {
-	id, pk, connections, self, rooms, stats, serverOnline, friendRequests, friends
+	id, pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
 let selfPromiseResolver: (con: Connection) => void
@@ -53,18 +49,6 @@ createEffect(() => {
 	const value = self()
 	if (value) selfPromiseResolver(value)
 })
-
-export function connectionsInRoom() {
-	return connections.filter(
-		con =>
-			self()?.roomId
-			&& con.id != self()?.id
-			&& con.roomId === self()?.roomId
-	)
-}
-
-export const room = createMemo(() => rooms.find(r => r.id === self()?.roomId))
-
 
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
@@ -187,28 +171,6 @@ export async function becomeAnonymous() {
 	}
 }
 
-export async function createRoom() {
-	const result = await POST(apiRoute.room)
-	if (!result.ok) throw new Error("could not create room")
-
-	//Optimistically create the room locally
-	// so we can update the UI while we wait for the server
-	// to send us a room ID via SSE
-	const room = await result.json() as Room
-	const myId = id()
-	const index = connections.findIndex(con => con.id === myId)
-	if (!(index >= 0)) throw new Error('ID not found!')
-
-	setConnections({ from: index, to: index }, "roomId", room.id)
-	return room
-}
-export async function joinRoom(roomId: string) {
-	return await POST(apiRoute["room/join"], { subRoute: roomId })
-}
-export async function exitRoom(roomId: string) {
-	return await DELETE(apiRoute.room, roomId)
-}
-
 class SSEventEmitter extends EventTarget {
 	onSseEvent(event: SSEvent, value: string | {}) {
 		this.dispatchEvent(new CustomEvent(event, { detail: value }))
@@ -266,11 +228,6 @@ function handleSseEvent(event: SSEventPayload) {
 			getAllUnread(friends, connections)
 			console.log('SSE', event.event, conData);
 			break;
-		case sse.rooms:
-			const roomData = JSON.parse(event.data) as Room[]
-			setRooms(roomData)
-			console.log('SSE', event.event, roomData)
-			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
 		case sse.refresh:
@@ -290,11 +247,6 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections({ from: index, to: index }, update.field, update.value)
 			onConnectionsChanged()
 			break;
-		case sse.new_room:
-			const newRoom = JSON.parse(event.data) as Room
-			console.log('SSE', event.event, newRoom)
-			setRooms(rooms.length, newRoom)
-			break;
 		case sse.webRTC:
 			// console.log('SSE', event.event, event.data)
 			try {
@@ -303,11 +255,6 @@ function handleSseEvent(event: SSEventPayload) {
 			} catch (error) {
 				console.error("Failed to parse webRTC event", event)
 			}
-			break;
-		case sse.delete_room:
-			const room = JSON.parse(event.data) as Room
-			console.log('SSE', event.event, room)
-			setRooms(rooms.filter(r => r.id !== room.id))
 			break;
 		case sse.new_connection:
 			const newCon = JSON.parse(event.data) as Connection
