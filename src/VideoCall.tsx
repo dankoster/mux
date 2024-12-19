@@ -2,49 +2,27 @@
 import { createMemo, createSignal, For, onCleanup, onMount } from "solid-js";
 import "./VideoCall.css"
 import * as server from "./data/data"
-import type { DM } from "../server/types"
-import { onCallEvent, sendDm } from "./data/directMessages";
 import { uiLog } from "./uiLog";
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
+import { onVisibilityChange } from "./onVisibilityChange";
+import { trace } from "./trace";
 
-let localStream: MediaStream
+export let localStream: MediaStream
 
-type ConnectionCommand = 'start' | 'end'
-export function SendVideoCallRequest(conId: string, message: ConnectionCommand) {
-	const con = server.connections.find(c => c.id === conId)
-	const self = server.self();
-	const dm: DM = {
-		toId: con.id,
-		fromId: self.id,
-		fromName: self.identity?.name,
-		message,
-		kind: "call"
-	};
-	sendDm(dm, con.publicKey);
-}
-
-const handleConnectionCommand: { [key in ConnectionCommand]: (conId: string) => void } = {
-	start: (conId) => ConnectVideo(conId, true),
-	end: (conId) => DisconnectVideo(conId)
-}
-
-onCallEvent(dm => {
-	//messages are broadcast to all connections that share an identity
-	// but we only want to handle call messages for us specifically
-	if (dm.toId !== server.self()?.id) {
-		//console.log('ignoring call message', dm)
-		return
+server.onWebRtcMessage((message) => {
+	if (!peersById.has(message.senderId)) {
+		ConnectVideo(message.senderId, false)
 	}
 
-	console.log('onCallEvent', dm)
-	handleConnectionCommand[dm.message as ConnectionCommand](dm.fromId)
+	peersById.get(message.senderId)?.handleMessage(JSON.parse(message.message))
 })
+
 
 //both sides need to call this funciton
 // the callee is polite, the caller is not
 export function ConnectVideo(conId: string, polite: boolean = true) {
-	console.log('ConnectVideo', conId)
+	console.log('ConnectVideo', conId, { polite })
 
 	if (!localStream) throw new Error('local stream not ready')
 	if (peersById.has(conId)) {
@@ -52,26 +30,11 @@ export function ConnectVideo(conId: string, polite: boolean = true) {
 		return //already connected?
 	}
 
-	//Caller should send a connection request to the callee
-	//Calee does not need to send a connection request back
-	if (!polite)
-		SendVideoCallRequest(conId, 'start')
-
 	const peer = new PeerConnection({
 		conId,
 		polite,
+		onDisconnect: () => DisconnectVideo(conId)
 	})
-
-	const abortController = server.onWebRtcMessage((message) => {
-		//only handle messages from this peer
-		if (message.senderId === conId) {
-			const { description, candidate } = JSON.parse(message.message);
-			peer.handleMessage({ description, candidate })
-		}
-	})
-
-	//cleanup the onDM evnet handler when we're done
-	peer.addAbortController(abortController)
 
 	peersById.set(conId, peer)
 	peerAdded(conId)
@@ -90,19 +53,32 @@ export function DisconnectVideo(conId: string) {
 	peer.endCall()
 	peersById.delete(conId)
 	peerRemoved(conId)
+}
 
-	SendVideoCallRequest(conId, 'end')
+export async function startLocalVideo() {
+	localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
+	if (localVideo) {
+		localVideo.srcObject = localStream;
+		localVideo.muted = true;
+	}
+}
+
+export async function stopLocalVideo() {
+	localStream?.getTracks().forEach(track => track.stop())
+	peersById?.forEach(peer => peer.holdCall())
 }
 
 let peerAdded: (conId: string) => void
 let peerRemoved: (conId: string) => void
+let localVideo: HTMLVideoElement
 
 const peersById = new Map<string, PeerConnection>()
 
 export default function VideoCall() {
 	let videoContainer: HTMLDivElement
-	let localVideo: HTMLVideoElement
 	let localVideoContainer: HTMLDivElement
+	let popover: HTMLDivElement
 	let observer: MutationObserver
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
@@ -117,31 +93,25 @@ export default function VideoCall() {
 		setPeers(Array.from(peersById.values()))
 	}
 
-	async function startLocalVideo() {
-		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-		localVideo.srcObject = localStream;
-		localVideo.muted = true;
+	const popoverClick = () => {
+		console.log('popoverClick')
+		startLocalVideo()
+		popover.hidePopover()
 	}
 
 	onMount(async () => {
+		startLocalVideo()
 
-		//connect local video
-		if (!document.hidden)
-			await startLocalVideo()
+		// onVisibilityChange(visible => {
+		// 	trace('visible', visible)
+		// 	if (!visible) {
+		// 		//say 'welcome back' in popover
+		// 		// click anywhere to start video
+		// 		// stopLocalVideo()
+		// 		// popover.showPopover()
+		// 	}
+		// });
 
-		//pause while tab is not in view
-		document.addEventListener("visibilitychange", async () => {
-			if (document.hidden) {
-				console.log('/// Hidden')
-				localStream.getTracks().forEach(track => track.stop())
-				peersById.forEach(peer => peer.holdCall())
-
-			} else {
-				console.log('/// Visible')
-				startLocalVideo()
-				peersById.forEach(peer => peer.resumeCall(localStream))
-			}
-		});
 
 		//handle style changes when videos are added and removed
 		observer = new MutationObserver(() =>
@@ -165,6 +135,11 @@ export default function VideoCall() {
 		<div class="video-ui local alone" ref={localVideoContainer}>
 			<video id="local-video" ref={localVideo} autoplay playsinline />
 			<span class="name">{myName()}</span>
+		</div>
+
+		<div ref={popover} popover>
+			Popover content
+			<button onclick={popoverClick}>Enable Video</button>
 		</div>
 
 		<For each={peers()}>

@@ -5,7 +5,7 @@ import { createSignal } from "solid-js";
 import { localStorage_GetMap, localStorage_SetMap } from "./localStore";
 import { connections, isSelf, self } from "./data";
 
-type DMEventType = 'unreadMessges' | 'newMessage' | 'call'
+type DMEventType = 'unreadMessges' | 'newMessage'
 type UnreadCountByConId = { [key: string]: number }
 type LastReadTimestamp = { [key: string]: number }
 const LAST_READ_DMS = 'lastCheckedDms'
@@ -68,10 +68,6 @@ async function handleKeyShare(dm: DM) {
 class DMEventEmitter extends EventTarget {
 	Dispatch(event: DMEventType, messagesByConId: Map<string, Map<number, DM>>) {
 		this.dispatchEvent(new CustomEvent(event, { detail: messagesByConId }))
-	}
-	DispatchCallMessage(dm: DM) {
-		const event: DMEventType = 'call'
-		this.dispatchEvent(new CustomEvent(event, { detail: dm }))
 	}
 	DispatchNewMessage(dm: DM) {
 		const event: DMEventType = 'newMessage'
@@ -143,15 +139,6 @@ export function setLastReadTimestamp(conId: string, timestamp: number) {
 	console.log("setLastReadTimestamp", conId, timestamp)
 
 	clearUnreadCount(conId)
-}
-
-export function onCallEvent(callback: (message: DM) => void) {
-	const ac = new AbortController()
-	const event: DMEventType = 'call'
-	DirectMessageEvents.addEventListener(event, async (e: CustomEvent) => {
-		callback(e.detail)
-	}, { signal: ac.signal })
-	return ac
 }
 
 export function onNewMessage(callback: (dm: DM) => void) {
@@ -276,11 +263,6 @@ async function decryptAndSaveMessage(dm: DM) {
 	} catch (error) {
 		console.warn(error)
 		console.log('could not decrypt', dm)
-	}
-
-	if (dm.kind === "call") {
-		DirectMessageEvents.DispatchCallMessage(dm)
-		return
 	}
 
 	const conId = sentByMe ? dm.toId : dm.fromId;

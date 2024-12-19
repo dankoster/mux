@@ -20,16 +20,16 @@
 
 		.name {
 			text-overflow: ellipsis;
-            max-width: inherit;
-            overflow: hidden;
-            display: block;
-            position: absolute;
-            top: 0.25rem;
-            left: 0.25rem;
-            backdrop-filter: brightness(0.5);
-            border-radius: 0.5rem;
-            padding-inline: 0.5rem;
-            font-size: x-small;
+			max-width: inherit;
+			overflow: hidden;
+			display: block;
+			position: absolute;
+			top: 0.25rem;
+			left: 0.25rem;
+			backdrop-filter: brightness(0.5);
+			border-radius: 0.5rem;
+			padding-inline: 0.5rem;
+			font-size: x-small;
 		}
 
 		video {
@@ -44,6 +44,10 @@
 		video {
 			transform: scaleX(-1);
 		}
+	}
+
+	.video-muted {
+		filter: brightness(0.5) blur(1px);
 	}
 
 	.alone {

@@ -37,6 +37,7 @@ type pcInit = {
 	conId: string;
 	polite: boolean;
 	onTrack?: (track: MediaStreamTrack) => void;
+	onDisconnect: () => void;
 };
 export class PeerConnection {
 	remoteStream = new MediaStream();
@@ -51,13 +52,14 @@ export class PeerConnection {
 	ignoreOffer = false;
 
 	onTrack: (track: MediaStreamTrack) => void;
+	onDisconnect: () => void;
 
-	constructor({ conId, polite, onTrack }: pcInit) {
+	constructor({ conId, polite, onDisconnect }: pcInit) {
 
 		this.conId = conId;
 		this.pc = new RTCPeerConnection(servers);
-		this.onTrack = onTrack;
 		this.polite = polite;
+		this.onDisconnect = onDisconnect;
 
 		// Pull tracks from remote stream, add to video stream
 		this.pc.ontrack = (event) => {
@@ -81,7 +83,6 @@ export class PeerConnection {
 			try {
 				this.makingOffer = true;
 				await this.pc.setLocalDescription();
-				//await server.sendDM(otherUser()?.id, JSON.stringify({ description: this.pc.localDescription }))
 				await this.sendMessage({ description: this.pc.localDescription });
 			} catch (err) {
 				console.error(err);
@@ -96,17 +97,16 @@ export class PeerConnection {
 			}
 
 			if (this.pc.iceConnectionState === 'disconnected') {
-				// onDisconnect()
-				console.log('disconnect!');
+				this.onDisconnect()
 			}
 		};
 
 		// this.pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
 		this.pc.onicecandidate = ({ candidate }) => this.sendMessage({ candidate });
 
-		// this.pc.onsignalingstatechange = () => {
-		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
-		// }
+		this.pc.onsignalingstatechange = () => {
+			console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
+		}
 	}
 
 	addAbortController(ac: AbortController) {
@@ -131,8 +131,11 @@ export class PeerConnection {
 	}
 
 	holdCall() {
-		this.localRTCRtpSenders.forEach(t => {
-			this.pc.removeTrack(t);
+		//don't close the connection, just don't send anything
+		// could replace tracks to send hold music or something
+		this.localRTCRtpSenders.forEach(sender => {
+			console.log('holdCall - removing', sender)
+			this.pc.removeTrack(sender);
 		});
 	}
 
@@ -198,7 +201,6 @@ export class PeerConnection {
 				await this.pc.setRemoteDescription(description);
 				if (description.type === "offer") {
 					await this.pc.setLocalDescription();
-					// server.sendDM(otherUser()?.id, JSON.stringify({ description: this.pc.localDescription }));
 					this.sendMessage({ description: this.pc.localDescription });
 				}
 			} else if (candidate) {
