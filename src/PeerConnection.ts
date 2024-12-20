@@ -144,7 +144,7 @@ export class PeerConnection {
 	}
 
 	endCall() {
-		console.groupCollapsed('end call...');
+		console.log('PeerConnection.endCall', this.conId);
 
 		this.abortControllers.forEach(ac => {
 			ac.abort();
@@ -156,12 +156,10 @@ export class PeerConnection {
 
 		try {
 			//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
-			this.pc?.close();
+			this.pc.close();
 		} catch (err) {
 			console.error(err);
 		}
-
-		console.groupEnd();
 	}
 
 	logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {

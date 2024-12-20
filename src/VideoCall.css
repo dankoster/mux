@@ -47,7 +47,7 @@
 	}
 
 	.video-muted {
-		filter: brightness(0.5) blur(1px);
+		backdrop-filter: brightness(0.5) blur(1px);
 	}
 
 	.alone {

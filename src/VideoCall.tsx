@@ -55,7 +55,7 @@ export function DisconnectVideo(conId: string) {
 	peerRemoved(conId)
 }
 
-export async function startLocalVideo() {
+async function startLocalVideo() {
 	localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
 
 	if (localVideo) {
@@ -64,9 +64,17 @@ export async function startLocalVideo() {
 	}
 }
 
-export async function stopLocalVideo() {
+async function stopLocalVideo() {
 	localStream?.getTracks().forEach(track => track.stop())
 	peersById?.forEach(peer => peer.holdCall())
+}
+
+export type TrackKind = 'audio' | 'video'
+export async function enableLocal(kind: TrackKind, enable: boolean) {
+	localStream.getTracks().forEach(track => {
+		if(track.kind === kind)
+			track.enabled = enable
+	})
 }
 
 let peerAdded: (conId: string) => void
@@ -115,7 +123,7 @@ export default function VideoCall() {
 
 		//handle style changes when videos are added and removed
 		observer = new MutationObserver(() =>
-			localVideoContainer?.classList.toggle('alone', videoContainer.children.length === 1))
+			localVideoContainer?.classList.toggle('alone', videoContainer.children.length <= 2))
 		observer.observe(videoContainer, { childList: true })
 	})
 
@@ -152,6 +160,9 @@ function PeerVideo(props: { peer: PeerConnection }) {
 	let videoElement: HTMLVideoElement
 
 	const handleMuteEvent = (track: MediaStreamTrack) => {
+		if(track.kind == 'video') {
+			videoElement.srcObject = track.muted ? null : props.peer.remoteStream
+		}
 		videoElement.classList.toggle(`${track.kind}-muted`, track.muted)
 	}
 
@@ -162,8 +173,8 @@ function PeerVideo(props: { peer: PeerConnection }) {
 		setName(displayName(con) || shortId(props.peer.conId))
 
 		console.log('mounted!', videoElement, props.peer.remoteStream)
-		props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('addTrack', ev))
-		props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('removetrack', ev))
+		props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('PeerVideo.addTrack', ev))
+		props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('PeerVideo.removetrack', ev))
 		videoElement.srcObject = props.peer.remoteStream
 		props.peer.onTrack = (track: MediaStreamTrack) => {
 			console.log('PeerVideo.onTrack', track)

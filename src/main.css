@@ -151,7 +151,7 @@ body {
 	/* border-top: 1px solid var(--separator-color); */
 	bottom: 0;
 	position: absolute;
-    width: 100%;
+	width: 100%;
 
 	display: flex;
 	flex-direction: row;
@@ -232,12 +232,16 @@ body {
 }
 
 .avatar {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
 	text-wrap: nowrap;
-	overflow: hidden;
-
+    overflow: hidden;
+    display: grid;
+    grid-auto-flow: column;
+    align-items: stretch;
+	user-select: none;
+	
+	& * {
+		align-content: center;
+	}
 
 	&.button {
 		cursor: pointer;
@@ -247,10 +251,32 @@ body {
 		.name {
 			position: relative;
 			font-weight: bold;
+			padding-inline: 1rem;
 		}
 
+		.audio,
+		.video {
+			
+			padding-inline: 1rem;
+			border-left: 1px solid var(--button-outline-color);
+
+			svg {
+				fill: #4ae872bf;
+				width: 1rem;
+				height: 1rem;
+				vertical-align: text-top;
+			}
+		}
+
+		.muted {
+			svg {
+				fill: #e84a4abf;
+			}
+		}
+
+
 		img {
-			max-width: 1.75rem;
+			max-width: 2.5rem;
 		}
 	}
 
