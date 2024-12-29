@@ -11,7 +11,7 @@ type LastReadTimestamp = { [key: string]: number }
 const LAST_READ_DMS = 'lastCheckedDms'
 const SHARED_KEYS = 'sharedKeys'
 
-console.log('GETTING DM CRYPTO KEYS')
+// console.log('GETTING DM CRYPTO KEYS')
 let myKeys: CryptoKeyPair
 
 const sharedKeyByConnectionId = new Map<string, CryptoKey>()
@@ -153,7 +153,7 @@ export function onNewMessage(callback: (dm: DM) => void) {
 //we're starting up... query the server for unread messages
 export async function getAllUnread(friends: Friend[], connections: Connection[]) {
 	if (!friends?.length || !connections?.length) {
-		console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
+		// console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
 		return
 	}
 	const friendConId = connections

@@ -213,12 +213,12 @@ function handleSseEvent(event: SSEventPayload) {
 				}, [])
 				.join()
 			localStorage.setItem(OLD_KEYS, updatedOldKeys)
-			console.log('SSE', event.event, newKey, { history: updatedOldKeys.split(',') });
+			//console.log('SSE', event.event, newKey, { history: updatedOldKeys.split(',') });
 			break;
 		case sse.id:
 			setId(event.data);
 			if (event.data && connections) setSelf(connections.find(con => con.id === event.data))
-			console.log('SSE', event.event, event.data);
+			//console.log('SSE', event.event, event.data);
 			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
@@ -226,17 +226,17 @@ function handleSseEvent(event: SSEventPayload) {
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			onConnectionsChanged()
 			getAllUnread(friends, connections)
-			console.log('SSE', event.event, conData);
+			//console.log('SSE', event.event, conData);
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
 		case sse.refresh:
-			console.log("REFRESH")
+			//console.log("REFRESH")
 			location.reload()
 			break;
 		case sse.update:
 			const update = JSON.parse(event.data) as Update
-			console.log('SSE', event.event, update)
+			//console.log('SSE', event.event, update)
 			if (update.field === 'identity') {
 				console.log('parsing identity...')
 				update.value = update.value && JSON.parse(update.value)
@@ -277,7 +277,7 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.friendRequests:
 			const frenReqList = JSON.parse(event.data)
 			setFriendRequests(frenReqList)
-			console.log('SSE', event.event, frenReqList)
+			//console.log('SSE', event.event, frenReqList)
 			break;
 		case sse.friendRequestAccepted:
 			const newFriend = JSON.parse(event.data) as Friend
@@ -285,13 +285,13 @@ function handleSseEvent(event: SSEventPayload) {
 				fr => fr.fromId === newFriend.friendId || fr.toId === newFriend.friendId)
 			setFriendRequests(friendRequests.filter(fr => fr.id !== acceptedFrenReq.id))
 			setFriends(friends.length, newFriend)
-			console.log('SSE', event.event, { newFriend, acceptedFrenReq })
+			//console.log('SSE', event.event, { newFriend, acceptedFrenReq })
 			break;
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
 			getAllUnread(friends, connections)
-			console.log('SSE', event.event, friends)
+			//console.log('SSE', event.event, friends)
 			break;
 
 		case sse.dm:
@@ -330,7 +330,7 @@ function onConnectionsChanged() {
 		) {
 			const dateCreated = new Date(Number.parseInt(con.id))
 			const kind = con.id === me.id ? "myself" : con.kind
-			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()} ${con.publicKey ? 'YES key' : 'NO key'}`)
+			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()} pk:${con.publicKey}`)
 			sharePrivateKey(me.id, con)
 		}
 	})

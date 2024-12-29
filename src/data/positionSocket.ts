@@ -11,11 +11,9 @@ const handlers: PositionMessageHandler[] = []
 
 connectSocket()
 function connectSocket() {
-	console.log('connecting websocket!')
 	const socket = new WebSocket(`${API_URI}/${apiRoute.ws}`);
 	socket.onopen = () => {
 		socket.send(pk()) //auth by sending UUID as first message
-		console.log("WS - Connected to server")
 	}
 
 	//reconnect on close!
