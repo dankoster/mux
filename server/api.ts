@@ -373,7 +373,7 @@ api.post(`/${apiRoute.publicKey}`, async (ctx) => {
 
 	con.publicKey = publicKey
 	db.persistPublicKey({ uuid, publicKey })
-	console.log('PUBLIC KEY', 'saved for', con.identity?.name, uuid)
+	console.log('PUBLIC KEY saved for', con.identity ? `${con.identity.source}:${con.identity.name}` : `conId:${con.id}`, uuid)
 	ctx.response.status = 200
 
 	//tell everyone else that I have a new public key
