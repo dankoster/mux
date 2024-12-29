@@ -36,6 +36,11 @@
 			border-radius: 10px;
 			max-width: 100%;
 		}
+
+		.video-muted {
+			backdrop-filter: brightness(0.5) blur(1px) opacity(0.5);
+			filter: brightness(0.5) blur(1px) opacity(0.5);
+		}
 	}
 
 	.local {
@@ -44,10 +49,6 @@
 		video {
 			transform: scaleX(-1);
 		}
-	}
-
-	.video-muted {
-		backdrop-filter: brightness(0.5) blur(1px);
 	}
 
 	.alone {

@@ -7,30 +7,8 @@ import './planet.css'
 import { broadcastPosition, onGotPosition } from './data/positionSocket';
 import { connections, getSelf } from './data/data';
 import { Connection } from '../server/types';
-import { ConnectVideo, DisconnectVideo } from './VideoCall';
 import { displayName, shortId } from './helpers';
 import { degToRad } from 'three/src/math/MathUtils.js';
-
-function makeAvatar(size: number, color?: number, x: number = 0): Avatar {
-	const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
-	const boxGeometry = new THREE.BoxGeometry(size, size, size);
-	const mesh = new THREE.Mesh(boxGeometry, material);
-	mesh.position.x = x;
-
-	const labelDiv = document.createElement('div');
-	labelDiv.className = 'label';
-	labelDiv.textContent = '';
-	labelDiv.style.backgroundColor = 'transparent';
-	labelDiv.style.pointerEvents = 'none';
-
-	const label = new CSS2DObject(labelDiv);
-	label.position.set(1.5 * size, 0, 0);
-	label.center.set(0, 1);
-	mesh.add(label);
-	label.layers.set(0);
-
-	return new Avatar(labelDiv, mesh)
-}
 
 function makeSphere(radius: number, color: number) {
 	const sphereParams = {
@@ -71,22 +49,42 @@ function makeSphere(radius: number, color: number) {
 	return sphere
 }
 
-class Avatar {
+export class Avatar {
 	mesh: THREE.Mesh
 	connection?: Connection
 	_distance: number = 0
+	prevDistance: number = 0
 	private labelDiv: HTMLDivElement
 
-	constructor(label: HTMLDivElement, mesh: THREE.Mesh) {
-		this.labelDiv = label
+	constructor(size: number, color?: number, x: number = 0) {
+		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
+		const boxGeometry = new THREE.BoxGeometry(size, size, size);
+		const mesh = new THREE.Mesh(boxGeometry, material);
+		mesh.position.x = x;
+	
+		const labelDiv = document.createElement('div');
+		labelDiv.className = 'label';
+		labelDiv.textContent = '';
+		labelDiv.style.backgroundColor = 'transparent';
+		labelDiv.style.pointerEvents = 'none';
+	
+		const label = new CSS2DObject(labelDiv);
+		label.position.set(1.5 * size, 0, 0);
+		label.center.set(0, 1);
+		mesh.add(label);
+		label.layers.set(0);
+	
+		this.labelDiv = labelDiv
 		this.mesh = mesh
 	}
+	
 
 	set label(value: string) {
 		this.labelDiv.textContent = value
 	}
 
 	set distance(value: number) {
+		this.prevDistance = this._distance
 		this._distance = value
 		this.labelDiv.style.opacity = `${100 - (this._distance * 3)}%`
 	}
@@ -102,7 +100,9 @@ class Avatar {
 	}
 }
 
-export function Planet() {
+export function Planet(props: {
+	onDistanceChanged: (avatar: Avatar) => void
+}) {
 
 	let planetCanvas: HTMLCanvasElement
 	let self: Connection
@@ -139,7 +139,7 @@ export function Planet() {
 
 		let selfAvatar: Avatar
 		getSelf.then((con) => {
-			selfAvatar = makeAvatar(1, 0x44aa88, 0)
+			selfAvatar = new Avatar(1, 0x44aa88, 0)
 			selfAvatar.label = displayName(con)
 			scene.add(selfAvatar.mesh);
 			avatarsById.set(con.id, selfAvatar)
@@ -152,21 +152,12 @@ export function Planet() {
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
 
-		const proxRange = 2
 		orbit.addEventListener('change', (e) => {
 			avatarsById.forEach(avatar => {
 				if (avatar == selfAvatar) return
-
-				const prevDistance = avatar.distance
+				
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
-				if (prevDistance > proxRange && avatar.distance < proxRange) {
-					console.log('IN RANGE OF', avatar)
-					ConnectVideo(avatar.connection?.id, false)
-				}
-				else if (prevDistance < proxRange && avatar.distance > proxRange) {
-					console.log('LEFT RANGE OF', avatar)
-					DisconnectVideo(avatar.connection?.id)
-				}
+				props.onDistanceChanged(avatar)
 			})
 		})
 
@@ -203,7 +194,7 @@ export function Planet() {
 
 			if (!avatarsById.has(message.id)) {
 				const label = displayName(con)
-				avatar = makeAvatar(1)
+				avatar = new Avatar(1)
 				scene.add(avatar.mesh);
 				avatar.connection = con
 				avatar.label = label || shortId(message.id)

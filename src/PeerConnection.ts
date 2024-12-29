@@ -115,17 +115,11 @@ export class PeerConnection {
 
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 	//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#adding_tracks_to_multiple_streams
-	startCall(localStream: MediaStream) {
-		console.log('startCall');
-		this.addTracks(localStream);
-		//this.onConnect(this.remoteStream)
-	}
-
-	addTracks(localStream: MediaStream) {
+	addTracks(stream: MediaStream) {
 		// Push tracks from local stream to peer connection
-		localStream.getTracks().forEach((track) => {
+		stream.getTracks().forEach((track) => {
 			console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label);
-			this.localRTCRtpSenders.push(this.pc.addTrack(track, localStream));
+			this.localRTCRtpSenders.push(this.pc.addTrack(track, stream));
 			this.logTrackEvents(track, 'local');
 		});
 	}
@@ -139,16 +133,12 @@ export class PeerConnection {
 		});
 	}
 
-	resumeCall(localStream: MediaStream) {
-		this.addTracks(localStream);
-	}
-
 	endCall() {
 		console.log('PeerConnection.endCall', this.conId);
 
-		this.abortControllers.forEach(ac => {
-			ac.abort();
-		});
+		// this.abortControllers.forEach(ac => {
+		// 	ac.abort();
+		// });
 
 		this.localRTCRtpSenders.forEach(t => {
 			this.pc.removeTrack(t);

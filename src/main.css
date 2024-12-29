@@ -254,6 +254,7 @@ body {
 			padding-inline: 1rem;
 		}
 
+		.screen,
 		.audio,
 		.video {
 			
@@ -261,10 +262,16 @@ body {
 			border-left: 1px solid var(--button-outline-color);
 
 			svg {
-				fill: #4ae872bf;
+				fill: var(--text-color);
 				width: 1rem;
 				height: 1rem;
 				vertical-align: text-top;
+			}
+		}
+
+		.active {
+			svg {
+				fill: #4ae872bf;
 			}
 		}
 
