@@ -176,7 +176,7 @@ export class FigmentMenu extends HTMLElement {
 			// }
 		}
 		if (overflowY > 0) {
-			console.log(`Fix overflow Y: ${top} - ${overflowY} = ${top - overflowY}px`)
+			// console.log(`Fix overflow Y: ${top} - ${overflowY} = ${top - overflowY}px`)
 			container.style.top = container.parentElement.offsetTop - container.clientHeight + 'px'
 		}
 	}

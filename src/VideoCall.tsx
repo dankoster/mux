@@ -4,6 +4,7 @@ import "./VideoCall.css"
 import * as server from "./data/data"
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
+import { GetSettingValue } from "./Settings";
 
 
 
@@ -19,56 +20,13 @@ export {
 	screenEnabled
 }
 
-export const toggleMic = () => {
-	const enabled = !micEnabled()
-	try {
-		localStream.getAudioTracks().forEach(track => track.enabled = enabled)
-		setMicEnabled(enabled)
-	} catch (error) {
-		if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
-			console.log('no local stream')
-		}
-		else throw error
-	}
-}
-export const toggleVideo = () => {
-	const enabled = !camEnabled()
-	try {
-		localStream.getVideoTracks().forEach(track => track.enabled = enabled)
-		setCamEnabled(enabled)
-	} catch (error) {
-		if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
-			console.log('no local stream')
-		}
-		else throw error
-	}
-}
-export const toggleScreenShare = () => {
-	const enabled = !screenEnabled()
-	setScreenEnabled(enabled)
+function NotReady() { throw new Error('<VideoCall /> not mounted') }
 
-	if (enabled) {
-		//TODO: add video element
-		const options = { audio: true, video: true };
-		navigator.mediaDevices.getDisplayMedia(options).then(
-			stream => {
-				console.log('toggleScreenShare', stream)
-				//share stream with peer connection
-				peersById.forEach(peer => peer.addTracks(stream))
-
-				//TODO: display stream preview thumbnail?
-			},
-			error => console.error(error)
-		)
-	}
-}
-
-export let ConnectVideo = (conId: string, polite: boolean = true): void => {
-	throw new Error('VideoCall not ready')
-}
-export let DisconnectVideo = (conId: string): void => {
-	throw new Error('VideoCall not ready')
-}
+export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+export let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+export let toggleScreenShare: () => void = () => NotReady()
+export let ConnectVideo: (conId: string, polite: boolean) => void = (conId: string, polite: boolean): void => NotReady()
+export let DisconnectVideo: (conId: string) => void = (conId: string): void => NotReady()
 
 export default function VideoCall() {
 	let videoContainer: HTMLDivElement
@@ -102,6 +60,15 @@ export default function VideoCall() {
 			await startLocalVideo()
 		}
 
+		const startCamMuted = GetSettingValue('Start Call Muted (video)')
+		const startMicMuted = GetSettingValue('Start Call Muted (audio)')
+
+		console.log('ConnectVideo', { startCamMuted, startMicMuted })
+
+		toggleVideo(!startCamMuted)
+		toggleMic(!startMicMuted)
+
+
 		peer.addTracks(localStream)
 
 		setPeers(Array.from(peersById.values()))
@@ -134,14 +101,67 @@ export default function VideoCall() {
 		setPeers(Array.from(peersById.values()))
 	}
 
+	toggleVideo = (enabled?: boolean) => {
+		if (enabled === undefined)
+			enabled = !camEnabled()
+		try {
+			localStream.getVideoTracks().forEach(track => track.enabled = enabled)
+			setCamEnabled(enabled)
+		} catch (error) {
+			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
+				startLocalVideo()
+			}
+			else throw error
+		}
+	}
+
+	toggleScreenShare = () => {
+		const enabled = !screenEnabled()
+		setScreenEnabled(enabled)
+
+		if (enabled) {
+			//TODO: add video element
+			const options = { audio: true, video: true };
+			navigator.mediaDevices.getDisplayMedia(options).then(
+				stream => {
+					console.log('toggleScreenShare', stream)
+					//share stream with peer connection
+					peersById.forEach(peer => peer.addTracks(stream))
+
+					//TODO: display stream preview thumbnail?
+				},
+				error => console.error(error)
+			)
+		}
+	}
+
+	toggleMic = (enabled?: boolean) => {
+		if (enabled === undefined)
+			enabled = !micEnabled()
+		try {
+			localStream.getAudioTracks().forEach(track => track.enabled = enabled)
+			setMicEnabled(enabled)
+		} catch (error) {
+			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
+				console.log('no local stream')
+			}
+			else throw error
+		}
+	}
+
 	async function startLocalVideo() {
 		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
 
 		localVideo.srcObject = localStream;
 		localVideo.muted = true;
 
-		setCamEnabled(true)
-		setMicEnabled(true)
+		const startCamMuted = GetSettingValue('Start Call Muted (video)')
+		const startMicMuted = GetSettingValue('Start Call Muted (audio)')
+
+		console.log('startLocalVideo', { startCamMuted, startMicMuted })
+
+		toggleVideo(!startCamMuted)
+		toggleMic(!startMicMuted)
 	}
 
 	async function stopLocalVideo() {
@@ -157,10 +177,8 @@ export default function VideoCall() {
 	}
 
 	onMount(async () => {
-		//startLocalVideo()
 
 		server.onWebRtcMessage((message) => {
-			console.log('onWebRtcMessage', message)
 			if (!peersById.has(message.senderId)) {
 				ConnectVideo(message.senderId, false)
 			}

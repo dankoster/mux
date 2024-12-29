@@ -1,11 +1,8 @@
 
-import { createEffect, createSignal, Match, onMount, Show, Switch } from "solid-js";
+import { Match, onMount, Show, Switch } from "solid-js";
 import { render } from "solid-js/web";
 import { GitHubSvg } from "./GitHubSvg";
 import { Avatar, Planet } from "./planet";
-import { JSX } from "solid-js/jsx-runtime";
-import { People } from "./People";
-import { scrollLatestMessageIntoView } from "./Chat";
 
 import * as server from "./data/data";
 
@@ -13,6 +10,7 @@ import "./main.css"
 import { FigmentMenu, MenuItem } from "./Menu";
 import VideoCall, * as videoCall from "./VideoCall";
 import { SvgIcon } from "./SvgIcon";
+import Settings, { ShowSettings } from "./Settings";
 
 type SelectedView = 'people' | 'planet'
 
@@ -67,6 +65,7 @@ function App() {
 				</div>
 			</div>
 		</Show>
+		<Settings />
 	</>
 };
 
@@ -96,6 +95,14 @@ function VideoCallToolbar() {
 
 		menu.AddSeparator()
 		menu.AddItem(new MenuItem({
+			text: `Settings`,
+			onTextClick: () => {
+				ShowSettings()
+				menu.Clear()
+			}
+		}))
+		menu.AddSeparator()
+		menu.AddItem(new MenuItem({
 			text: `Logout ${server.self().identity.name}`,
 			onTextClick: () => server.becomeAnonymous(),
 		}))
@@ -112,7 +119,7 @@ function VideoCallToolbar() {
 		<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={userClicked} />
 		<div class="name" onclick={userClicked}>{server.self()?.identity.name}</div>
 
-		<div class={`audio ${videoCall.micEnabled() ? 'active' : 'muted'}`} onclick={videoCall.toggleMic}>
+		<div class={`audio ${videoCall.micEnabled() ? 'active' : 'muted'}`} onclick={() => videoCall.toggleMic()}>
 			<Switch>
 				<Match when={videoCall.micEnabled()}>
 					<SvgIcon icon={'microphone'} />
@@ -122,7 +129,7 @@ function VideoCallToolbar() {
 				</Match>
 			</Switch>
 		</div>
-		<div class={`video ${videoCall.camEnabled() ? 'active' : 'muted'}`} onclick={videoCall.toggleVideo}>
+		<div class={`video ${videoCall.camEnabled() ? 'active' : 'muted'}`} onclick={() => videoCall.toggleVideo()}>
 			<Switch>
 				<Match when={videoCall.camEnabled()}>
 					<SvgIcon icon={'camera'} />
