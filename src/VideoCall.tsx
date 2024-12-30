@@ -5,6 +5,7 @@ import * as server from "./data/data"
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
 import { GetSettingValue } from "./Settings";
+import { onVisibilityChange } from "./onVisibilityChange";
 
 
 
@@ -56,18 +57,16 @@ export default function VideoCall() {
 		peersById.set(conId, peer)
 
 		if (!localStream) {
-			// popover.showPopover()
 			await startLocalVideo()
 		}
 
+		//TODO: more robust startup settings
+		//TODO: per-user exceptions
+		//TODO: friend exceptions
 		const startCamMuted = GetSettingValue('Start Call Muted (video)')
 		const startMicMuted = GetSettingValue('Start Call Muted (audio)')
-
-		console.log('ConnectVideo', { startCamMuted, startMicMuted })
-
-		toggleVideo(!startCamMuted)
-		toggleMic(!startMicMuted)
-
+		if (startCamMuted) toggleVideo(!startCamMuted)
+		if (startMicMuted) toggleMic(!startMicMuted)
 
 		peer.addTracks(localStream)
 
@@ -187,15 +186,26 @@ export default function VideoCall() {
 		})
 
 
-		// onVisibilityChange(visible => {
-		// 	console.log('visible', visible)
-		// 	//if (!visible) {
-		// 		//say 'welcome back' in popover
-		// 		// click anywhere to start video
-		// 		// stopLocalVideo()
-		// 		// popover.showPopover()
-		// 	//}
-		// });
+		let savedMuteState: { micEnabled: boolean; camEnabled: boolean; }
+		onVisibilityChange(visible => {
+			const shouldMute = GetSettingValue('Mute when focus is lost')
+			const shouldUnMute = GetSettingValue('Restore mute state when refocused')
+			console.log('onVisibilityChange', { visible, shouldMute })
+			if (!visible && shouldMute) {
+				savedMuteState = {
+					micEnabled: micEnabled(),
+					camEnabled: camEnabled()
+				}
+				console.log('save state', savedMuteState)
+				toggleVideo(false)
+				toggleMic(false)
+			}
+			if (visible && shouldUnMute && savedMuteState) {
+				console.log('restore state', savedMuteState)
+				toggleMic(savedMuteState.micEnabled)
+				toggleVideo(savedMuteState.camEnabled)
+			}
+		});
 
 
 		//handle style changes when videos are added and removed

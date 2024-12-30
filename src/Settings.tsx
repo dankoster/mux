@@ -3,7 +3,11 @@ import "./Settings.css"
 
 export let ShowSettings: () => void = () => { throw new Error('NOT READY - <Settings /> element not mounted') }
 
-type SettingName = 'Start Call Muted (audio)' | 'Start Call Muted (video)'
+type SettingName = 'Start Call Muted (audio)'
+	| 'Start Call Muted (video)'
+	| 'Mute when focus is lost'
+	| 'Restore mute state when refocused'
+
 type Setting = {
 	name: SettingName,
 	value: boolean
@@ -19,17 +23,28 @@ const SettingsData: Setting[] = [
 		name: 'Start Call Muted (video)',
 		value: false
 	},
+	{
+		name: "Mute when focus is lost",
+		value: true
+	},
+	{
+		name: "Restore mute state when refocused",
+		value: true
+	}
 ]
 
 
 for (const setting of SettingsData) {
 	const value = localStorage.getItem(setting.name)
-	if (value !== null) 
+	if (value !== null)
 		setting.value = JSON.parse(value)
 }
 
 export function GetSettingValue(name: SettingName) {
-	return SettingsData.find(setting => setting.name === name).value
+	const setting = SettingsData.find(setting => setting.name === name)
+	if (!setting) throw new Error(`setting "${name}" not found`)
+
+	return setting.value
 }
 
 export default function Settings() {
