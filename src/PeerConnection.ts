@@ -64,12 +64,12 @@ export class PeerConnection {
 		// Pull tracks from remote stream, add to video stream
 		this.pc.ontrack = (event) => {
 			const track = event.track;
-			console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label);
+			// console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label);
 			//track.addEventListener('end', () => this.remoteStream.removeTrack(track))
 			//track.addEventListener('mute', () => this.remoteStream.removeTrack(track))
 			//track.addEventListener('unmute', () => this.remoteStream.addTrack(track))
 			this.remoteStream.addTrack(track);
-			this.logTrackEvents(track, 'remote');
+			// this.logTrackEvents(track, 'remote');
 
 			if (!this.onTrack) {
 				console.warn('onTrack not defined');
@@ -104,9 +104,9 @@ export class PeerConnection {
 		// this.pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
 		this.pc.onicecandidate = ({ candidate }) => this.sendMessage({ candidate });
 
-		this.pc.onsignalingstatechange = () => {
-			console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
-		}
+		// this.pc.onsignalingstatechange = () => {
+		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
+		// }
 	}
 
 	addAbortController(ac: AbortController) {
@@ -118,9 +118,9 @@ export class PeerConnection {
 	addTracks(stream: MediaStream) {
 		// Push tracks from local stream to peer connection
 		stream.getTracks().forEach((track) => {
-			console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label);
+			// console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label);
 			this.localRTCRtpSenders.push(this.pc.addTrack(track, stream));
-			this.logTrackEvents(track, 'local');
+			// this.logTrackEvents(track, 'local');
 		});
 	}
 
