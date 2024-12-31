@@ -1,5 +1,5 @@
 
-import { Match, onMount, Show, Switch } from "solid-js";
+import { onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { GitHubSvg } from "./GitHubSvg";
 import { Avatar, Planet } from "./planet";
@@ -9,8 +9,8 @@ import * as server from "./data/data";
 import "./main.css"
 import { FigmentMenu, MenuItem } from "./Menu";
 import VideoCall, * as videoCall from "./VideoCall";
-import { SvgIcon } from "./SvgIcon";
 import Settings, { ShowSettings } from "./Settings";
+import { MediaButton } from "./MediaButton";
 
 type SelectedView = 'people' | 'planet'
 
@@ -119,29 +119,22 @@ function VideoCallToolbar() {
 		<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={userClicked} />
 		<div class="name" onclick={userClicked}>{server.self()?.identity.name}</div>
 
-		<div class={`audio ${videoCall.micEnabled() ? 'active' : 'muted'}`} onclick={() => videoCall.toggleMic()}>
-			<Switch>
-				<Match when={videoCall.micEnabled()}>
-					<SvgIcon icon={'microphone'} />
-				</Match>
-				<Match when={!videoCall.micEnabled()}>
-					<SvgIcon icon={'microphone_muted'} />
-				</Match>
-			</Switch>
-		</div>
-		<div class={`video ${videoCall.camEnabled() ? 'active' : 'muted'}`} onclick={() => videoCall.toggleVideo()}>
-			<Switch>
-				<Match when={videoCall.camEnabled()}>
-					<SvgIcon icon={'camera'} />
-				</Match>
-				<Match when={!videoCall.camEnabled()}>
-					<SvgIcon icon={'camera_muted'} />
-				</Match>
-			</Switch>
-		</div>
-		<div class={`screen`} onclick={videoCall.toggleScreenShare}>
+		<MediaButton
+			className="audio"
+			enabled={videoCall.micEnabled}
+			onClick={() => videoCall.toggleMic()}
+			enabledIcon="microphone"
+			disabledIcon="microphone_muted"
+		/>
+		<MediaButton
+			className="video"
+			enabled={videoCall.camEnabled}
+			onClick={() => videoCall.toggleVideo()}
+			enabledIcon="camera"
+			disabledIcon="camera_muted"
+		/>
+		{/* <div class={`screen`} onclick={videoCall.toggleScreenShare}>
 			<SvgIcon icon={'share_screen'} />
-		</div>
+		</div> */}
 	</div>
 }
-

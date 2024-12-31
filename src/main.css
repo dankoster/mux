@@ -39,6 +39,9 @@ body {
 	--background-color: #1f0e3c;
 	--text-color: rgba(255, 255, 255, 0.87);
 
+	--media-active: #4ae872bf;
+	--media-muted: #e84a4abf;
+
 	color-scheme: light dark;
 	color: var(--text-color);
 	background-color: var(--background-color);
@@ -268,20 +271,19 @@ body {
 				vertical-align: text-top;
 			}
 		}
-
+		
 		.active {
 			svg {
-				fill: #4ae872bf;
+				fill: var(--media-active);
 			}
 		}
-
+	
 		.muted {
 			svg {
-				fill: #e84a4abf;
+				fill: var(--media-muted);
 			}
-		}
-
-
+		}		
+		
 		img {
 			max-width: 2.5rem;
 		}

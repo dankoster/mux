@@ -1,4 +1,4 @@
-type svgIcon = 'camera' | 'camera_muted' | 'microphone' | 'microphone_muted' | 'share_screen';
+export type svgIcon = 'camera' | 'camera_muted' | 'microphone' | 'microphone_muted' | 'share_screen';
 export function SvgIcon(props: { icon: svgIcon; }) {
 	// Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.
 	switch (props.icon) {
