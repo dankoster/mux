@@ -1,11 +1,12 @@
 
-import { createMemo, createSignal, For, onCleanup, onMount } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import "./VideoCall.css"
 import * as server from "./data/data"
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
 import { GetSettingValue } from "./Settings";
 import { onVisibilityChange } from "./onVisibilityChange";
+import { MediaButton } from "./MediaButton";
 
 
 
@@ -85,18 +86,6 @@ export default function VideoCall() {
 		peer.endCall()
 		peersById.delete(conId)
 
-		// if(peers.length === 0) {
-		// 	localStream.getTracks().forEach(track => {
-		// 		track.stop()
-		// 		localStream.removeTrack(track)
-		// 	})
-
-		// 	localVideo.srcObject = undefined
-		// 	localStream = undefined
-		// 	setCamEnabled(false)
-		// 	setMicEnabled(false)
-		// }
-
 		setPeers(Array.from(peersById.values()))
 	}
 
@@ -105,10 +94,48 @@ export default function VideoCall() {
 			enabled = !camEnabled()
 		try {
 			localStream.getVideoTracks().forEach(track => track.enabled = enabled)
+
+			// if (!enabled && peers.length === 0) {
+			// 	localStream.getVideoTracks().forEach(track => {
+			// 		track.stop()
+			// 		localStream.removeTrack(track)
+			// 	})
+
+			// 	// localVideo.srcObject = undefined
+			// 	// localStream = undefined
+			// }
+
 			setCamEnabled(enabled)
 		} catch (error) {
 			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
 				startLocalVideo()
+			}
+			else throw error
+		}
+	}
+
+	toggleMic = (enabled?: boolean) => {
+		if (enabled === undefined)
+			enabled = !micEnabled()
+		try {
+			localStream.getAudioTracks().forEach(track => track.enabled = enabled)
+			setMicEnabled(enabled)
+
+			// if (!enabled && peers.length === 0) {
+			// 	localStream.getAudioTracks().forEach(track => {
+			// 		track.stop()
+			// 		localStream.removeTrack(track)
+			// 	})
+
+			// 	if (localStream.getTracks().length == 0) {
+			// 		// localVideo.srcObject = undefined
+			// 		// localStream = undefined
+			// 	}
+			// }
+
+		} catch (error) {
+			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
+				console.log('no local stream')
 			}
 			else throw error
 		}
@@ -134,22 +161,9 @@ export default function VideoCall() {
 		}
 	}
 
-	toggleMic = (enabled?: boolean) => {
-		if (enabled === undefined)
-			enabled = !micEnabled()
-		try {
-			localStream.getAudioTracks().forEach(track => track.enabled = enabled)
-			setMicEnabled(enabled)
-		} catch (error) {
-			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
-				console.log('no local stream')
-			}
-			else throw error
-		}
-	}
-
 	async function startLocalVideo() {
 		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
 
 		localVideo.srcObject = localStream;
 		localVideo.muted = true;
@@ -157,16 +171,17 @@ export default function VideoCall() {
 		const startCamMuted = GetSettingValue('Start Call Muted (video)')
 		const startMicMuted = GetSettingValue('Start Call Muted (audio)')
 
-		console.log('startLocalVideo', { startCamMuted, startMicMuted })
+		// console.log('startLocalVideo', { startCamMuted, startMicMuted })
+		// localStream.getTracks().map((t) => console.log(t.getCapabilities()));
 
 		toggleVideo(!startCamMuted)
 		toggleMic(!startMicMuted)
 	}
 
-	async function stopLocalVideo() {
-		localStream?.getTracks().forEach(track => track.stop())
-		peersById?.forEach(peer => peer.holdCall())
-	}
+	// async function stopLocalVideo() {
+	// 	localStream?.getTracks().forEach(track => track.stop())
+	// 	peersById?.forEach(peer => peer.holdCall())
+	// }
 
 
 	const popoverClick = () => {
@@ -186,11 +201,11 @@ export default function VideoCall() {
 		})
 
 
+		//BUG: something weird here on Chrome
 		let savedMuteState: { micEnabled: boolean; camEnabled: boolean; }
 		onVisibilityChange(visible => {
 			const shouldMute = GetSettingValue('Mute when focus is lost')
 			const shouldUnMute = GetSettingValue('Restore mute state when refocused')
-			console.log('onVisibilityChange', { visible, shouldMute })
 			if (!visible && shouldMute) {
 				savedMuteState = {
 					micEnabled: micEnabled(),
@@ -208,11 +223,13 @@ export default function VideoCall() {
 		});
 
 
-		//handle style changes when videos are added and removed
-		observer = new MutationObserver(() =>
-			localVideoContainer?.classList.toggle('alone', videoContainer.children.length <= 2)
-		)
-		observer.observe(videoContainer, { childList: true })
+		// //handle style changes when videos are added and removed
+		// observer = new MutationObserver(() => {
+		// 	const isAlone = videoContainer.children.length <= 1
+		// 	console.log("isAlone", isAlone, videoContainer.children)
+		// 	localVideoContainer?.classList.toggle('alone', isAlone)
+		// })
+		// observer.observe(videoContainer, { childList: true })
 	})
 
 	onCleanup(() => {
@@ -227,16 +244,35 @@ export default function VideoCall() {
 		return displayName(self)
 	})
 
+	const isAlone = createMemo(() => {
+		const peerList = peers()
+		const alone = Array.isArray(peerList) ? peerList.length === 0 : true
+		console.log('alone', alone)
+		return alone
+	})
+
 	return <div id="videos-container" class="video-call" ref={videoContainer}>
-		<div class="video-ui local alone" ref={localVideoContainer}>
+		<div class={`video-ui local ${isAlone() ? 'alone' : ''}`} ref={localVideoContainer}>
 			<video id="local-video" ref={localVideo} autoplay playsinline />
 			<span class="name">{myName()}</span>
+			<Show when={!isAlone()}>
+
+				<div class="buttons">
+					<MediaButton
+						className="audio"
+						enabled={micEnabled}
+						onClick={() => toggleMic()}
+						enabledIcon="microphone"
+						disabledIcon="microphone_muted"
+					/>
+				</div>
+			</Show>
 		</div>
 
-		<div ref={popover} popover>
+		{/* <div ref={popover} popover>
 			Popover content
 			<button onclick={popoverClick}>Enable Video</button>
-		</div>
+		</div> */}
 
 		<For each={peers()}>
 			{(peer) => <PeerVideo peer={peer} />}
@@ -261,12 +297,13 @@ function PeerVideo(props: { peer: PeerConnection }) {
 		//TODO: generate a video element for each video stream. 
 		// 
 
-		console.log('mounted!', videoElement, props.peer.remoteStream)
-		props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('PeerVideo.addTrack', ev))
-		props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('PeerVideo.removetrack', ev))
+		// console.log('mounted!', videoElement, props.peer.remoteStream)
+		// props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('PeerVideo.addTrack', ev))
+		// props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('PeerVideo.removetrack', ev))
 		videoElement.srcObject = props.peer.remoteStream
 		props.peer.onTrack = (track: MediaStreamTrack) => {
-			console.log('PeerVideo.onTrack', track)
+			// console.log('PeerVideo.onTrack', track, track.getCapabilities())
+
 			track.addEventListener('mute', () => handleMuteEvent(track))
 			track.addEventListener('unmute', () => handleMuteEvent(track))
 			handleMuteEvent(track)
