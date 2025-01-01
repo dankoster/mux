@@ -6,7 +6,7 @@ import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
 import { GetSettingValue } from "./Settings";
 import { onVisibilityChange } from "./onVisibilityChange";
-import { MediaButton } from "./MediaButton";
+import { MediaButton } from "./component/MediaButton";
 
 
 
@@ -200,6 +200,10 @@ export default function VideoCall() {
 			peersById.get(message.senderId)?.handleMessage(JSON.parse(message.message))
 		})
 
+		const startVideoOnLoad = GetSettingValue('Start video on load')
+		if (startVideoOnLoad) {
+			startLocalVideo()
+		}
 
 		//BUG: something weird here on Chrome
 		let savedMuteState: { micEnabled: boolean; camEnabled: boolean; }
@@ -221,15 +225,6 @@ export default function VideoCall() {
 				toggleVideo(savedMuteState.camEnabled)
 			}
 		});
-
-
-		// //handle style changes when videos are added and removed
-		// observer = new MutationObserver(() => {
-		// 	const isAlone = videoContainer.children.length <= 1
-		// 	console.log("isAlone", isAlone, videoContainer.children)
-		// 	localVideoContainer?.classList.toggle('alone', isAlone)
-		// })
-		// observer.observe(videoContainer, { childList: true })
 	})
 
 	onCleanup(() => {
@@ -252,18 +247,23 @@ export default function VideoCall() {
 	})
 
 	return <div id="videos-container" class="video-call" ref={videoContainer}>
-		<div class={`video-ui local ${isAlone() ? 'alone' : ''}`} ref={localVideoContainer}>
+		<div class="video-ui local" classList={{ alone: isAlone() }} ref={localVideoContainer}>
 			<video id="local-video" ref={localVideo} autoplay playsinline />
 			<span class="name">{myName()}</span>
 			<Show when={!isAlone()}>
 
 				<div class="buttons">
 					<MediaButton
-						className="audio"
 						enabled={micEnabled}
 						onClick={() => toggleMic()}
 						enabledIcon="microphone"
 						disabledIcon="microphone_muted"
+					/>
+					<MediaButton
+						enabled={camEnabled}
+						onClick={() => toggleVideo()}
+						enabledIcon="camera"
+						disabledIcon="camera_muted"
 					/>
 				</div>
 			</Show>
@@ -289,6 +289,7 @@ function PeerVideo(props: { peer: PeerConnection }) {
 	}
 
 	const [name, setName] = createSignal('')
+	const [soundEnabled, setSoundEnabled] = createSignal(true)
 
 	onMount(() => {
 		const con = server.connections.find(con => con.id === props.peer.conId)
@@ -313,5 +314,14 @@ function PeerVideo(props: { peer: PeerConnection }) {
 	return <div class="video-ui peer" ref={containerElement}>
 		<video id={props.peer.conId} class="remote" ref={videoElement} autoplay playsinline />
 		<span class="name">{name()}</span>
+		<div class="buttons">
+			<MediaButton
+				enabled={soundEnabled}
+				onClick={() => setSoundEnabled(!soundEnabled())}
+				enabledIcon="unmute"
+				disabledIcon="mute"
+			/>
+		</div>
+
 	</div>
 }

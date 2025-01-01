@@ -1,0 +1,29 @@
+.media-button {
+	/* outline: 1px solid gold; */
+	padding: 0.5rem;
+	display: grid;
+	cursor: pointer;
+
+	&+.media-button {
+		border-left: 1px solid var(--button-outline-color);
+	}
+
+	svg {
+		fill: var(--text-color);
+		width: 1rem;
+		height: 1rem;
+		vertical-align: middle;
+	}
+
+	&.active {
+		svg {
+			fill: var(--media-active);
+		}
+	}
+
+	&.muted {
+		svg {
+			fill: var(--media-muted);
+		}
+	}
+}

@@ -255,34 +255,8 @@ body {
 			position: relative;
 			font-weight: bold;
 			padding-inline: 1rem;
-		}
-
-		.screen,
-		.audio,
-		.video {
-			
-			padding-inline: 1rem;
-			border-left: 1px solid var(--button-outline-color);
-
-			svg {
-				fill: var(--text-color);
-				width: 1rem;
-				height: 1rem;
-				vertical-align: text-top;
-			}
-		}
-		
-		.active {
-			svg {
-				fill: var(--media-active);
-			}
-		}
-	
-		.muted {
-			svg {
-				fill: var(--media-muted);
-			}
-		}		
+			border-right: 1px solid var(--button-outline-color);
+		}	
 		
 		img {
 			max-width: 2.5rem;

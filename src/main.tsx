@@ -10,7 +10,7 @@ import "./main.css"
 import { FigmentMenu, MenuItem } from "./Menu";
 import VideoCall, * as videoCall from "./VideoCall";
 import Settings, { ShowSettings } from "./Settings";
-import { MediaButton } from "./MediaButton";
+import { MediaButton } from "./component/MediaButton";
 
 type SelectedView = 'people' | 'planet'
 

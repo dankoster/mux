@@ -48,26 +48,16 @@
 			right: 0.25rem;
 			display: flex;
 			backdrop-filter: brightness(0.5);
-			padding-inline: 0.5rem;
 			border-radius: 0.5rem;
 
-			svg {
-				width: 1rem;
-				height: 2rem;
-				vertical-align: middle;
-				fill: var(--text-color);
-			}
-
-			.active {
+			.media-button {
+				padding: 0.3rem;
+				padding-inline: 0.4rem;
+				
 				svg {
-					fill: var(--media-active);
-				}
-			}
-
-			.muted {
-				svg {
-					fill: var(--media-muted);
-				}
+					width: 0.7rem;
+					height: 0.7rem;
+				}			
 			}
 		}
 	}
