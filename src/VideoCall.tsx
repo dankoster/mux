@@ -242,7 +242,6 @@ export default function VideoCall() {
 	const isAlone = createMemo(() => {
 		const peerList = peers()
 		const alone = Array.isArray(peerList) ? peerList.length === 0 : true
-		console.log('alone', alone)
 		return alone
 	})
 
@@ -291,6 +290,12 @@ function PeerVideo(props: { peer: PeerConnection }) {
 	const [name, setName] = createSignal('')
 	const [soundEnabled, setSoundEnabled] = createSignal(true)
 
+	const toggleSoundEnabled = () => {
+		const enabled = !soundEnabled()
+		setSoundEnabled(enabled)
+		props.peer.enableAudio(enabled)
+	}
+
 	onMount(() => {
 		const con = server.connections.find(con => con.id === props.peer.conId)
 		setName(displayName(con) || shortId(props.peer.conId))
@@ -317,7 +322,7 @@ function PeerVideo(props: { peer: PeerConnection }) {
 		<div class="buttons">
 			<MediaButton
 				enabled={soundEnabled}
-				onClick={() => setSoundEnabled(!soundEnabled())}
+				onClick={toggleSoundEnabled}
 				enabledIcon="unmute"
 				disabledIcon="mute"
 			/>

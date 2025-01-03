@@ -124,13 +124,8 @@ export class PeerConnection {
 		});
 	}
 
-	holdCall() {
-		//don't close the connection, just don't send anything
-		// could replace tracks to send hold music or something
-		this.localRTCRtpSenders.forEach(sender => {
-			console.log('holdCall - removing', sender)
-			this.pc.removeTrack(sender);
-		});
+	enableAudio(enabled: boolean) {
+		this.remoteStream.getAudioTracks()?.forEach(track => track.enabled = enabled)
 	}
 
 	endCall() {
