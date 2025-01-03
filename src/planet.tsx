@@ -151,6 +151,8 @@ export function Planet(props: {
 
 		const orbit = new OrbitControls(camera, renderer.domElement);
 		orbit.enableZoom = true;
+		orbit.enableDamping = true;
+		orbit.dampingFactor = 0.04
 
 		orbit.addEventListener('change', (e) => {
 			avatarsById.forEach(avatar => {
@@ -290,6 +292,8 @@ export function Planet(props: {
 				camera.aspect = canvas.clientWidth / canvas.clientHeight;
 				camera.updateProjectionMatrix();
 			}
+
+			orbit.update()
 
 			renderer.render(scene, camera);
 			labelRenderer.render(scene, camera);
