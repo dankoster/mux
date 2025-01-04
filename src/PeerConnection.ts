@@ -39,7 +39,7 @@ type pcInit = {
 	onTrack?: (track: MediaStreamTrack) => void;
 	onDisconnect: () => void;
 };
-export class PeerConnection {
+export class PeerConnection extends EventTarget {
 	remoteStream = new MediaStream();
 	abortControllers: AbortController[] = [];
 	localRTCRtpSenders: RTCRtpSender[] = [];
@@ -51,10 +51,10 @@ export class PeerConnection {
 	makingOffer = false;
 	ignoreOffer = false;
 
-	onTrack: (track: MediaStreamTrack) => void;
 	onDisconnect: () => void;
 
 	constructor({ conId, polite, onDisconnect }: pcInit) {
+		super()
 
 		this.conId = conId;
 		this.pc = new RTCPeerConnection(servers);
@@ -71,13 +71,8 @@ export class PeerConnection {
 			this.remoteStream.addTrack(track);
 			// this.logTrackEvents(track, 'remote');
 
-			if (!this.onTrack) {
-				console.warn('onTrack not defined');
-				return;
-			}
-
-			this.onTrack(track);
-		};
+			this.dispatchEvent(new CustomEvent('track', { detail: track }))
+		}
 
 		this.pc.onnegotiationneeded = async () => {
 			try {

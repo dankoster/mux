@@ -38,6 +38,7 @@ export default function VideoCall() {
 	let localVideo: HTMLVideoElement
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
+	const [outlineColor, setOutlineColor] = createSignal('')
 
 	//both sides need to call this funciton
 	// the callee is polite, the caller is not
@@ -94,20 +95,10 @@ export default function VideoCall() {
 			enabled = !camEnabled()
 		try {
 			localStream.getVideoTracks().forEach(track => track.enabled = enabled)
-
-			// if (!enabled && peers.length === 0) {
-			// 	localStream.getVideoTracks().forEach(track => {
-			// 		track.stop()
-			// 		localStream.removeTrack(track)
-			// 	})
-
-			// 	// localVideo.srcObject = undefined
-			// 	// localStream = undefined
-			// }
-
 			setCamEnabled(enabled)
 		} catch (error) {
 			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
+				console.warn(error)
 				startLocalVideo()
 			}
 			else throw error
@@ -120,19 +111,6 @@ export default function VideoCall() {
 		try {
 			localStream.getAudioTracks().forEach(track => track.enabled = enabled)
 			setMicEnabled(enabled)
-
-			// if (!enabled && peers.length === 0) {
-			// 	localStream.getAudioTracks().forEach(track => {
-			// 		track.stop()
-			// 		localStream.removeTrack(track)
-			// 	})
-
-			// 	if (localStream.getTracks().length == 0) {
-			// 		// localVideo.srcObject = undefined
-			// 		// localStream = undefined
-			// 	}
-			// }
-
 		} catch (error) {
 			if (error.name === 'TypeError' && error.message.startsWith('Cannot read properties of undefined')) {
 				console.log('no local stream')
@@ -164,7 +142,6 @@ export default function VideoCall() {
 	async function startLocalVideo() {
 		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
 
-
 		localVideo.srcObject = localStream;
 		localVideo.muted = true;
 
@@ -176,18 +153,11 @@ export default function VideoCall() {
 
 		toggleVideo(!startCamMuted)
 		toggleMic(!startMicMuted)
-	}
 
-	// async function stopLocalVideo() {
-	// 	localStream?.getTracks().forEach(track => track.stop())
-	// 	peersById?.forEach(peer => peer.holdCall())
-	// }
-
-
-	const popoverClick = () => {
-		console.log('popoverClick')
-		startLocalVideo()
-		popover.hidePopover()
+		watchVolumeLevel(localStream, volume => {
+			const color = toColor(volume);
+			setOutlineColor(color)
+		})
 	}
 
 	onMount(async () => {
@@ -247,7 +217,7 @@ export default function VideoCall() {
 
 	return <div id="videos-container" class="video-call" ref={videoContainer}>
 		<div class="video-ui local" classList={{ alone: isAlone() }} ref={localVideoContainer}>
-			<video id="local-video" ref={localVideo} autoplay playsinline />
+			<video id="local-video" ref={localVideo} style={{"border-color":outlineColor()}} autoplay playsinline />
 			<span class="name">{myName()}</span>
 			<Show when={!isAlone()}>
 
@@ -268,11 +238,6 @@ export default function VideoCall() {
 			</Show>
 		</div>
 
-		{/* <div ref={popover} popover>
-			Popover content
-			<button onclick={popoverClick}>Enable Video</button>
-		</div> */}
-
 		<For each={peers()}>
 			{(peer) => <PeerVideo peer={peer} />}
 		</For>
@@ -289,6 +254,7 @@ function PeerVideo(props: { peer: PeerConnection }) {
 
 	const [name, setName] = createSignal('')
 	const [soundEnabled, setSoundEnabled] = createSignal(true)
+	const [volume, setVolume] = createSignal('')
 
 	const toggleSoundEnabled = () => {
 		const enabled = !soundEnabled()
@@ -307,17 +273,25 @@ function PeerVideo(props: { peer: PeerConnection }) {
 		// props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('PeerVideo.addTrack', ev))
 		// props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('PeerVideo.removetrack', ev))
 		videoElement.srcObject = props.peer.remoteStream
-		props.peer.onTrack = (track: MediaStreamTrack) => {
-			// console.log('PeerVideo.onTrack', track, track.getCapabilities())
+
+		props.peer.addEventListener('track', (e: CustomEvent<MediaStreamTrack>) => {
+			const track = e.detail
 
 			track.addEventListener('mute', () => handleMuteEvent(track))
 			track.addEventListener('unmute', () => handleMuteEvent(track))
 			handleMuteEvent(track)
-		}
+
+			if (track.kind === 'audio') {
+				watchVolumeLevel(props.peer.remoteStream, volume => {
+					const color = toColor(volume)
+					setVolume(color)
+				})
+			}
+		})
 	})
 
 	return <div class="video-ui peer" ref={containerElement}>
-		<video id={props.peer.conId} class="remote" ref={videoElement} autoplay playsinline />
+		<video id={props.peer.conId} style={{ "border-color": volume() }} class="remote" ref={videoElement} autoplay playsinline />
 		<span class="name">{name()}</span>
 		<div class="buttons">
 			<MediaButton
@@ -327,6 +301,39 @@ function PeerVideo(props: { peer: PeerConnection }) {
 				disabledIcon="mute"
 			/>
 		</div>
-
 	</div>
+}
+
+function toColor(volume: number) {
+	//HACK... Should be able to normalize the valume to fit 0-255
+	const opacity = Math.min(Math.round(volume * 10), 0xff).toString(16);
+	const color = `#f9ff00${opacity}`;
+	return color;
+}
+
+async function watchVolumeLevel(mediaStream: MediaStream, callback: (volume: number) => void) {
+	const audioContext = new AudioContext();
+	const streamSource = audioContext.createMediaStreamSource(mediaStream)
+	const analyser = audioContext.createAnalyser();
+	const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+	streamSource.connect(analyser)
+	// analyser.connect(audioContext.destination)
+
+	function caclculateVolume() {
+		analyser.getByteFrequencyData(dataArray)
+
+		let sum = 0;
+		for (const amplitude of dataArray) {
+			sum += amplitude * amplitude
+		}
+
+		const volume = Math.sqrt(sum / dataArray.length)
+		callback(volume)
+
+		if (mediaStream.active)
+			requestAnimationFrame(caclculateVolume)
+	}
+
+	caclculateVolume()
 }
