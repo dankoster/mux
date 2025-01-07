@@ -2,7 +2,7 @@
 	position: absolute;
 	width: 100%;
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(80px, max-content));
+	grid-template-columns: repeat(auto-fit, minmax(90px, 150px));
 	align-items: center;
 	justify-content: center;
 	gap: 1rem;
@@ -10,9 +10,12 @@
 	z-index: 1;
 	padding: 1rem;
 
+	&.max-video {
+		grid-template-columns: repeat(auto-fit, minmax(90px, max-content));
+	}
+
 	.video-ui {
 		justify-items: center;
-		max-width: 150px;
 		white-space: nowrap;
 		text-overflow: ellipsis;
 		overflow: hidden;

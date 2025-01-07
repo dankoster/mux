@@ -1,39 +1,35 @@
 
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import "./VideoCall.css"
 import * as server from "./data/data"
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
-import { GetSettingValue } from "./Settings";
+import { GetSettingValue, ShowSettings } from "./Settings";
 import { onVisibilityChange } from "./onVisibilityChange";
 import { MediaButton } from "./component/MediaButton";
+import { FigmentMenu, MenuItem } from "./Menu";
 
-
+import "./VideoCall.css"
 
 const peersById = new Map<string, PeerConnection>()
 let localStream: MediaStream
 const [micEnabled, setMicEnabled] = createSignal(false)
 const [camEnabled, setCamEnabled] = createSignal(false)
 const [screenEnabled, setScreenEnabled] = createSignal(false)
+const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
 
-export {
-	micEnabled,
-	camEnabled,
-	screenEnabled
-}
 
 function NotReady() { throw new Error('<VideoCall /> not mounted') }
 
-export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
-export let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
-export let toggleScreenShare: () => void = () => NotReady()
+let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+let toggleMaxVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+let toggleScreenShare: () => void = () => NotReady()
 export let ConnectVideo: (conId: string, polite: boolean) => void = (conId: string, polite: boolean): void => NotReady()
 export let DisconnectVideo: (conId: string) => void = (conId: string): void => NotReady()
 
 export default function VideoCall() {
 	let videoContainer: HTMLDivElement
 	let localVideoContainer: HTMLDivElement
-	let popover: HTMLDivElement
 	let observer: MutationObserver
 	let localVideo: HTMLVideoElement
 
@@ -88,6 +84,12 @@ export default function VideoCall() {
 		peersById.delete(conId)
 
 		setPeers(Array.from(peersById.values()))
+	}
+
+	toggleMaxVideo = (enabled?: boolean) => {
+		if(enabled === undefined) enabled = maxVideoEnabled()
+
+		setMaxVideoEnabled(!enabled)
 	}
 
 	toggleVideo = (enabled?: boolean) => {
@@ -215,9 +217,9 @@ export default function VideoCall() {
 		return alone
 	})
 
-	return <div id="videos-container" class="video-call" ref={videoContainer}>
+	return <div id="videos-container" class="video-call" classList={{'max-video': maxVideoEnabled()}} ref={videoContainer}>
 		<div class="video-ui local" classList={{ alone: isAlone() }} ref={localVideoContainer}>
-			<video id="local-video" ref={localVideo} style={{"border-color":outlineColor()}} autoplay playsinline />
+			<video id="local-video" ref={localVideo} style={{ "border-color": outlineColor() }} autoplay playsinline />
 			<span class="name">{myName()}</span>
 			<Show when={!isAlone()}>
 
@@ -304,8 +306,86 @@ function PeerVideo(props: { peer: PeerConnection }) {
 	</div>
 }
 
+
+export function VideoCallToolbar() {
+	const userClicked = (e: MouseEvent) => {
+		menu.Clear()
+		menu.AddItem(new MenuItem({
+			text: `Chat`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Map`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Build`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Share`,
+			subtext: 'coming soon...'
+		}))
+		menu.AddItem(new MenuItem({
+			text: `Find`,
+			subtext: 'coming soon...'
+		}))
+
+		menu.AddSeparator()
+		menu.AddItem(new MenuItem({
+			text: `Settings`,
+			onTextClick: () => {
+				ShowSettings()
+				menu.Clear()
+			}
+		}))
+		menu.AddSeparator()
+		menu.AddItem(new MenuItem({
+			text: `Logout ${server.self().identity.name}`,
+			onTextClick: () => server.becomeAnonymous(),
+		}))
+		menu.ShowFor((e.target as HTMLElement).parentElement)
+	}
+
+	let menu: FigmentMenu
+	onMount(() => {
+		menu = new FigmentMenu()
+	})
+
+	return <div class="avatar button">
+		<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={userClicked} />
+		<div class="name" onclick={userClicked}>{server.self()?.identity.name}</div>
+
+		<MediaButton
+			className="audio"
+			enabled={micEnabled}
+			onClick={() => toggleMic()}
+			enabledIcon="microphone"
+			disabledIcon="microphone_muted"
+		/>
+		<MediaButton
+			className="video"
+			enabled={camEnabled}
+			onClick={() => toggleVideo()}
+			enabledIcon="camera"
+			disabledIcon="camera_muted"
+		/>
+		<MediaButton
+			className="max-video"
+			enabled={maxVideoEnabled}
+			onClick={() => toggleMaxVideo()}
+			enabledIcon="users"
+			disabledIcon="users_rays"
+		/>
+		{/* <div class={`screen`} onclick={toggleScreenShare}>
+			<SvgIcon icon={'share_screen'} />
+		</div> */}
+	</div>
+}
+
+
 function toColor(volume: number) {
-	const amplify = 4
+	const amplify = 3
 	const opacity = Math.min(Math.round(volume * amplify), 0xff).toString(16);
 	const color = `#f9ff00${opacity}`;
 	return color;
@@ -318,10 +398,10 @@ async function watchVolumeLevel(mediaStream: MediaStream, callback: (volume: num
 	//Must be a power of 2 between 2^5 and 2^15
 	//A higher value will result in more details in the frequency domain but fewer details in the amplitude domain.
 	analyser.fftSize = 32
-	
+
 	const streamSource = audioContext.createMediaStreamSource(mediaStream)
 	streamSource.connect(analyser)
-	
+
 	const dataArray = new Uint8Array(analyser.frequencyBinCount);
 	function caclculateVolume() {
 		analyser.getByteFrequencyData(dataArray)

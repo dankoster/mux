@@ -1,11 +1,9 @@
 
-import { onMount, Show } from "solid-js";
+import { Show } from "solid-js";
 import { render } from "solid-js/web";
 import { GitHubSvg } from "./GitHubSvg";
 import { Avatar, Planet } from "./planet";
-import { MediaButton } from "./component/MediaButton";
-import { FigmentMenu, MenuItem } from "./Menu";
-import Settings, { ShowSettings } from "./Settings";
+import Settings from "./Settings";
 import * as server from "./data/data";
 import VideoCall, * as videoCall from "./VideoCall";
 
@@ -50,7 +48,7 @@ function App() {
 						</a>
 					</Show>
 					<Show when={server.self()?.identity}>
-						<VideoCallToolbar />
+						<videoCall.VideoCallToolbar />
 					</Show>
 
 				</div>
@@ -58,73 +56,4 @@ function App() {
 		</Show>
 		<Settings />
 	</>
-};
-
-function VideoCallToolbar() {
-	const userClicked = (e: MouseEvent) => {
-		menu.Clear()
-		menu.AddItem(new MenuItem({
-			text: `Chat`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Map`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Build`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Share`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Find`,
-			subtext: 'coming soon...'
-		}))
-
-		menu.AddSeparator()
-		menu.AddItem(new MenuItem({
-			text: `Settings`,
-			onTextClick: () => {
-				ShowSettings()
-				menu.Clear()
-			}
-		}))
-		menu.AddSeparator()
-		menu.AddItem(new MenuItem({
-			text: `Logout ${server.self().identity.name}`,
-			onTextClick: () => server.becomeAnonymous(),
-		}))
-		menu.ShowFor((e.target as HTMLElement).parentElement)
-	}
-
-	let menu: FigmentMenu
-	onMount(() => {
-		menu = new FigmentMenu()
-	})
-
-	return <div class="avatar button">
-		<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={userClicked} />
-		<div class="name" onclick={userClicked}>{server.self()?.identity.name}</div>
-
-		<MediaButton
-			className="audio"
-			enabled={videoCall.micEnabled}
-			onClick={() => videoCall.toggleMic()}
-			enabledIcon="microphone"
-			disabledIcon="microphone_muted"
-		/>
-		<MediaButton
-			className="video"
-			enabled={videoCall.camEnabled}
-			onClick={() => videoCall.toggleVideo()}
-			enabledIcon="camera"
-			disabledIcon="camera_muted"
-		/>
-		{/* <div class={`screen`} onclick={videoCall.toggleScreenShare}>
-			<SvgIcon icon={'share_screen'} />
-		</div> */}
-	</div>
 }
