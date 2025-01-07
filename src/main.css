@@ -19,7 +19,6 @@ body {
 	margin: 0;
 
 	display: grid;
-	grid-template-rows: 1fr min-content;
 }
 
 :root {
@@ -117,38 +116,6 @@ body {
 	grid-auto-flow: row;
 }
 
-.middle {
-	display: grid;
-	transition: 500ms;
-	position: relative;
-	overflow: auto;
-
-	/* &.no_call {
-			grid-template-rows: 60px 1fr;
-		} */
-
-	&.server_wait {
-		grid-template-rows: 1fr 1fr;
-	}
-
-	&.server_error {
-		grid-template-rows: 1fr 1fr;
-	}
-
-	&.call_ready {
-		grid-template-rows: 1fr 1fr;
-	}
-
-	&.call_connected {
-		grid-template-rows: 60px 1fr;
-	}
-
-	.call_state_message {
-		align-self: center;
-		justify-self: center;
-	}
-}
-
 .toolbar {
 	padding: 1rem;
 	/* border-top: 1px solid var(--separator-color); */
@@ -236,12 +203,12 @@ body {
 
 .avatar {
 	text-wrap: nowrap;
-    overflow: hidden;
-    display: grid;
-    grid-auto-flow: column;
-    align-items: stretch;
+	overflow: hidden;
+	display: grid;
+	grid-auto-flow: column;
+	align-items: stretch;
 	user-select: none;
-	
+
 	& * {
 		align-content: center;
 	}
@@ -256,8 +223,8 @@ body {
 			font-weight: bold;
 			padding-inline: 1rem;
 			border-right: 1px solid var(--button-outline-color);
-		}	
-		
+		}
+
 		img {
 			max-width: 2.5rem;
 		}

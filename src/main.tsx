@@ -3,32 +3,27 @@ import { onMount, Show } from "solid-js";
 import { render } from "solid-js/web";
 import { GitHubSvg } from "./GitHubSvg";
 import { Avatar, Planet } from "./planet";
-
+import { MediaButton } from "./component/MediaButton";
+import { FigmentMenu, MenuItem } from "./Menu";
+import Settings, { ShowSettings } from "./Settings";
 import * as server from "./data/data";
+import VideoCall, * as videoCall from "./VideoCall";
 
 import "./main.css"
-import { FigmentMenu, MenuItem } from "./Menu";
-import VideoCall, * as videoCall from "./VideoCall";
-import Settings, { ShowSettings } from "./Settings";
-import { MediaButton } from "./component/MediaButton";
-
-type SelectedView = 'people' | 'planet'
 
 render(() => <App />, document.body)
 
-function App() {
-
-
-
-	const onDistanceChanged = (avatar: Avatar) => {
-		const proxRange = 3
-		if (avatar.prevDistance > proxRange && avatar.distance < proxRange) {
-			videoCall.ConnectVideo(avatar.connection?.id, false)
-		}
-		else if (avatar.prevDistance < proxRange && avatar.distance > proxRange) {
-			videoCall.DisconnectVideo(avatar.connection?.id)
-		}
+function handleDistanceChange(avatar: Avatar) {
+	const proxRange = 3
+	if (avatar.prevDistance > proxRange && avatar.distance < proxRange) {
+		videoCall.ConnectVideo(avatar.connection?.id, false)
 	}
+	else if (avatar.prevDistance < proxRange && avatar.distance > proxRange) {
+		videoCall.DisconnectVideo(avatar.connection?.id)
+	}
+}
+
+function App() {
 
 	return <>
 		<meta name="theme-color" content="#1f0e3c"></meta>
@@ -38,11 +33,7 @@ function App() {
 		<Show when={server.serverOnline()}>
 
 			<VideoCall />
-
-			<div class={`middle`}>
-				<Planet onDistanceChanged={onDistanceChanged} />
-			</div>
-
+			<Planet onDistanceChanged={handleDistanceChange} />
 
 			<div class="toolbar">
 				<div class="stats">
@@ -108,7 +99,6 @@ function VideoCallToolbar() {
 		}))
 		menu.ShowFor((e.target as HTMLElement).parentElement)
 	}
-
 
 	let menu: FigmentMenu
 	onMount(() => {
