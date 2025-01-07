@@ -37,26 +37,13 @@ export function getElementPath(element: any) {
 }
 
 
-export class FigmentMenu extends HTMLElement {
+export class FigmentMenu {
 	container?: HTMLDivElement
 	menu?: HTMLDivElement
 	items: MenuItem[] = []
 	target?: HTMLElement
 
 	constructor() {
-		super();
-
-		// this.attachShadow({ mode: 'open' })
-
-		// // Apply external styles to the shadow dom
-		// const cssLink = document.createElement('link')
-		// cssLink.setAttribute('rel', 'stylesheet')
-		// cssLink.setAttribute('href', `chrome-extension://${figmentId}/styles.css`)
-		// this.shadowRoot?.appendChild(cssLink)
-
-		// TODO: consider moving the menu and outline into the same shadow dom. 
-		// Making the menu track the location of a target element that is in a
-		// different shadow dom appears to be problematic for reading position data. 
 
 		//watch for changes to the size of the document and just close the menu
 		const resizeObserver = new ResizeObserver(() => {
@@ -78,18 +65,6 @@ export class FigmentMenu extends HTMLElement {
 		this.container?.remove()
 		this.container = undefined
 		this.items.length = 0
-	}
-
-	static Create({ extraClasses }: { extraClasses: ExtraClasses }) {
-		if (!customElements.get('figment-menu'))
-			customElements.define('figment-menu', FigmentMenu)
-
-		let figmentMenu = document.createElement('figment-menu')
-
-		AddExtraClasses(figmentMenu, extraClasses)
-		document.body.appendChild(figmentMenu)
-
-		return figmentMenu
 	}
 
 	ShowFor(target: HTMLElement, extra?: HTMLElement) {

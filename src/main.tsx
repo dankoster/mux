@@ -102,7 +102,7 @@ function VideoCallToolbar() {
 
 	let menu: FigmentMenu
 	onMount(() => {
-		menu = FigmentMenu.Create({ extraClasses: 'menu-keep-open' }) as FigmentMenu
+		menu = new FigmentMenu()
 	})
 
 	return <div class="avatar button">
