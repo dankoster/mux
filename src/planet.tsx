@@ -61,23 +61,23 @@ export class Avatar {
 		const boxGeometry = new THREE.BoxGeometry(size, size, size);
 		const mesh = new THREE.Mesh(boxGeometry, material);
 		mesh.position.x = x;
-	
+
 		const labelDiv = document.createElement('div');
 		labelDiv.className = 'label';
 		labelDiv.textContent = '';
 		labelDiv.style.backgroundColor = 'transparent';
 		labelDiv.style.pointerEvents = 'none';
-	
+
 		const label = new CSS2DObject(labelDiv);
 		label.position.set(1.5 * size, 0, 0);
 		label.center.set(0, 1);
 		mesh.add(label);
 		label.layers.set(0);
-	
+
 		this.labelDiv = labelDiv
 		this.mesh = mesh
 	}
-	
+
 
 	set label(value: string) {
 		this.labelDiv.textContent = value
@@ -105,13 +105,14 @@ export function Planet(props: {
 }) {
 
 	let planetCanvas: HTMLCanvasElement
+	let planetLabels: HTMLDivElement
 	let self: Connection
 
 	const avatarsById = new Map<string, Avatar>()
 
 	//remove avatars for connections that go offline
 	createEffect(() => {
-		for(const con of connections) {
+		for (const con of connections) {
 			//solid-js wierdness: if the following two conditionals are swapped
 			// this effect does not fire. 
 			if (con.status !== 'online' && avatarsById.has(con.id)) {
@@ -123,41 +124,33 @@ export function Planet(props: {
 	})
 
 	onMount(() => {
-		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
-		const scene = new THREE.Scene();
-
-		const labelRenderer = new CSS2DRenderer();
-		labelRenderer.setSize(window.innerWidth, window.innerHeight);
-		labelRenderer.domElement.style.position = 'absolute';
-		const rect = renderer.domElement.getBoundingClientRect()
-		labelRenderer.domElement.style.top = rect && `${rect.top}px`
-		labelRenderer.domElement.style.pointerEvents = "none";
-		document.body.appendChild(labelRenderer.domElement);
-
-		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
-		camera.position.z = 60;
+		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
+		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
+		const scene = new THREE.Scene()
+		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000)
+		camera.position.z = 60
 
 		let selfAvatar: Avatar
 		getSelf.then((con) => {
 			selfAvatar = new Avatar(1, 0x44aa88, 0)
 			selfAvatar.label = displayName(con)
-			scene.add(selfAvatar.mesh);
+			scene.add(selfAvatar.mesh)
 			avatarsById.set(con.id, selfAvatar)
 			self = con
 		})
 
 		const sphere = makeSphere(30, 0x156289)
-		scene.add(sphere);
+		scene.add(sphere)
 
-		const orbit = new OrbitControls(camera, renderer.domElement);
-		orbit.enableZoom = true;
-		orbit.enableDamping = true;
+		const orbit = new OrbitControls(camera, renderer.domElement)
+		orbit.enableZoom = true
+		orbit.enableDamping = true
 		orbit.dampingFactor = 0.04
 
 		orbit.addEventListener('change', (e) => {
 			avatarsById.forEach(avatar => {
 				if (avatar == selfAvatar) return
-				
+
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 				props.onDistanceChanged(avatar)
 			})
@@ -175,14 +168,14 @@ export function Planet(props: {
 
 		// })
 
-		const lights = [];
-		lights[0] = new THREE.DirectionalLight(0xffffff, 3);
-		lights[1] = new THREE.DirectionalLight(0xffffff, 3);
-		lights[2] = new THREE.DirectionalLight(0xffffff, 3);
+		const lights = []
+		lights[0] = new THREE.DirectionalLight(0xffffff, 3)
+		lights[1] = new THREE.DirectionalLight(0xffffff, 3)
+		lights[2] = new THREE.DirectionalLight(0xffffff, 3)
 
-		lights[0].position.set(0, 200, 0);
-		lights[1].position.set(100, 200, 100);
-		lights[2].position.set(- 100, - 200, - 100);
+		lights[0].position.set(0, 200, 0)
+		lights[1].position.set(100, 200, 100)
+		lights[2].position.set(- 100, - 200, - 100)
 
 		for (const light of lights) {
 			scene.add(light)
@@ -288,38 +281,39 @@ export function Planet(props: {
 
 			const resized = resizeRendererToDisplaySize()
 			if (resized) {
-				const canvas = renderer.domElement;
-				camera.aspect = canvas.clientWidth / canvas.clientHeight;
-				camera.updateProjectionMatrix();
+				const canvas = renderer.domElement
+				camera.aspect = canvas.clientWidth / canvas.clientHeight
+				camera.updateProjectionMatrix()
 			}
 
 			orbit.update()
 
-			renderer.render(scene, camera);
-			labelRenderer.render(scene, camera);
+			renderer.render(scene, camera)
+			labelRenderer.render(scene, camera)
 
-			requestAnimationFrame(render);
+			requestAnimationFrame(render)
 		}
-		requestAnimationFrame(render);
+		requestAnimationFrame(render)
 
 		function resizeRendererToDisplaySize() {
-			const canvas = renderer.domElement;
-			const width = canvas.parentElement?.clientWidth;
-			const height = canvas.parentElement?.clientHeight;
+			const canvas = renderer.domElement
+			const width = canvas.parentElement?.clientWidth
+			const height = canvas.parentElement?.clientHeight
 
 			if (!width || !height)
 				return false
 
-			const needResize = canvas.width !== width || canvas.height !== height;
+			const needResize = canvas.width !== width || canvas.height !== height
 			if (needResize) {
-				renderer.setSize(width, height, false);
-				labelRenderer.setSize(width, height);
-				const rect = renderer.domElement.getBoundingClientRect()
-				labelRenderer.domElement.style.top = rect && `${rect.top}px`
+				renderer.setSize(width, height)
+				labelRenderer.setSize(width, height)
 			}
-			return needResize;
+			return needResize
 		}
 	})
 
-	return <canvas id="planet" class="planet" ref={planetCanvas}></canvas>
+	return <div class="planet-container">
+		<div class="labels" ref={planetLabels}></div>
+		<canvas id="planet" class="planet" ref={planetCanvas}></canvas>
+	</div>
 }

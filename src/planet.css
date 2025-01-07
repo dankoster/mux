@@ -1,6 +1,18 @@
-.planet {
-	width: 100%;
-	height: 100%;
+.planet-container {
+
+	display: grid;
+	position: relative;
 	overflow: auto;
-	user-select: none;
+
+	.labels {
+		position: absolute;
+		pointer-events: none;
+	}
+	
+	.planet {
+		width: 100%;
+		height: 100%;
+		overflow: auto;
+		user-select: none;
+	}
 }
