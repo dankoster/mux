@@ -254,7 +254,7 @@ function PeerVideo(props: { peer: PeerConnection }) {
 
 	const [name, setName] = createSignal('')
 	const [soundEnabled, setSoundEnabled] = createSignal(true)
-	const [volume, setVolume] = createSignal('')
+	const [outlineColor, setOutlineColor] = createSignal('')
 
 	const toggleSoundEnabled = () => {
 		const enabled = !soundEnabled()
@@ -284,14 +284,14 @@ function PeerVideo(props: { peer: PeerConnection }) {
 			if (track.kind === 'audio') {
 				watchVolumeLevel(props.peer.remoteStream, volume => {
 					const color = toColor(volume)
-					setVolume(color)
+					setOutlineColor(color)
 				})
 			}
 		})
 	})
 
 	return <div class="video-ui peer" ref={containerElement}>
-		<video id={props.peer.conId} style={{ "border-color": volume() }} class="remote" ref={videoElement} autoplay playsinline />
+		<video id={props.peer.conId} style={{ "border-color": outlineColor() }} class="remote" ref={videoElement} autoplay playsinline />
 		<span class="name">{name()}</span>
 		<div class="buttons">
 			<MediaButton
@@ -305,21 +305,24 @@ function PeerVideo(props: { peer: PeerConnection }) {
 }
 
 function toColor(volume: number) {
-	//HACK... Should be able to normalize the valume to fit 0-255
-	const opacity = Math.min(Math.round(volume * 10), 0xff).toString(16);
+	const amplify = 4
+	const opacity = Math.min(Math.round(volume * amplify), 0xff).toString(16);
 	const color = `#f9ff00${opacity}`;
 	return color;
 }
 
 async function watchVolumeLevel(mediaStream: MediaStream, callback: (volume: number) => void) {
 	const audioContext = new AudioContext();
-	const streamSource = audioContext.createMediaStreamSource(mediaStream)
 	const analyser = audioContext.createAnalyser();
-	const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+	//Must be a power of 2 between 2^5 and 2^15
+	//A higher value will result in more details in the frequency domain but fewer details in the amplitude domain.
+	analyser.fftSize = 32
+	
+	const streamSource = audioContext.createMediaStreamSource(mediaStream)
 	streamSource.connect(analyser)
-	// analyser.connect(audioContext.destination)
-
+	
+	const dataArray = new Uint8Array(analyser.frequencyBinCount);
 	function caclculateVolume() {
 		analyser.getByteFrequencyData(dataArray)
 
