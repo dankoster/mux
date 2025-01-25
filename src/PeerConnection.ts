@@ -40,12 +40,12 @@ type pcInit = {
 	onDisconnect: () => void;
 };
 export class PeerConnection extends EventTarget {
-	remoteStream = new MediaStream();
 	abortControllers: AbortController[] = [];
 	localRTCRtpSenders: RTCRtpSender[] = [];
 	conId: string;
 
-	pc: RTCPeerConnection;
+	pc: RTCPeerConnection
+	streams = new Set<MediaStream>()
 
 	polite = false;
 	makingOffer = false;
@@ -61,24 +61,21 @@ export class PeerConnection extends EventTarget {
 		this.polite = polite;
 		this.onDisconnect = onDisconnect;
 
-		// Pull tracks from remote stream, add to video stream
-		this.pc.ontrack = (event) => {
-			const track = event.track;
-			// console.log(`got ${event.type}: ${track.muted ? "muted" : "un-muted"} ${track.kind} from peer connection`, track.label);
-			//track.addEventListener('end', () => this.remoteStream.removeTrack(track))
-			//track.addEventListener('mute', () => this.remoteStream.removeTrack(track))
-			//track.addEventListener('unmute', () => this.remoteStream.addTrack(track))
-			this.remoteStream.addTrack(track);
-			// this.logTrackEvents(track, 'remote');
+		this.pc.ontrack = (e) => {
+			console.log(`PeerConnection: got ${e.track.kind} ${e.type} from peer connection. Saving MediaStreams`, e.streams)
 
-			this.dispatchEvent(new CustomEvent('track', { detail: track }))
+			const streamCount = this.streams.size
+			e.streams?.forEach(stream => this.streams.add(stream))
+			if(streamCount != this.streams.size){
+				console.log("PeerConnection sending streamsChanged event")
+				this.dispatchEvent(new Event('PeerConnection:StreamsChanged'))}
 		}
 
 		this.pc.onnegotiationneeded = async () => {
 			try {
 				this.makingOffer = true;
 				await this.pc.setLocalDescription();
-				await this.sendMessage({ description: this.pc.localDescription });
+				await server.sendWebRtcMessage(this.conId, JSON.stringify({ description: this.pc.localDescription }))
 			} catch (err) {
 				console.error(err);
 			} finally {
@@ -96,8 +93,7 @@ export class PeerConnection extends EventTarget {
 			}
 		};
 
-		// this.pc.onicecandidate = ({ candidate }) => server.sendDM(otherUser()?.id, JSON.stringify({ candidate }));
-		this.pc.onicecandidate = ({ candidate }) => this.sendMessage({ candidate });
+		this.pc.onicecandidate = ({ candidate }) => server.sendWebRtcMessage(this.conId, JSON.stringify({ candidate }))
 
 		// this.pc.onsignalingstatechange = () => {
 		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
@@ -113,22 +109,26 @@ export class PeerConnection extends EventTarget {
 	addTracks(stream: MediaStream) {
 		// Push tracks from local stream to peer connection
 		stream.getTracks().forEach((track) => {
-			// console.log(`adding ${track.muted ? "muted" : "un-muted"} local ${track.kind} track to peer connection:`, track.label);
+			console.log(`adding ${track.enabled ? "enabled" : "disabled"} local ${track.kind} track to peer connection:`, track.label);
 			this.localRTCRtpSenders.push(this.pc.addTrack(track, stream));
 			// this.logTrackEvents(track, 'local');
 		});
 	}
 
-	enableAudio(enabled: boolean) {
-		this.remoteStream.getAudioTracks()?.forEach(track => track.enabled = enabled)
+	enableRemoteAudio(enabled: boolean) {
+		this.pc.getReceivers()
+			.filter(r => r.track.kind === 'audio')
+			.forEach(r => r.track.enabled = enabled)
+
+		// this.remoteStream.getAudioTracks()?.forEach(track => track.enabled = enabled)
 	}
 
 	endCall() {
 		console.log('PeerConnection.endCall', this.conId);
 
-		// this.abortControllers.forEach(ac => {
-		// 	ac.abort();
-		// });
+		this.abortControllers.forEach(ac => {
+			ac.abort();
+		});
 
 		this.localRTCRtpSenders.forEach(t => {
 			this.pc.removeTrack(t);
@@ -150,19 +150,15 @@ export class PeerConnection extends EventTarget {
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal });
 	}
 
-	sendMessage(message: {}) {
-		return server.sendWebRtcMessage(this.conId, JSON.stringify(message));
-	}
-
 	async handleMessage({ description, candidate }) {
 		try {
-
 			if (this.pc.signalingState === "closed") {
 				console.warn(`RTCPeerConnection's signalingState is 'closed'... retrying...`);
 				await new Promise((resolve) => setTimeout(() => resolve(''), 1)); //just give it a tick then try again...
 			}
 
 			if (description) {
+				// console.log("handleMessage: description", description.type)
 				const offerCollision = description.type === "offer"
 					&& (this.makingOffer || this.pc.signalingState !== "stable");
 
@@ -179,7 +175,7 @@ export class PeerConnection extends EventTarget {
 				await this.pc.setRemoteDescription(description);
 				if (description.type === "offer") {
 					await this.pc.setLocalDescription();
-					this.sendMessage({ description: this.pc.localDescription });
+					server.sendWebRtcMessage(this.conId, JSON.stringify({ description: this.pc.localDescription }))
 				}
 			} else if (candidate) {
 				try {

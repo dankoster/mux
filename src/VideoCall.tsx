@@ -87,7 +87,7 @@ export default function VideoCall() {
 	}
 
 	toggleMaxVideo = (enabled?: boolean) => {
-		if(enabled === undefined) enabled = maxVideoEnabled()
+		if (enabled === undefined) enabled = maxVideoEnabled()
 
 		setMaxVideoEnabled(!enabled)
 	}
@@ -121,23 +121,26 @@ export default function VideoCall() {
 		}
 	}
 
-	toggleScreenShare = () => {
+	toggleScreenShare = async () => {
 		const enabled = !screenEnabled()
 		setScreenEnabled(enabled)
 
-		if (enabled) {
-			//TODO: add video element
-			const options = { audio: true, video: true };
-			navigator.mediaDevices.getDisplayMedia(options).then(
-				stream => {
-					console.log('toggleScreenShare', stream)
-					//share stream with peer connection
-					peersById.forEach(peer => peer.addTracks(stream))
+		console.log('toggleScreenShare', enabled)
 
-					//TODO: display stream preview thumbnail?
-				},
-				error => console.error(error)
-			)
+		//TODO: remove video on disabled case
+
+		if (enabled) {
+			try {
+				const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+
+				console.log('toggleScreenShare', stream, stream.getTracks())
+
+				//share stream with peer connection
+				peersById.forEach(peer => peer.addTracks(stream))
+			}
+			catch (error) {
+				console.error(error)
+			}
 		}
 	}
 
@@ -217,7 +220,7 @@ export default function VideoCall() {
 		return alone
 	})
 
-	return <div id="videos-container" class="video-call" classList={{'max-video': maxVideoEnabled()}} ref={videoContainer}>
+	return <div id="videos-container" class="video-call" classList={{ 'max-video': maxVideoEnabled() }} ref={videoContainer}>
 		<div class="video-ui local" classList={{ alone: isAlone() }} ref={localVideoContainer}>
 			<video id="local-video" ref={localVideo} style={{ "border-color": outlineColor() }} autoplay playsinline />
 			<span class="name">{myName()}</span>
@@ -241,68 +244,86 @@ export default function VideoCall() {
 		</div>
 
 		<For each={peers()}>
-			{(peer) => <PeerVideo peer={peer} />}
+			{(peer) => <PeerConnectionMedia peer={peer} />}
 		</For>
 	</div>
 }
 
-function PeerVideo(props: { peer: PeerConnection }) {
-	let videoElement: HTMLVideoElement
-	let containerElement: HTMLDivElement
+function PeerConnectionMedia(props: { peer: PeerConnection }) {
 
-	const handleMuteEvent = (track: MediaStreamTrack) => {
+	const [mediaStreams, setMediaStreams] = createSignal<readonly MediaStream[]>([])
+	const [name, setName] = createSignal('')
+
+	onMount(() => {
+		console.log('PeerConnectionMedia.onMount', props.peer.streams)
+
+		setMediaStreams(Array.from(props.peer.streams))
+		props.peer.addEventListener('PeerConnection:StreamsChanged', () => {
+			console.log('PeerConnection:StreamsChanged', props.peer.streams)
+			setMediaStreams(Array.from(props.peer.streams))
+		})
+
+
+		const con = server.connections.find(con => con.id === props.peer.conId)
+		setName(displayName(con) || shortId(props.peer.conId))
+	})
+
+	return <For each={mediaStreams()}>
+		{stream => <PeerVideo name={name()} peer={props.peer} stream={stream} />}
+	</For>
+}
+
+function PeerVideo(props: { name: string, peer: PeerConnection, stream: MediaStream }) {
+	let videoElement: HTMLVideoElement
+
+	const [remoteAudioEnabled, setRemoteAudioEnabled] = createSignal(true)
+	const [outlineColor, setOutlineColor] = createSignal('')
+	const [hasAudio, setHasAudio] = createSignal(false)
+
+
+	const toggleTrackKindMutedClass = (track: MediaStreamTrack) => {
 		videoElement.classList.toggle(`${track.kind}-muted`, track.muted)
 	}
 
-	const [name, setName] = createSignal('')
-	const [soundEnabled, setSoundEnabled] = createSignal(true)
-	const [outlineColor, setOutlineColor] = createSignal('')
-
-	const toggleSoundEnabled = () => {
-		const enabled = !soundEnabled()
-		setSoundEnabled(enabled)
-		props.peer.enableAudio(enabled)
+	const toggleRemoteAudioEnabled = () => {
+		const enabled = !remoteAudioEnabled()
+		setRemoteAudioEnabled(enabled)
+		props.peer.enableRemoteAudio(enabled)
 	}
 
 	onMount(() => {
-		const con = server.connections.find(con => con.id === props.peer.conId)
-		setName(displayName(con) || shortId(props.peer.conId))
+		videoElement.srcObject = props.stream
 
-		//TODO: generate a video element for each video stream. 
-		// 
+		const audioTracks = props.stream.getAudioTracks()
 
-		// console.log('mounted!', videoElement, props.peer.remoteStream)
-		// props.peer.remoteStream.addEventListener('addtrack', (ev) => console.log('PeerVideo.addTrack', ev))
-		// props.peer.remoteStream.addEventListener('removetrack', (ev) => console.log('PeerVideo.removetrack', ev))
-		videoElement.srcObject = props.peer.remoteStream
+		if (audioTracks?.length > 0) {
+			setHasAudio(true)
+			watchVolumeLevel(props.stream, volume => {
+				const color = toColor(volume)
+				setOutlineColor(color)
+			})
+		}
 
-		props.peer.addEventListener('track', (e: CustomEvent<MediaStreamTrack>) => {
-			const track = e.detail
-
-			track.addEventListener('mute', () => handleMuteEvent(track))
-			track.addEventListener('unmute', () => handleMuteEvent(track))
-			handleMuteEvent(track)
-
-			if (track.kind === 'audio') {
-				watchVolumeLevel(props.peer.remoteStream, volume => {
-					const color = toColor(volume)
-					setOutlineColor(color)
-				})
-			}
+		props.stream.getTracks().forEach(track => {
+			track.addEventListener('mute', () => toggleTrackKindMutedClass(track))
+			track.addEventListener('unmute', () => toggleTrackKindMutedClass(track))
+			toggleTrackKindMutedClass(track)
 		})
 	})
 
-	return <div class="video-ui peer" ref={containerElement}>
+	return <div class="video-ui peer">
 		<video id={props.peer.conId} style={{ "border-color": outlineColor() }} class="remote" ref={videoElement} autoplay playsinline />
-		<span class="name">{name()}</span>
-		<div class="buttons">
-			<MediaButton
-				enabled={soundEnabled}
-				onClick={toggleSoundEnabled}
-				enabledIcon="unmute"
-				disabledIcon="mute"
-			/>
-		</div>
+		<span class="name">{props.name}</span>
+		<Show when={hasAudio()}>
+			<div class="buttons">
+				<MediaButton
+					enabled={remoteAudioEnabled}
+					onClick={toggleRemoteAudioEnabled}
+					enabledIcon="unmute"
+					disabledIcon="mute"
+				/>
+			</div>
+		</Show>
 	</div>
 }
 
@@ -310,28 +331,6 @@ function PeerVideo(props: { peer: PeerConnection }) {
 export function VideoCallToolbar() {
 	const userClicked = (e: MouseEvent) => {
 		menu.Clear()
-		menu.AddItem(new MenuItem({
-			text: `Chat`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Map`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Build`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Share`,
-			subtext: 'coming soon...'
-		}))
-		menu.AddItem(new MenuItem({
-			text: `Find`,
-			subtext: 'coming soon...'
-		}))
-
-		menu.AddSeparator()
 		menu.AddItem(new MenuItem({
 			text: `Settings`,
 			onTextClick: () => {
@@ -371,15 +370,19 @@ export function VideoCallToolbar() {
 			disabledIcon="camera_muted"
 		/>
 		<MediaButton
+			className="screen"
+			enabled={screenEnabled}
+			onClick={() => toggleScreenShare()}
+			enabledIcon="share_screen"
+			disabledIcon="share_screen"
+		/>
+		<MediaButton
 			className="max-video"
 			enabled={maxVideoEnabled}
 			onClick={() => toggleMaxVideo()}
 			enabledIcon="users"
 			disabledIcon="users_rays"
 		/>
-		{/* <div class={`screen`} onclick={toggleScreenShare}>
-			<SvgIcon icon={'share_screen'} />
-		</div> */}
 	</div>
 }
 
@@ -399,24 +402,29 @@ async function watchVolumeLevel(mediaStream: MediaStream, callback: (volume: num
 	//A higher value will result in more details in the frequency domain but fewer details in the amplitude domain.
 	analyser.fftSize = 32
 
-	const streamSource = audioContext.createMediaStreamSource(mediaStream)
-	streamSource.connect(analyser)
+	try {
+		const streamSource = audioContext.createMediaStreamSource(mediaStream)
+		streamSource.connect(analyser)
 
-	const dataArray = new Uint8Array(analyser.frequencyBinCount);
-	function caclculateVolume() {
-		analyser.getByteFrequencyData(dataArray)
+		const dataArray = new Uint8Array(analyser.frequencyBinCount);
+		function caclculateVolume() {
+			analyser.getByteFrequencyData(dataArray)
 
-		let sum = 0;
-		for (const amplitude of dataArray) {
-			sum += amplitude * amplitude
+			let sum = 0;
+			for (const amplitude of dataArray) {
+				sum += amplitude * amplitude
+			}
+
+			const volume = Math.sqrt(sum / dataArray.length)
+			callback(volume)
+
+			if (mediaStream.active)
+				requestAnimationFrame(caclculateVolume)
 		}
 
-		const volume = Math.sqrt(sum / dataArray.length)
-		callback(volume)
+		caclculateVolume()
 
-		if (mediaStream.active)
-			requestAnimationFrame(caclculateVolume)
+	} catch (error) {
+		console.error(error)
 	}
-
-	caclculateVolume()
 }
