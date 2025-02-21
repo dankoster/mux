@@ -40,7 +40,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmHistory: "dmHistory",
 	dmUnread: "dmUnread",
 	publicKey: "publicKey",
-	ws: "ws"
+	position: "position"
 }
 
 
@@ -147,7 +147,7 @@ const api = new Router();
 
 const lastWsMessageByUUID = new Map<string, string>()
 
-api.get(`/${apiRoute.ws}`, async (ctx) => {
+api.get(`/${apiRoute.position}`, async (ctx) => {
 
 	if (!ctx.isUpgradable) {
 		ctx.throw(501);
@@ -301,8 +301,6 @@ api.post(`/${apiRoute.acceptFriendRequest}`, async (ctx) => {
 	ctx.response.status = 200
 })
 
-
-
 api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	try {
 		const { uuid, con } = getConnection(ctx.request);
@@ -361,7 +359,6 @@ api.post(`/${apiRoute.setColor}`, async (ctx) => {
 		ctx.response.status = 400
 	}
 });
-
 
 api.post(`/${apiRoute.publicKey}`, async (ctx) => {
 	const { uuid, con } = getConnection(ctx.request)

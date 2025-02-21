@@ -14,7 +14,7 @@ export type ApiRoute = "sse" |
 	"dmHistory" |
 	"dmUnread" |
 	"publicKey" |
-	"ws";
+	"position";
 
 export type SSEvent = "pk" |
 	"id" |

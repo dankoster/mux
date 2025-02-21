@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import './planet.css'
-import { broadcastPosition, onGotPosition } from './data/positionSocket';
+import * as positionSocket from './data/positionSocket';
 import { connections, getSelf } from './data/data';
 import { Connection } from '../server/types';
 import { displayName, shortId } from './helpers';
@@ -147,6 +147,7 @@ export function Planet(props: {
 		orbit.enableDamping = true
 		orbit.dampingFactor = 0.04
 
+		//calculate distance to every other avatar
 		orbit.addEventListener('change', (e) => {
 			avatarsById.forEach(avatar => {
 				if (avatar == selfAvatar) return
@@ -181,21 +182,23 @@ export function Planet(props: {
 			scene.add(light)
 		}
 
-		onGotPosition((message) => {
+		positionSocket.onGotPosition((message) => {
 			let avatar: Avatar
 			const con = connections.find(con => con.id === message.id)
 			if (con.status !== 'online')
 				return
 
+			//add avatar for this position
 			if (!avatarsById.has(message.id)) {
 				const label = displayName(con)
 				avatar = new Avatar(1)
-				scene.add(avatar.mesh);
+				scene.add(avatar.mesh)
 				avatar.connection = con
 				avatar.label = label || shortId(message.id)
 				avatarsById.set(message.id, avatar)
 			}
 
+			//set avatar position and orientation
 			avatar = avatarsById.get(message.id)
 			avatar.mesh.position.fromArray([
 				message.position.x,
@@ -203,9 +206,12 @@ export function Planet(props: {
 				message.position.z
 			])
 			avatar.mesh.lookAt(sphere.position)
+
+			//calculate distance from self
 			if (selfAvatar && avatar != selfAvatar)
 				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 
+			//let the server control position and orientation of self
 			if (self && message.id === self.id) {
 				//make camera move to the new avatar position from the server
 				//calculate camera direction relative to avatar position and distance from sphere
@@ -272,7 +278,7 @@ export function Planet(props: {
 				if (time - _lastBroadcastTime > 25) {
 					_lastBroadcastTime = time
 					if (_currentPosition.distanceTo(_lastBroadcastPosition) > 0.25) {
-						const broadcasted = broadcastPosition(_currentPosition)
+						const broadcasted = positionSocket.broadcastPosition(_currentPosition)
 						if (broadcasted)
 							_lastBroadcastPosition.copy(_currentPosition)
 					}
