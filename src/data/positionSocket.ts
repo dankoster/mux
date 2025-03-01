@@ -1,10 +1,7 @@
+import { Position, PositionMessage, PositionMessageHandler } from "../../server/types"
 import { API_URI } from "../API_URI"
 import { id, pk } from "./data"
 import { apiRoute } from "./http"
-
-type xyz = {x:number, y: number, z: number}
-type PositionMessage = {id: string, position: xyz}
-type PositionMessageHandler = (message: PositionMessage) => void
 
 let socket: WebSocket
 const handlers: PositionMessageHandler[] = []
@@ -23,18 +20,13 @@ function connectSocket() {
 	handlers.forEach(h => onGotPosition(h))
 }
 
-export function broadcastPosition(position: xyz) {
+export function broadcastPosition(position: Position) {
 
 	//TODO: queue up this broadcast to be sent when we're ready
 	if(!id() || socket.readyState != 1) 
 		return false
 
-	const message: PositionMessage = {
-		id: id(),
-		position
-	}
-	//console.log('broadcastPosition', message)
-	socket.send(JSON.stringify(message))
+	socket.send(JSON.stringify(position))
 	return true
 }
 

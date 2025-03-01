@@ -6,7 +6,7 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import './planet.css'
 import * as positionSocket from './data/positionSocket';
 import { connections, getSelf } from './data/data';
-import { Connection } from '../server/types';
+import { Connection, Position } from '../server/types';
 import { displayName, shortId } from './helpers';
 import { degToRad } from 'three/src/math/MathUtils.js';
 
@@ -78,7 +78,21 @@ export class Avatar {
 		this.mesh = mesh
 	}
 
+	get position(): THREE.Vector3 {
+		return this.mesh.position
+	}
+	set position(pos: Position) {
+		if(!pos) return
+		this.mesh.position.fromArray([
+			pos.x,
+			pos.y,
+			pos.z
+		])
+	}
 
+	get label() { 
+		return this.labelDiv.textContent
+	}
 	set label(value: string) {
 		this.labelDiv.textContent = value
 	}
@@ -106,40 +120,85 @@ export function Planet(props: {
 
 	let planetCanvas: HTMLCanvasElement
 	let planetLabels: HTMLDivElement
-	let self: Connection
-
+	let scene: THREE.Scene
+	let camera: THREE.PerspectiveCamera
+	let sphere: THREE.Group<THREE.Object3DEventMap>
+	let selfAvatar: Avatar
+	const cameraToSphere = new THREE.Vector3();
 	const avatarsById = new Map<string, Avatar>()
+
+	function GetAvatar(con: Connection) {
+		if (!scene) throw new Error('scene not ready')
+
+		if (!avatarsById.has(con.id)) {
+			let avatar = new Avatar(1)
+			avatar.connection = con
+			avatar.label = displayName(con) || shortId(con.id)
+			avatar.position = con.position			
+			avatar.mesh.lookAt(sphere.position)
+			scene.add(avatar.mesh)
+			avatarsById.set(con.id, avatar)
+		} 
+		
+		return avatarsById.get(con.id)
+	}
+
+	function moveCameraToAvatar(avatar: Avatar) {
+		//calculate camera direction relative to avatar position and distance from sphere
+		cameraToSphere
+			.subVectors(avatar.mesh.position, sphere.position)
+			.normalize()
+			.multiplyScalar(camera.position.distanceTo(sphere.position));
+
+		camera.position.copy(cameraToSphere);
+		camera.lookAt(sphere.position);
+	}
 
 	//remove avatars for connections that go offline
 	createEffect(() => {
 		for (const con of connections) {
+			if(con.status === 'online' && con.position)
+				GetAvatar(con)
+
 			//solid-js wierdness: if the following two conditionals are swapped
 			// this effect does not fire. 
 			if (con.status !== 'online' && avatarsById.has(con.id)) {
 				const avatar = avatarsById.get(con.id)
+				//const avatar = avatarsById.get(con.id)
 				avatar?.delete()
 				avatarsById.delete(con.id)
 			}
 		}
 	})
 
+	positionSocket.onGotPosition((message) => {
+		const con = connections.find(con => con.id === message.id)
+		if (con.status !== 'online')
+			return
+
+		//add avatar for this position
+		let avatar = GetAvatar(con)
+		avatar.position = message.position
+		avatar.mesh.lookAt(sphere?.position)
+
+		//calculate distance from self
+		if (selfAvatar && avatar != selfAvatar)
+			avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+	})
+
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
 		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
-		const scene = new THREE.Scene()
-		const camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000)
+		scene = new THREE.Scene()
+		camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000)
 		camera.position.z = 60
 
-		let selfAvatar: Avatar
 		getSelf.then((con) => {
-			selfAvatar = new Avatar(1, 0x44aa88, 0)
-			selfAvatar.label = displayName(con)
-			scene.add(selfAvatar.mesh)
-			avatarsById.set(con.id, selfAvatar)
-			self = con
+			selfAvatar = GetAvatar(con)
+			moveCameraToAvatar(selfAvatar)
 		})
 
-		const sphere = makeSphere(30, 0x156289)
+		sphere = makeSphere(30, 0x156289)
 		scene.add(sphere)
 
 		const orbit = new OrbitControls(camera, renderer.domElement)
@@ -182,52 +241,8 @@ export function Planet(props: {
 			scene.add(light)
 		}
 
-		positionSocket.onGotPosition((message) => {
-			let avatar: Avatar
-			const con = connections.find(con => con.id === message.id)
-			if (con.status !== 'online')
-				return
-
-			//add avatar for this position
-			if (!avatarsById.has(message.id)) {
-				const label = displayName(con)
-				avatar = new Avatar(1)
-				scene.add(avatar.mesh)
-				avatar.connection = con
-				avatar.label = label || shortId(message.id)
-				avatarsById.set(message.id, avatar)
-			}
-
-			//set avatar position and orientation
-			avatar = avatarsById.get(message.id)
-			avatar.mesh.position.fromArray([
-				message.position.x,
-				message.position.y,
-				message.position.z
-			])
-			avatar.mesh.lookAt(sphere.position)
-
-			//calculate distance from self
-			if (selfAvatar && avatar != selfAvatar)
-				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
-
-			//let the server control position and orientation of self
-			if (self && message.id === self.id) {
-				//make camera move to the new avatar position from the server
-				//calculate camera direction relative to avatar position and distance from sphere
-				direction
-					.subVectors(avatar.mesh.position, sphere.position)
-					.normalize()
-					.multiplyScalar(camera.position.distanceTo(sphere.position));
-
-				camera.position.copy(direction)
-				camera.lookAt(sphere.position)
-			}
-		})
-
 
 		const raycaster = new THREE.Raycaster();
-		var direction = new THREE.Vector3();
 
 		let _currentPosition: THREE.Vector3
 		let _currentLookat: THREE.Vector3
@@ -245,10 +260,10 @@ export function Planet(props: {
 			_prevTime = time
 
 			//direction vector from camera to sphere
-			direction.subVectors(sphere.position, camera.position).normalize();
+			cameraToSphere.subVectors(sphere.position, camera.position).normalize();
 
 			//find intersection point(s) on surface of sphere
-			raycaster.set(camera.position, direction)
+			raycaster.set(camera.position, cameraToSphere)
 			const intersections = raycaster.intersectObject(sphere)
 
 			//put the cube on the surface of the sphere

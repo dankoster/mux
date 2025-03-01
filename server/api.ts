@@ -1,8 +1,9 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest, PositionMessage, Position } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
+import { MediaType } from "jsr:@oak/commons@^1.0/media_types";
 
 export { api }
 
@@ -171,13 +172,22 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 			return
 		}
 
-		//TODO: add a message header here so the client doesn't get to control the "from" address
+		const con = connectionByUUID.get(socketUuid)
+		if (!con) throw new Error("no connection found by UUID for web socket")
 
+		con.position = JSON.parse(m.data) as Position
+		db.persistConnection(socketUuid, con)
+		const pm: PositionMessage = {
+			id: con.id,
+			position: con.position
+		}
+		const messageString = JSON.stringify(pm)
+		
 		//broadcast the message to all other connected clients
+		lastWsMessageByUUID.set(socketUuid, messageString)
 		wsByUUID.forEach((ws, uuid) => {
-			lastWsMessageByUUID.set(socketUuid, m.data)
 			if (uuid !== socketUuid) {
-				ws.send(m.data)
+				ws.send(messageString)
 			}
 		})
 	};

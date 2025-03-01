@@ -142,6 +142,8 @@ export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, ti
 }
 
 AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
+
 function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableName: string, columnName: string, columnType: "TEXT" }) {
 	const transaction = db.transaction(() => {
 		const getColumns = db.prepare(
@@ -178,13 +180,22 @@ export function persistPublicKey({ uuid, publicKey }: { uuid: string, publicKey:
 	return updatePublicKey.all({ uuid, publicKey })
 }
 
+export function persistPosition({ uuid, position }: { uuid: string, position: string }) {
+	const updatePublicKey = db.prepare(
+		`UPDATE connection 
+		SET position = :position 
+		WHERE uuid = :uuid
+		RETURNING *;`)
+	return updatePublicKey.all({ uuid, position })
+}
+
 
 
 const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
 
 const upsertConnection = db.prepare(`INSERT INTO connection 
-	(uuid, id, identityId, color, text, status, kind, publicKey) 
-	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey)
+	(uuid, id, identityId, color, text, status, kind, publicKey, position) 
+	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey, :position)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
 		id = excluded.id,
@@ -193,7 +204,8 @@ const upsertConnection = db.prepare(`INSERT INTO connection
 		text = excluded.text,
 		status = excluded.status,
 		kind = excluded.kind,
-		publicKey = excluded.publicKey
+		publicKey = excluded.publicKey,
+		position = excluded.position
 	RETURNING *;`
 )
 

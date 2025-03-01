@@ -8,8 +8,8 @@ export type ApiRoute = "sse" |
 	"log" |
 	"discardKey" |
 	"webRTC" |
-	"friendRequest" | 
-	"acceptFriendRequest" | 
+	"friendRequest" |
+	"acceptFriendRequest" |
 	"dm" |
 	"dmHistory" |
 	"dmUnread" |
@@ -27,7 +27,7 @@ export type SSEvent = "pk" |
 	"reconnect" |
 	"friendRequest" |
 	"friendRequests" |
-	"friendList" | 
+	"friendList" |
 	"friendRequestAccepted" |
 	"dm";
 
@@ -47,7 +47,12 @@ export type Connection = {
 	kind?: string;
 	publicKey?: string;
 	identity?: Identity;
+	position?: Position;
 };
+
+export type Position = { x: number, y: number, z: number }
+export type PositionMessage = { id: string, position: Position }
+export type PositionMessageHandler = (message: PositionMessage) => void
 
 export type Update = {
 	connectionId: string;
@@ -55,10 +60,10 @@ export type Update = {
 	value: string;
 };
 
-export type Friend = { 
-	id: string, 
-	myId: string, 
-	friendId: string 
+export type Friend = {
+	id: string,
+	myId: string,
+	friendId: string
 }
 
 export type FriendRequest = {
@@ -68,23 +73,23 @@ export type FriendRequest = {
 	status: string
 }
 
-export type DM = { 
+export type DM = {
 	id?: number,
-	toId: string, 
+	toId: string,
 	fromId: string,
 	fromName?: string,
 	timestamp?: number,
-	message: string | EncryptedMessage, 
-	kind: 'key-share'|'text'|'call'
+	message: string | EncryptedMessage,
+	kind: 'key-share' | 'text' | 'call'
 }
 
 export type EncryptedMessage = { iv: string, data: string }
 
 
-export type DMInsert = { 
-	toUuid: string, 
+export type DMInsert = {
+	toUuid: string,
 	fromUuid: string,
-	message: string | EncryptedMessage, 
+	message: string | EncryptedMessage,
 }
 
 export type DMRequest = {
