@@ -128,7 +128,7 @@ export function Planet(props: {
 	const avatarsById = new Map<string, Avatar>()
 
 	function GetAvatar(con: Connection) {
-		if (!scene) throw new Error('scene not ready')
+		if (!scene) return undefined
 
 		if (!avatarsById.has(con.id)) {
 			let avatar = new Avatar(1)
