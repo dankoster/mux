@@ -78,11 +78,8 @@ export class Avatar {
 		this.mesh = mesh
 	}
 
-	get position(): THREE.Vector3 {
-		return this.mesh.position
-	}
-	set position(pos: Position) {
-		if(!pos) return
+	setPosition(pos: Position) {
+		if (!pos) return
 		this.mesh.position.fromArray([
 			pos.x,
 			pos.y,
@@ -90,7 +87,7 @@ export class Avatar {
 		])
 	}
 
-	get label() { 
+	get label() {
 		return this.labelDiv.textContent
 	}
 	set label(value: string) {
@@ -134,16 +131,18 @@ export function Planet(props: {
 			let avatar = new Avatar(1)
 			avatar.connection = con
 			avatar.label = displayName(con) || shortId(con.id)
-			avatar.position = con.position			
+			avatar.setPosition(con.position)
 			avatar.mesh.lookAt(sphere.position)
 			scene.add(avatar.mesh)
 			avatarsById.set(con.id, avatar)
-		} 
-		
+		}
+
 		return avatarsById.get(con.id)
 	}
 
 	function moveCameraToAvatar(avatar: Avatar) {
+		if (!avatar?.mesh?.position?.length()) return //don't move the camera to {0,0,0}
+
 		//calculate camera direction relative to avatar position and distance from sphere
 		cameraToSphere
 			.subVectors(avatar.mesh.position, sphere.position)
@@ -157,7 +156,7 @@ export function Planet(props: {
 	//remove avatars for connections that go offline
 	createEffect(() => {
 		for (const con of connections) {
-			if(con.status === 'online' && con.position)
+			if (con.status === 'online' && con.position)
 				GetAvatar(con)
 
 			//solid-js wierdness: if the following two conditionals are swapped
@@ -178,7 +177,7 @@ export function Planet(props: {
 
 		//add avatar for this position
 		let avatar = GetAvatar(con)
-		avatar.position = message.position
+		avatar.setPosition(message.position)
 		avatar.mesh.lookAt(sphere?.position)
 
 		//calculate distance from self
