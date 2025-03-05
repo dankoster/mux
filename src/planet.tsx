@@ -9,6 +9,7 @@ import { connections, getSelf } from './data/data';
 import { Connection, Position } from '../server/types';
 import { displayName, shortId } from './helpers';
 import { degToRad } from 'three/src/math/MathUtils.js';
+import { trace } from './trace';
 
 function makeSphere(radius: number, color: number) {
 	const sphereParams = {
@@ -111,9 +112,7 @@ export class Avatar {
 	}
 }
 
-export function Planet(props: {
-	onDistanceChanged: (avatar: Avatar) => void
-}) {
+export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 
 	let planetCanvas: HTMLCanvasElement
 	let planetLabels: HTMLDivElement
@@ -121,20 +120,23 @@ export function Planet(props: {
 	let camera: THREE.PerspectiveCamera
 	let sphere: THREE.Group<THREE.Object3DEventMap>
 	let selfAvatar: Avatar
-	const cameraToSphere = new THREE.Vector3();
+	const tmpVec3 = new THREE.Vector3();
 	const avatarsById = new Map<string, Avatar>()
 
-	function GetAvatar(con: Connection) {
-		if (!scene) return undefined
+	function GetAvatar(con: Connection): Avatar | undefined {
+		if (!scene) {
+			console.log('GetAvatar: scene not ready!')
+			return undefined
+		}
 
 		if (!avatarsById.has(con.id)) {
 			let avatar = new Avatar(1)
 			avatar.connection = con
 			avatar.label = displayName(con) || shortId(con.id)
 			avatar.setPosition(con.position)
-			avatar.mesh.lookAt(sphere.position)
 			scene.add(avatar.mesh)
 			avatarsById.set(con.id, avatar)
+			console.log('created avatar for', avatar.label)
 		}
 
 		return avatarsById.get(con.id)
@@ -143,20 +145,21 @@ export function Planet(props: {
 	function moveCameraToAvatar(avatar: Avatar) {
 		if (!avatar?.mesh?.position?.length()) return //don't move the camera to {0,0,0}
 
+		console.log('moveCameraToAvatar', avatar.mesh.position)
+
 		//calculate camera direction relative to avatar position and distance from sphere
-		cameraToSphere
-			.subVectors(avatar.mesh.position, sphere.position)
+		tmpVec3.subVectors(avatar.mesh.position, sphere.position)
 			.normalize()
 			.multiplyScalar(camera.position.distanceTo(sphere.position));
 
-		camera.position.copy(cameraToSphere);
+		camera.position.copy(tmpVec3);
 		camera.lookAt(sphere.position);
 	}
 
 	//remove avatars for connections that go offline
 	createEffect(() => {
 		for (const con of connections) {
-			if (con.status === 'online' && con.position)
+			if (con.status === 'online' && con.position && !avatarsById.has(con.id))
 				GetAvatar(con)
 
 			//solid-js wierdness: if the following two conditionals are swapped
@@ -172,18 +175,27 @@ export function Planet(props: {
 
 	positionSocket.onGotPosition((message) => {
 		const con = connections.find(con => con.id === message.id)
-		if (con.status !== 'online')
+		if (con?.status !== 'online')
 			return
 
 		//add avatar for this position
 		let avatar = GetAvatar(con)
-		avatar.setPosition(message.position)
-		avatar.mesh.lookAt(sphere?.position)
+		avatar?.setPosition(message.position)
+		avatar?.mesh.lookAt(sphere?.position)
 
 		//calculate distance from self
 		if (selfAvatar && avatar != selfAvatar)
 			avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 	})
+
+	let lastBroadcastPosition = new THREE.Vector3()
+	function broadcastPosition(avatar: Avatar, minDistanceMoved: number = 0.25) {
+		if (avatar?.mesh?.position.distanceTo(lastBroadcastPosition) > minDistanceMoved) {
+			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position);
+			if (broadcasted)
+				lastBroadcastPosition.copy(selfAvatar?.mesh?.position);
+		}
+	}
 
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
@@ -196,6 +208,10 @@ export function Planet(props: {
 			selfAvatar = GetAvatar(con)
 			moveCameraToAvatar(selfAvatar)
 		})
+
+		setInterval(() => {
+			broadcastPosition(selfAvatar);
+		}, 25);
 
 		sphere = makeSphere(30, 0x156289)
 		scene.add(sphere)
@@ -243,62 +259,24 @@ export function Planet(props: {
 
 		const raycaster = new THREE.Raycaster();
 
-		let _currentPosition: THREE.Vector3
-		let _currentLookat: THREE.Vector3
-		let _prevTime: number
-		let _elapsedTime: number
-		let _elapsedSec: number
 
-		let _lastBroadcastTime: number = 0
-		let _lastBroadcastPosition = new THREE.Vector3()
+		let prevTime: number
 
 		function render(time: number) {
+			const deltaTime = time - prevTime
+			prevTime = time;
 
-			_elapsedTime = time - _prevTime
-			_elapsedSec = _elapsedTime *= 0.001;  // convert time to seconds
-			_prevTime = time
-
-			//direction vector from camera to sphere
-			cameraToSphere.subVectors(sphere.position, camera.position).normalize();
-
-			//find intersection point(s) on surface of sphere
-			raycaster.set(camera.position, cameraToSphere)
-			const intersections = raycaster.intersectObject(sphere)
-
-			//put the cube on the surface of the sphere
-			//@ts-expect-error Property 'geometry' does not exist on type 'Object3D<Object3DEventMap>'.
-			const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry')
-			if (firstIntersectedSphereGeometry) {
-
-				const idealPosition = firstIntersectedSphereGeometry?.point
-					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5) //move away from the sphere origin
-				const idealLookat = firstIntersectedSphereGeometry.normal
-
-				const t = 1.0 - Math.pow(0.001, _elapsedSec);
-				if (_currentPosition && _currentLookat) {
-					_currentPosition?.lerp(idealPosition, t);
-					_currentLookat?.lerp(idealLookat, t);
-				}
-				else {
-					_currentPosition = idealPosition
-					_currentLookat = idealLookat
-				}
-
-				//set position
-				selfAvatar?.mesh?.position.copy(_currentPosition)
-				selfAvatar?.mesh?.lookAt(_currentLookat)
-
-				//broadcast position
-				if (time - _lastBroadcastTime > 25) {
-					_lastBroadcastTime = time
-					if (_currentPosition.distanceTo(_lastBroadcastPosition) > 0.25) {
-						const broadcasted = positionSocket.broadcastPosition(_currentPosition)
-						if (broadcasted)
-							_lastBroadcastPosition.copy(_currentPosition)
-					}
-				}
+			//move our avatar to be under the camera
+			if (selfAvatar?.mesh?.position) {
+				const thirdPersonCamera = calculateThirdPersonCamera(deltaTime, sphere);
+				selfAvatar?.mesh?.position.copy(thirdPersonCamera.currentPosition);
+				selfAvatar?.mesh?.lookAt(thirdPersonCamera.currentLookat);
 			}
 
+			//move the camera around the scene origin
+			orbit.update()
+
+			//handle resize
 			const resized = resizeRendererToDisplaySize()
 			if (resized) {
 				const canvas = renderer.domElement
@@ -306,14 +284,54 @@ export function Planet(props: {
 				camera.updateProjectionMatrix()
 			}
 
-			orbit.update()
-
 			renderer.render(scene, camera)
 			labelRenderer.render(scene, camera)
 
 			requestAnimationFrame(render)
 		}
 		requestAnimationFrame(render)
+
+		let _currentPosition: THREE.Vector3
+		let _currentLookat: THREE.Vector3
+		function calculateThirdPersonCamera(deltaTime: number, target: THREE.Group) {
+			const _elapsedSec = deltaTime * 0.001; // convert time to seconds
+
+			//direction vector from camera to sphere
+			tmpVec3.subVectors(target.position, camera.position).normalize();
+
+			//find intersection point(s) on surface of sphere
+			raycaster.set(camera.position, tmpVec3);
+			const intersections = raycaster.intersectObject(target);
+
+			//find intersection with the surface of the sphere
+			//@ts-expect-error Property 'geometry' does not exist on type 'Object3D<Object3DEventMap>'.
+			const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry');
+			if (firstIntersectedSphereGeometry) {
+
+				//move away from the sphere origin by ... half a normal vector?
+				// TODO: this should place the position on the surface of the target object
+				const idealPosition = firstIntersectedSphereGeometry?.point
+					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5); 
+				const idealLookat = firstIntersectedSphereGeometry.normal;
+
+				const t = 1.0 - Math.pow(0.001, _elapsedSec);
+				if (_currentPosition && _currentLookat) {
+					_currentPosition?.lerp(idealPosition, t);
+					_currentLookat?.lerp(idealLookat, t);
+				}
+				else {
+					_currentPosition = idealPosition;
+					_currentLookat = idealLookat;
+				}
+
+				return {
+					currentPosition: _currentPosition,
+					currentLookat: _currentLookat,
+					idealPosition,
+					idealLookat
+				}
+			}
+		}
 
 		function resizeRendererToDisplaySize() {
 			const canvas = renderer.domElement

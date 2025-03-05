@@ -21,9 +21,8 @@ function connectSocket() {
 }
 
 export function broadcastPosition(position: Position) {
-
 	//TODO: queue up this broadcast to be sent when we're ready
-	if(!id() || socket.readyState != 1) 
+	if(!id() || socket.readyState != WebSocket.OPEN) 
 		return false
 
 	socket.send(JSON.stringify(position))
