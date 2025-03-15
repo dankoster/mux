@@ -53,16 +53,16 @@ export function GetSettingValue(name: SettingName) {
 }
 
 export default function Settings() {
-	let popover: HTMLDivElement
+	let dialog: HTMLDialogElement
 
 	onMount(() => {
 		ShowSettings = () => {
-			popover.showPopover()
+			dialog.showModal()
 		}
 	})
 
-	const close = () => {
-		popover.hidePopover()
+	const closeSettings = () => {
+		dialog.close()
 	}
 
 	const handleChange = (s: Setting, newValue: any) => {
@@ -71,7 +71,15 @@ export default function Settings() {
 		console.log('changed', s, newValue)
 	}
 
-	return <div class="settings" ref={popover} popover>
+	const onClick = (e) => {
+		//are we clicking on the dialog/backdrop itself? (e.target could be a child element)
+		if (e.target === e.currentTarget) {
+			//e.stopPropagation(); //don't click things under the backdrop
+			closeSettings();
+		}
+	}
+
+	return <dialog class="settings" onclick={onClick} ref={dialog}>
 		<div class="layout">
 			<h2>Settings</h2>
 			<div>
@@ -88,8 +96,8 @@ export default function Settings() {
 			</div>
 			<div class="buttons">
 				<span class="status"></span>
-				<button onclick={close}>Done</button>
+				<button onclick={closeSettings}>Close</button>
 			</div>
 		</div>
-	</div>
+	</dialog>
 }

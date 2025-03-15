@@ -53,7 +53,7 @@ function App() {
 
 				</div>
 			</div>
+			<Settings />
 		</Show>
-		<Settings />
 	</>
 }

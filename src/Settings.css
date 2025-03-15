@@ -1,14 +1,15 @@
 .settings {
 	border: 1px solid var(--button-outline-color);
 	border-radius: 5px;
-	padding: 1rem;
-
+	padding: initial;
+	
 	&::backdrop {
 		backdrop-filter: blur(2px) brightness(0.5);
 	}
-
+	
 	.layout {
 		display: grid;
+		padding: 2rem;
 		gap: 1rem;
 
 		h2 {
