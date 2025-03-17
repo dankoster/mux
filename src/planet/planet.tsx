@@ -1,118 +1,32 @@
 import { createEffect, onMount } from 'solid-js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import './planet.css'
-import * as positionSocket from './data/positionSocket';
-import { connections, getSelf } from './data/data';
-import { Connection, Position } from '../server/types';
-import { displayName, shortId } from './helpers';
+import * as positionSocket from '../data/positionSocket';
+import { connections, getSelf } from '../data/data';
+import { Connection } from '../../server/types';
+import { displayName, shortId } from '../helpers';
 import { degToRad } from 'three/src/math/MathUtils.js';
-import { trace } from './trace';
+import { trace } from '../trace';
+import { makeSphere } from './makeSphere';
+import { Avatar, AvatarEvents } from './avatar';
 
-function makeSphere(radius: number, color: number) {
-	const sphereParams = {
-		radius: radius,
-		widthSegments: 72,
-		heightSegments: 36,
-		phiStart: 0,
-		phiLength: Math.PI * 2,
-		thetaStart: 0,
-		thetaLength: Math.PI
-	};
-	const sphereGeo = new THREE.SphereGeometry(
-		sphereParams.radius,
-		sphereParams.widthSegments,
-		sphereParams.heightSegments,
-		sphereParams.phiStart,
-		sphereParams.phiLength,
-		sphereParams.thetaStart,
-		sphereParams.thetaLength
-	)
-	const sphereWireGeo = new THREE.EdgesGeometry(sphereGeo);
-	const sphereLineMat = new THREE.LineBasicMaterial({
-		color: 0xffffff,
-		transparent: true,
-		opacity: 0.2
-	});
-	const meshMaterial = new THREE.MeshPhongMaterial({
-		color,
-		emissive: 0x072534,
-		side: THREE.DoubleSide,
-		flatShading: false //false = smooth, true = facets
-	});
+//TODO: when the user moves, calculate the distance to other users
 
-	const sphere = new THREE.Group();
-	sphere.add(new THREE.LineSegments(sphereWireGeo, sphereLineMat));
-	sphere.add(new THREE.Mesh(sphereGeo, meshMaterial));
 
-	return sphere
+const distanceChangedHandlers: DistanceChangedHandler[] = []
+export type DistanceChangedHandler = (av: Avatar) => void
+function distanceToAvatarChanged(av: Avatar) {
+	distanceChangedHandlers.forEach(handler => handler(av))
 }
 
-export class Avatar {
-	mesh: THREE.Mesh
-	connection?: Connection
-	_distance: number = 0
-	prevDistance: number = 0
-	private labelDiv: HTMLDivElement
-
-	constructor(size: number, color?: number, x: number = 0) {
-		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
-		const boxGeometry = new THREE.BoxGeometry(size, size, size);
-		const mesh = new THREE.Mesh(boxGeometry, material);
-		mesh.position.x = x;
-
-		const labelDiv = document.createElement('div');
-		labelDiv.className = 'label';
-		labelDiv.textContent = '';
-		labelDiv.style.backgroundColor = 'transparent';
-		labelDiv.style.pointerEvents = 'none';
-
-		const label = new CSS2DObject(labelDiv);
-		label.position.set(1.5 * size, 0, 0);
-		label.center.set(0, 1);
-		mesh.add(label);
-		label.layers.set(0);
-
-		this.labelDiv = labelDiv
-		this.mesh = mesh
-	}
-
-	setPosition(pos: Position) {
-		if (!pos) return
-		this.mesh.position.fromArray([
-			pos.x,
-			pos.y,
-			pos.z
-		])
-	}
-
-	get label() {
-		return this.labelDiv.textContent
-	}
-	set label(value: string) {
-		this.labelDiv.textContent = value
-	}
-
-	set distance(value: number) {
-		this.prevDistance = this._distance
-		this._distance = value
-		this.labelDiv.style.opacity = `${100 - (this._distance * 3)}%`
-	}
-
-	get distance() {
-		return this._distance
-	}
-
-	delete() {
-		console.log('avatar delete!', this.connection.identity?.name)
-		this.mesh.removeFromParent()
-		this.labelDiv.remove()
-	}
+export function onDistanceToAvatarChanged(handler: DistanceChangedHandler) {
+	distanceChangedHandlers.push(handler)
 }
 
-export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
+export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
 	let planetLabels: HTMLDivElement
@@ -123,7 +37,7 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 	const tmpVec3 = new THREE.Vector3();
 	const avatarsById = new Map<string, Avatar>()
 
-	function GetAvatar(con: Connection): Avatar | undefined {
+	function getAvatar(con: Connection): Avatar | undefined {
 		if (!scene) {
 			console.log('GetAvatar: scene not ready!')
 			return undefined
@@ -133,7 +47,11 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 			let avatar = new Avatar(1)
 			avatar.connection = con
 			avatar.label = displayName(con) || shortId(con.id)
-			avatar.setPosition(con.position)
+			avatar.setPositionAndLook({ position: con.position, lookTarget: sphere?.position })
+			avatar.addEventListener(AvatarEvents.AvatarPositionChanged, () => {
+				if (avatar !== selfAvatar)
+					avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar?.mesh?.position)
+			})
 			scene.add(avatar.mesh)
 			avatarsById.set(con.id, avatar)
 			console.log('created avatar for', avatar.label)
@@ -160,13 +78,12 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 	createEffect(() => {
 		for (const con of connections) {
 			if (con.status === 'online' && con.position && !avatarsById.has(con.id))
-				GetAvatar(con)
+				getAvatar(con)
 
 			//solid-js wierdness: if the following two conditionals are swapped
 			// this effect does not fire. 
 			if (con.status !== 'online' && avatarsById.has(con.id)) {
 				const avatar = avatarsById.get(con.id)
-				//const avatar = avatarsById.get(con.id)
 				avatar?.delete()
 				avatarsById.delete(con.id)
 			}
@@ -179,13 +96,15 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 			return
 
 		//add avatar for this position
-		let avatar = GetAvatar(con)
-		avatar?.setPosition(message.position)
-		avatar?.mesh.lookAt(sphere?.position)
+		let avatar = getAvatar(con)
+		avatar.setPositionAndLook({
+			position: message.position,
+			lookTarget: sphere?.position
+		})
 
 		//calculate distance from self
-		if (selfAvatar && avatar != selfAvatar)
-			avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+		if (selfAvatar && avatar != selfAvatar && !avatar.distanceFromSelf)
+			avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 	})
 
 	let lastBroadcastPosition = new THREE.Vector3()
@@ -197,6 +116,18 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 		}
 	}
 
+	function updateDistanceFromSelfToAllOtherAvatars() {
+		avatarsById.forEach(avatar => {
+			if (avatar == selfAvatar) return
+
+			avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+
+			//TODO: debounce! Use same minDistanceMoved check as broadcastPosition
+			distanceToAvatarChanged(avatar)
+		})
+	}
+
+
 	onMount(() => {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
 		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
@@ -205,7 +136,8 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 		camera.position.z = 60
 
 		getSelf.then((con) => {
-			selfAvatar = GetAvatar(con)
+			selfAvatar = getAvatar(con)
+			selfAvatar.addEventListener(AvatarEvents.AvatarPositionChanged, updateDistanceFromSelfToAllOtherAvatars)
 			moveCameraToAvatar(selfAvatar)
 		})
 
@@ -220,17 +152,7 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 		orbit.enableZoom = true
 		orbit.enableDamping = true
 		orbit.dampingFactor = 0.04
-
-		//calculate distance to every other avatar
-		orbit.addEventListener('change', (e) => {
-			avatarsById.forEach(avatar => {
-				if (avatar == selfAvatar) return
-
-				avatar.distance = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
-				props.onDistanceChanged(avatar)
-			})
-		})
-
+		// orbit.addEventListener('change', updateDistanceFromSelfToAllOtherAvatars)
 
 		// //tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {
@@ -247,21 +169,14 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 		lights[0] = new THREE.DirectionalLight(0xffffff, 3)
 		lights[1] = new THREE.DirectionalLight(0xffffff, 3)
 		lights[2] = new THREE.DirectionalLight(0xffffff, 3)
-
 		lights[0].position.set(0, 200, 0)
 		lights[1].position.set(100, 200, 100)
 		lights[2].position.set(- 100, - 200, - 100)
-
 		for (const light of lights) {
 			scene.add(light)
 		}
 
-
-		const raycaster = new THREE.Raycaster();
-
-
 		let prevTime: number
-
 		function render(time: number) {
 			const deltaTime = time - prevTime
 			prevTime = time;
@@ -269,15 +184,17 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 			//move our avatar to be under the camera
 			if (selfAvatar?.mesh?.position) {
 				const thirdPersonCamera = calculateThirdPersonCamera(deltaTime, sphere);
-				selfAvatar?.mesh?.position.copy(thirdPersonCamera.currentPosition);
-				selfAvatar?.mesh?.lookAt(thirdPersonCamera.currentLookat);
+				selfAvatar?.setPositionAndLook({
+					position: thirdPersonCamera.currentPosition,
+					lookTarget: thirdPersonCamera.currentLookat
+				})
 			}
 
 			//move the camera around the scene origin
 			orbit.update()
 
 			//handle resize
-			const resized = resizeRendererToDisplaySize()
+			const resized = resizeRendererToDisplaySize(renderer.domElement)
 			if (resized) {
 				const canvas = renderer.domElement
 				camera.aspect = canvas.clientWidth / canvas.clientHeight
@@ -291,6 +208,8 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 		}
 		requestAnimationFrame(render)
 
+		//third person camera inspired by simondev
+		const raycaster = new THREE.Raycaster();
 		let _currentPosition: THREE.Vector3
 		let _currentLookat: THREE.Vector3
 		function calculateThirdPersonCamera(deltaTime: number, target: THREE.Group) {
@@ -311,7 +230,7 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 				//move away from the sphere origin by ... half a normal vector?
 				// TODO: this should place the position on the surface of the target object
 				const idealPosition = firstIntersectedSphereGeometry?.point
-					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5); 
+					.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5);
 				const idealLookat = firstIntersectedSphereGeometry.normal;
 
 				const t = 1.0 - Math.pow(0.001, _elapsedSec);
@@ -333,8 +252,7 @@ export function Planet(props: { onDistanceChanged: (avatar: Avatar) => void }) {
 			}
 		}
 
-		function resizeRendererToDisplaySize() {
-			const canvas = renderer.domElement
+		function resizeRendererToDisplaySize(canvas: HTMLCanvasElement) {
 			const width = canvas.parentElement?.clientWidth
 			const height = canvas.parentElement?.clientHeight
 

@@ -43,11 +43,13 @@ export {
 	id, pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
-let selfPromiseResolver: (con: Connection) => void
-export const getSelf = new Promise<Connection>((resolve) => selfPromiseResolver = resolve)
+let resolvePromiseToGetSelf: (con: Connection) => void
+export const getSelf = new Promise<Connection>((resolve) => resolvePromiseToGetSelf = resolve)
 createEffect(() => {
 	const value = self()
-	if (value) selfPromiseResolver(value)
+	if (value) {
+		resolvePromiseToGetSelf(value)
+	}
 })
 
 export function isSelf(con: Connection) {
@@ -217,7 +219,7 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.id:
 			setId(event.data);
-			if (event.data && connections) setSelf(connections.find(con => con.id === event.data))
+			if (id() && connections) setSelf(connections.find(con => con.id === event.data))
 			//console.log('SSE', event.event, event.data);
 			break;
 		case sse.connections:
@@ -330,7 +332,7 @@ function onConnectionsChanged() {
 		) {
 			const dateCreated = new Date(Number.parseInt(con.id))
 			const kind = con.id === me.id ? "myself" : con.kind
-			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()} pk:${con.publicKey}`)
+			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()}`)
 			sharePrivateKey(me.id, con)
 		}
 	})

@@ -50,7 +50,11 @@ export type Connection = {
 	position?: Position;
 };
 
-export type Position = { x: number, y: number, z: number }
+export type Position = {
+    readonly x: number
+    readonly y: number
+    readonly z: number
+}
 export type PositionMessage = { id: string, position: Position }
 export type PositionMessageHandler = (message: PositionMessage) => void
 
