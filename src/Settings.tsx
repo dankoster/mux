@@ -1,4 +1,4 @@
-import { For, onMount } from "solid-js"
+import { createSignal, For, onMount } from "solid-js"
 import "./Settings.css"
 
 export let ShowSettings: () => void = () => { throw new Error('NOT READY - <Settings /> element not mounted') }
@@ -38,7 +38,7 @@ const SettingsData: Setting[] = [
 	}
 ]
 
-
+//override any defaults that are already in local storage
 for (const setting of SettingsData) {
 	const value = localStorage.getItem(setting.name)
 	if (value !== null)
@@ -46,16 +46,18 @@ for (const setting of SettingsData) {
 }
 
 export function GetSettingValue(name: SettingName) {
-	const setting = SettingsData.find(setting => setting.name === name)
-	if (!setting) throw new Error(`setting "${name}" not found`)
+	return !!JSON.parse(localStorage.getItem(name))
+}
 
-	return setting.value
+export function GetSetting(name: SettingName): Setting {
+	return { name, value: GetSettingValue(name) }
 }
 
 export default function Settings() {
 	let dialog: HTMLDialogElement
 
 	onMount(() => {
+		//override the exported show functino! 
 		ShowSettings = () => {
 			dialog.showModal()
 		}
@@ -65,33 +67,21 @@ export default function Settings() {
 		dialog.close()
 	}
 
-	const handleChange = (s: Setting, newValue: any) => {
-		s.value = newValue
-		localStorage.setItem(s.name, JSON.stringify(s.value))
-		console.log('changed', s, newValue)
-	}
-
 	const onClick = (e) => {
 		//are we clicking on the dialog/backdrop itself? (e.target could be a child element)
 		if (e.target === e.currentTarget) {
-			//e.stopPropagation(); //don't click things under the backdrop
 			closeSettings();
 		}
 	}
 
+	const [settings] = createSignal(SettingsData)
+
 	return <dialog class="settings" onclick={onClick} ref={dialog}>
 		<div class="layout">
 			<h2>Settings</h2>
-			<div>
-				<For each={SettingsData}>
-					{setting => <div>
-						<input type="checkbox"
-							id={setting.name}
-							name={setting.name}
-							checked={setting.value}
-							onChange={(e) => handleChange(setting, e.currentTarget.checked)} />
-						<label for={setting.name}>{setting.name}</label>
-					</div>}
+			<div class="settingsList">
+				<For each={settings()}>
+					{setting => <SettingCheckBox setting={setting} />}
 				</For>
 			</div>
 			<div class="buttons">
@@ -100,4 +90,23 @@ export default function Settings() {
 			</div>
 		</div>
 	</dialog>
+}
+
+export function SettingCheckBox(props: { setting: Setting }) {
+
+	//SolidJS why are you so jank?!?!
+	const [setting, setSetting] = createSignal(props.setting)
+
+	const handleChange = (e) => {
+		setting().value = e.currentTarget.checked
+		localStorage.setItem(setting().name, JSON.stringify(setting().value))
+		console.log(setting())
+	}
+
+	return <label class="settingCheckBox" >
+		<input type="checkbox"
+			checked={setting().value}
+			onChange={handleChange} />
+		{setting().name}
+	</label>
 }

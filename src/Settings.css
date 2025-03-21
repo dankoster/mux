@@ -16,10 +16,19 @@
 			margin-block: auto;
 		}
 
+		.settingsList {
+			display: grid;
+			row-gap: 0.25rem;
+		}
+
 		.buttons {
 			display: flex;
 			justify-content: space-between;
 		}
 	}
+}
 
+.settingCheckBox {
+	display: flex;
+	gap: 0.5rem;
 }
