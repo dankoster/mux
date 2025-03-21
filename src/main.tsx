@@ -9,6 +9,7 @@ import * as server from "./data/data";
 import VideoCall, * as videoCall from "./VideoCall";
 
 import "./main.css"
+import Welcome from "./Welcome";
 
 render(() => <App />, document.body)
 
@@ -33,6 +34,7 @@ function App() {
 			<div class="offlineMessage">⨳ connecting...</div>
 		</Show>
 		<Show when={server.serverOnline()}>
+			<Welcome />
 			<VideoCall />
 			<Planet />
 			<Toolbar />
