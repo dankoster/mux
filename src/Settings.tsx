@@ -19,7 +19,7 @@ type Setting = {
 const SettingsData: Setting[] = [
 	{
 		name: "Show welcome",
-		value: true
+		value: false
 	},
 	{
 		name: "Start video on load",
