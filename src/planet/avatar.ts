@@ -16,7 +16,7 @@ export class Avatar extends EventTarget {
 	prevDistance: number = 0;
 	labelDiv: HTMLDivElement;
 	private distance: number = 0;
-	
+
 	constructor(size: number, color?: number, x: number = 0) {
 		super();
 		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
@@ -41,7 +41,12 @@ export class Avatar extends EventTarget {
 	}
 
 	setPositionAndLook({ position, lookTarget }: { position: THREE.Vector3Like, lookTarget?: THREE.Vector3 }) {
-		if (!this.mesh.position.equals(position)) {
+		if (!position) {
+			console.warn(`Tried to set position with position == ${position}`, this)
+			return
+		}
+
+		if (!this.mesh?.position?.equals(position)) {
 			this.mesh.position.copy(position)
 			this.dispatchEvent(AvatarPositionChanged)
 		}
