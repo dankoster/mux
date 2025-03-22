@@ -1,19 +1,19 @@
-import { createEffect, onMount } from 'solid-js';
+import { createEffect, onMount } from 'solid-js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 
-import { connections, getSelf } from '../data/data';
-import { Connection } from '../../server/types';
-import { displayName, shortId } from '../helpers';
-import { makeSphere } from './makeSphere';
-import { Avatar, AvatarEvents } from './avatar';
-import { calculateThirdPersonCamera, placeCameraPastTargetFromPosition } from './thirdPersonCamera';
+import { connections, getSelf } from '../data/data'
+import { Connection } from '../../server/types'
+import { displayName, shortId } from '../helpers'
+import { makeSphere } from './makeSphere'
+import { Avatar, AvatarEvents } from './avatar'
+import { calculateThirdPersonCamera, placeCameraPastTargetFromPosition } from './thirdPersonCamera'
 
-import * as THREE from 'three';
-import * as positionSocket from '../data/positionSocket';
+import * as THREE from 'three'
+import * as positionSocket from '../data/positionSocket'
 
 import './planet.css'
-import { resizeRendererToDisplaySize } from './resizeRenderer';
+import { resizeRendererToDisplaySize } from './resizeRenderer'
 
 
 const distanceChangedHandlers: DistanceChangedHandler[] = []
@@ -96,15 +96,15 @@ export function Planet() {
 	let lastBroadcastPosition = new THREE.Vector3()
 	function broadcastPosition(avatar: Avatar, minDistanceMoved: number = 0.25) {
 		if (avatar?.mesh?.position.distanceTo(lastBroadcastPosition) > minDistanceMoved) {
-			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position);
+			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position)
 			if (broadcasted)
-				lastBroadcastPosition.copy(selfAvatar?.mesh?.position);
+				lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
 		}
 	}
 
 	setInterval(() => {
-		broadcastPosition(selfAvatar);
-	}, 25);
+		broadcastPosition(selfAvatar)
+	}, 25)
 
 	function updateDistanceFromSelfToAllOtherAvatars() {
 		avatarsById.forEach(avatar => {
@@ -118,19 +118,19 @@ export function Planet() {
 	}
 
 	function BuildSceneAndStartRendering() {
-		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas });
-		const labelRenderer = new CSS2DRenderer({ element: planetLabels });
-		scene = new THREE.Scene();
-		camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000);
-		camera.position.z = 60;
+		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
+		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
+		scene = new THREE.Scene()
+		camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000)
+		camera.position.z = 60
 
-		sphere = makeSphere(30, 0x156289);
-		scene.add(sphere);
+		sphere = makeSphere(30, 0x156289)
+		scene.add(sphere)
 
-		const orbit = new OrbitControls(camera, renderer.domElement);
-		orbit.enableZoom = true;
-		orbit.enableDamping = true;
-		orbit.dampingFactor = 0.04;
+		const orbit = new OrbitControls(camera, renderer.domElement)
+		orbit.enableZoom = true
+		orbit.enableDamping = true
+		orbit.dampingFactor = 0.04
 
 		const lights: THREE.DirectionalLight[] = []
 		lights[0] = new THREE.DirectionalLight(0xffffff, 3)
@@ -143,42 +143,42 @@ export function Planet() {
 			scene.add(light)
 		}
 	
-		let prevTime: number;
+		let prevTime: number
 		function render(time: number) {
-			const deltaTime = time - prevTime;
-			prevTime = time;
+			const deltaTime = time - prevTime
+			prevTime = time
 
 			//move our avatar to be under the camera
 			if (selfAvatar?.mesh?.position) {
-				const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera });
+				const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
 				selfAvatar?.setPositionAndLook({
 					position: thirdPersonCamera.currentPosition,
 					lookTarget: thirdPersonCamera.currentLookat
-				});
+				})
 			}
 
 			//move the camera around the scene origin
-			orbit.update();
+			orbit.update()
 
 			//handle resize
-			const resized = resizeRendererToDisplaySize({ renderer, labelRenderer });
+			const resized = resizeRendererToDisplaySize({ renderer, labelRenderer })
 			if (resized) {
-				const canvas = renderer.domElement;
-				camera.aspect = canvas.clientWidth / canvas.clientHeight;
-				camera.updateProjectionMatrix();
+				const canvas = renderer.domElement
+				camera.aspect = canvas.clientWidth / canvas.clientHeight
+				camera.updateProjectionMatrix()
 			}
 
-			renderer.render(scene, camera);
-			labelRenderer.render(scene, camera);
+			renderer.render(scene, camera)
+			labelRenderer.render(scene, camera)
 
-			requestAnimationFrame(render);
+			requestAnimationFrame(render)
 		}
-		requestAnimationFrame(render);
+		requestAnimationFrame(render)
 	}
 
 
 	onMount(() => {
-		BuildSceneAndStartRendering();
+		BuildSceneAndStartRendering()
 
 		getSelf.then((con) => {
 			selfAvatar = getAvatar(con)

@@ -75,7 +75,7 @@ export default function Settings() {
 	const onClick = (e) => {
 		//are we clicking on the dialog/backdrop itself? (e.target could be a child element)
 		if (e.target === e.currentTarget) {
-			closeSettings();
+			closeSettings()
 		}
 	}
 
@@ -105,7 +105,6 @@ export function SettingCheckBox(props: { setting: Setting }) {
 	const handleChange = (e) => {
 		setting().value = e.currentTarget.checked
 		localStorage.setItem(setting().name, JSON.stringify(setting().value))
-		console.log(setting())
 	}
 
 	return <label class="settingCheckBox" >
