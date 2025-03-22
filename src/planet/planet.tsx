@@ -38,13 +38,10 @@ export function Planet() {
 	const avatarsById = new Map<string, Avatar>()
 
 	function getAvatar(con: Connection): Avatar | undefined {
-		if (!scene) {
-			console.log('GetAvatar: scene not ready!')
-			return undefined
-		}
-
-		if (!avatarsById.has(con.id)) {
-			let avatar = new Avatar(1)
+		let avatar = avatarsById.get(con.id)
+		
+		if (!avatar) {
+			avatar = new Avatar(1)
 			avatar.connection = con
 			avatar.label = displayName(con) || shortId(con.id)
 			avatar.setPositionAndLook({ position: con.position, lookTarget: sphere?.position })
@@ -52,15 +49,20 @@ export function Planet() {
 				if (avatar !== selfAvatar)
 					avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar?.mesh?.position)
 			})
-			scene.add(avatar.mesh)
 			avatarsById.set(con.id, avatar)
-			console.log('created avatar for', avatar.label)
 		}
-
-		return avatarsById.get(con.id)
+		
+		if(scene && !scene.children.includes(avatar.mesh)){
+			scene.add(avatar.mesh)
+		}
+		
+		if(!scene)
+			console.trace('scene not ready!', avatar)
+		
+		return avatar
 	}
 
-	//remove avatars for connections that go offline
+	//add/remove avatars when connection status changes
 	createEffect(() => {
 		for (const con of connections) {
 			if (con.status === 'online' && con.position && !avatarsById.has(con.id))
