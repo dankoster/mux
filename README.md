@@ -30,13 +30,31 @@ New-to-me learning for this project:
 ------
 
 
-### iteration 5 [WIP]
+### iteration 6 [WIP]
+> WIP
+
+screen sharing \
+more audio/video features \
+more 3d fun:
+- regions (everyone inside joins the same call)
+- Building: place thins in the world
+
+------
+
+
+### iteration 5
 > UI work and 3D experimentation
 
-I have figured out a bunch of foundational pieces like hosting, video calling, and e2e encryption. 
+Figured out a bunch of foundational pieces like hosting, video calling, and e2e encryption. Most of that is hidden for now while I do some UI tinkering and have some fun with 3D stuff. 
 
-Now I want to do some UI work and have some fun with 3D stuff. 
+- Implemented a tiny 3d world
+- Each user gets an avatar on the 3d world
+- When avatars get close to each other, a call starts very similar to how Gather.town does it. 
+- Video layout UI for this proximity chat is pretty solid
+- Still need to add a "video confrence" mode and other related features
 
+Also added a settings popover and patterns for modifying state outside of SolidJS's control. If you know how JavaScript works in the browser you can just do stuff and it's fine.
+ 
 ------
 
 
