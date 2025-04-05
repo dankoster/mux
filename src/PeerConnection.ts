@@ -41,7 +41,6 @@ type pcInit = {
 };
 export class PeerConnection extends EventTarget {
 	abortControllers: AbortController[] = [];
-	localRTCRtpSenders: RTCRtpSender[] = [];
 	conId: string;
 
 	pc: RTCPeerConnection
@@ -63,15 +62,16 @@ export class PeerConnection extends EventTarget {
 
 		this.pc.ontrack = (e) => {
 			console.log(`PeerConnection: got ${e.track.kind} ${e.type} from peer connection. Saving MediaStreams`, e.streams)
+			this.logTrackEvents(e.track, 'remote')
 
 			const streamCount = this.streams.size
 			e.streams?.forEach(stream => this.streams.add(stream))
 			if(streamCount != this.streams.size){
-				console.log("PeerConnection sending streamsChanged event")
 				this.dispatchEvent(new Event('PeerConnection:StreamsChanged'))}
 		}
 
 		this.pc.onnegotiationneeded = async () => {
+			console.log('onnegotiationneeded')
 			try {
 				this.makingOffer = true;
 				await this.pc.setLocalDescription();
@@ -84,6 +84,7 @@ export class PeerConnection extends EventTarget {
 		};
 
 		this.pc.oniceconnectionstatechange = () => {
+			console.log('oniceconnectionstatechange', this.pc.iceConnectionState)
 			if (this.pc.iceConnectionState === "failed") {
 				this.pc.restartIce();
 			}
@@ -95,9 +96,9 @@ export class PeerConnection extends EventTarget {
 
 		this.pc.onicecandidate = ({ candidate }) => server.sendWebRtcMessage(this.conId, JSON.stringify({ candidate }))
 
-		// this.pc.onsignalingstatechange = () => {
-		// 	console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
-		// }
+		this.pc.onsignalingstatechange = () => {
+			console.log(`RTCPeerConnection's signalingState changed: ${this.pc.signalingState}`)
+		}
 	}
 
 	addAbortController(ac: AbortController) {
@@ -110,9 +111,21 @@ export class PeerConnection extends EventTarget {
 		// Push tracks from local stream to peer connection
 		stream.getTracks().forEach((track) => {
 			console.log(`adding ${track.enabled ? "enabled" : "disabled"} local ${track.kind} track to peer connection:`, track.label);
-			this.localRTCRtpSenders.push(this.pc.addTrack(track, stream));
 			// this.logTrackEvents(track, 'local');
+			this.pc.addTrack(track, stream)
 		});
+	}
+	
+	removeTracks(stream: MediaStream) {
+		stream.getTracks().forEach(track => {
+			console.log(`removing ${track.enabled ? "enabled" : "disabled"} local ${track.kind} track from peer connection:`, track.label);
+			const sender = this.pc.getSenders()
+			.filter(sender => sender.track === track)
+			.forEach(sender => {
+				console.log('removing track', sender)
+				this.pc.removeTrack(sender)
+			})
+		})
 	}
 
 	enableRemoteAudio(enabled: boolean) {
@@ -128,10 +141,6 @@ export class PeerConnection extends EventTarget {
 
 		this.abortControllers.forEach(ac => {
 			ac.abort();
-		});
-
-		this.localRTCRtpSenders.forEach(t => {
-			this.pc.removeTrack(t);
 		});
 
 		try {

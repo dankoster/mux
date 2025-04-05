@@ -121,27 +121,23 @@ export default function VideoCall() {
 		}
 	}
 
+	let screenShareStream: MediaStream
+
 	toggleScreenShare = async () => {
 		const enabled = !screenEnabled()
-		setScreenEnabled(enabled)
-
-		console.log('toggleScreenShare', enabled)
-
-		//TODO: remove video on disabled case
+		
+		//TODO: handle new connections that come in later
 
 		if (enabled) {
-			try {
-				const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
-
-				console.log('toggleScreenShare', stream, stream.getTracks())
-
-				//share stream with peer connection
-				peersById.forEach(peer => peer.addTracks(stream))
-			}
-			catch (error) {
-				console.error(error)
-			}
+			screenShareStream = await navigator.mediaDevices.getDisplayMedia({ video: true })			
+			peersById.forEach(peer => peer.addTracks(screenShareStream))
 		}
+		else {
+			screenShareStream.getTracks().forEach(track => track.stop())
+			peersById.forEach(peer => peer.removeTracks(screenShareStream))
+		}
+
+		setScreenEnabled(enabled)
 	}
 
 	async function startLocalVideo() {
@@ -203,7 +199,6 @@ export default function VideoCall() {
 	})
 
 	onCleanup(() => {
-		console.log('VideoCall CLEANUP')
 		peersById.forEach(peer => peer.endCall())
 		peersById.clear();
 		observer?.disconnect()
