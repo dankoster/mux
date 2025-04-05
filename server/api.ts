@@ -98,7 +98,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 function notifyAllConnections(event: SSEvent, update: Update | Connection, options?: { excludeUUID?: string }) {
 	updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
 		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate) {
-			console.log(event.toUpperCase(), uuidToUpdate, update)
+			console.log('NOTIFY ALL ➤', event.toUpperCase(), uuidToUpdate, update)
 			fn.update(event, JSON.stringify(update))
 		}
 	})
