@@ -1,7 +1,5 @@
 import { EncryptedMessage } from "../server/types"
-
-const ECDH_PRIVATE_KEY = 'prikey'
-const ECDH_PUBLIC_KEY = 'pubkey'
+import { ECDH_PRIVATE_KEY, ECDH_PUBLIC_KEY } from "./data/localStore"
 
 const algorithm: EcKeyImportParams = {
 	"name": "ECDH",

@@ -1,3 +1,10 @@
+export const ECDH_PRIVATE_KEY = 'prikey'
+export const ECDH_PUBLIC_KEY = 'pubkey'
+export const LAST_READ_DMS = 'lastCheckedDms'
+export const SHARED_KEYS = 'sharedKeys'
+
+
+
 export function localStorage_GetMap<K, V>(key: string) {
 	const lsValue = localStorage.getItem(key)
 	try {

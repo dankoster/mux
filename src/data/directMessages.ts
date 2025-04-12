@@ -2,14 +2,12 @@ import { Connection, DM, DMRequest, EncryptedMessage, Friend, JwkPair } from "..
 import { apiRoute, POST } from "./http"
 import { computeSharedKey, decryptMessage, encryptMessage, exportJWK, getLocalKeyPair, jwkToCryptoKey, replaceLocaLKeyPair, sameAsPrivateKey } from "../crypto_ecdh_aes";
 import { createSignal } from "solid-js";
-import { localStorage_GetMap, localStorage_SetMap } from "./localStore";
+import { LAST_READ_DMS, localStorage_GetMap, SHARED_KEYS } from "./localStore";
 import { connections, isSelf, self } from "./data";
 
 type DMEventType = 'unreadMessges' | 'newMessage'
 type UnreadCountByConId = { [key: string]: number }
 type LastReadTimestamp = { [key: string]: number }
-const LAST_READ_DMS = 'lastCheckedDms'
-const SHARED_KEYS = 'sharedKeys'
 
 // console.log('GETTING DM CRYPTO KEYS')
 let myKeys: CryptoKeyPair
