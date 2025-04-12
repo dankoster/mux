@@ -20,6 +20,8 @@ dist
 dist-ssr
 *.local
 
+certbot.ini
+
 # Editor directories and files
 .idea
 .DS_Store
