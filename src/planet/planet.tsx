@@ -14,6 +14,11 @@ import * as positionSocket from '../data/positionSocket'
 
 import './planet.css'
 import { resizeRendererToDisplaySize } from './resizeRenderer'
+import { Area } from './area'
+
+function NotReady() { throw new Error('<Planet /> not mounted') }
+
+export let addArea: () => void = () => NotReady()
 
 
 const distanceChangedHandlers: DistanceChangedHandler[] = []
@@ -60,6 +65,21 @@ export function Planet() {
 			console.trace('scene not ready!', avatar)
 		
 		return avatar
+	}
+	
+	addArea = () => {
+		if(!selfAvatar) throw new Error("selfAvatar not ready!")
+		const area = new Area({size: 2})
+		area.setPositionAndLook({ position: selfAvatar.mesh.position, lookTarget: sphere?.position })
+		
+		console.log('addArea', area)
+		if(scene && !scene.children.includes(area.mesh)){
+			scene.add(area.mesh)
+		}
+		if(!scene)
+			console.trace('scene not ready!', area)	
+
+		//TODO: move area to surface of sphere!!!!
 	}
 
 	//add/remove avatars when connection status changes
