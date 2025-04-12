@@ -3,6 +3,7 @@
 	padding: 0.5rem;
 	display: grid;
 	cursor: pointer;
+	text-align: center;
 
 	&+.media-button {
 		border-left: 1px solid var(--button-outline-color);

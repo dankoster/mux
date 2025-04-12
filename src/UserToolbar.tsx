@@ -7,6 +7,7 @@ import * as server from "./data/data";
 import * as VideoCall from "./VideoCall";
 import { ServerStats } from "./ServerStats";
 import { GitHubSvg } from "./GitHubSvg";
+import { addArea } from "./planet/planet";
 
 
 export function UserToolbar() {
@@ -49,29 +50,30 @@ export function UserToolbar() {
 					<div class="name" onclick={showMenu}>{server.self()?.identity.name}</div>
 				</Show>
 
-				<IconButton icon="users" onClick={() => ShowSettings()} />
+				<IconButton icon="users" action={() => ShowSettings()} />
+				<IconButton icon="users" action={() => addArea()} keyChar="b" />
 				<MediaButton
 					className="audio"
 					enabled={VideoCall.micEnabled}
-					onClick={() => VideoCall.toggleMic()}
+					action={() => VideoCall.toggleMic()}
 					enabledIcon="microphone"
 					disabledIcon="microphone_muted" />
 				<MediaButton
 					className="video"
 					enabled={VideoCall.camEnabled}
-					onClick={() => VideoCall.toggleVideo()}
+					action={() => VideoCall.toggleVideo()}
 					enabledIcon="camera"
 					disabledIcon="camera_muted" />
 				<MediaButton
 					className="screen"
 					enabled={VideoCall.screenEnabled}
-					onClick={() => VideoCall.toggleScreenShare()}
+					action={() => VideoCall.toggleScreenShare()}
 					enabledIcon="share_screen"
 					disabledIcon="share_screen" />
 				<MediaButton
 					className="max-video"
 					enabled={VideoCall.maxVideoEnabled}
-					onClick={() => VideoCall.toggleMaxVideo()}
+					action={() => VideoCall.toggleMaxVideo()}
 					enabledIcon="users"
 					disabledIcon="users_rays" />
 			</div>

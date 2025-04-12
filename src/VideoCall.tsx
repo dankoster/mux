@@ -223,13 +223,13 @@ export default function VideoCall() {
 				<div class="buttons">
 					<MediaButton
 						enabled={micEnabled}
-						onClick={() => toggleMic()}
+						action={() => toggleMic()}
 						enabledIcon="microphone"
 						disabledIcon="microphone_muted"
 					/>
 					<MediaButton
 						enabled={camEnabled}
-						onClick={() => toggleVideo()}
+						action={() => toggleVideo()}
 						enabledIcon="camera"
 						disabledIcon="camera_muted"
 					/>
@@ -312,7 +312,7 @@ function PeerVideo(props: { name: string, peer: PeerConnection, stream: MediaStr
 			<div class="buttons">
 				<MediaButton
 					enabled={remoteAudioEnabled}
-					onClick={toggleRemoteAudioEnabled}
+					action={toggleRemoteAudioEnabled}
 					enabledIcon="unmute"
 					disabledIcon="mute"
 				/>
