@@ -15,3 +15,9 @@ export function MediaButton(props: { className?: string; enabled: Accessor<boole
 		</Switch>
 	</div>
 }
+
+export function IconButton(props: { onClick: (e: MouseEvent) => void; icon: svgIcon; }) {
+	return <div class={`media-button`} onclick={props.onClick}>
+		<SvgIcon icon={props.icon} />
+	</div>
+}

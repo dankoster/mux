@@ -80,22 +80,6 @@ body {
 		margin: auto;
 		margin-inline: 1rem;
 	}
-
-	.stats {
-		touch-action: none;
-		font-size: small;
-		/* display: flex;
-		column-gap: 1rem;
-		flex-wrap: wrap; */
-		justify-content: center;
-
-		opacity: 0.6;
-
-		.userCount {
-			touch-action: none;
-			text-wrap: nowrap;
-		}
-	}
 }
 
 .user {
@@ -114,6 +98,24 @@ body {
 	display: grid;
 	grid-template-rows: 1fr min-content;
 	grid-auto-flow: row;
+}
+
+.server-stats {
+	touch-action: none;
+	font-size: small;
+	display: flex;
+	column-gap: 1rem;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: center;
+
+	h2 {
+		margin-block: 0;
+	}
+
+	.userCount {
+		text-wrap: nowrap;
+	}
 }
 
 .toolbar {
@@ -135,25 +137,6 @@ body {
 
 	container-type: inline-size;
 	container-name: toolbar;
-
-	.stats {
-		touch-action: none;
-		font-size: small;
-		display: flex;
-		column-gap: 1rem;
-		flex-wrap: wrap;
-		justify-content: center;
-		align-items: center;
-
-		h2 {
-			margin-block: 0;
-		}
-
-		.userCount {
-			text-wrap: nowrap;
-		}
-	}
-
 
 	input[type="text"] {
 		touch-action: none;

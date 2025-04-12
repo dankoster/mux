@@ -3,27 +3,26 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-j
 import * as server from "./data/data"
 import { displayName, shortId } from "./helpers";
 import { PeerConnection } from "./PeerConnection";
-import { GetSettingValue, ShowSettings } from "./Settings";
+import { GetSettingValue } from "./Settings";
 import { onVisibilityChange } from "./onVisibilityChange";
 import { MediaButton } from "./component/MediaButton";
-import { FigmentMenu, MenuItem } from "./Menu";
 
 import "./VideoCall.css"
 
 const peersById = new Map<string, PeerConnection>()
 let localStream: MediaStream
-const [micEnabled, setMicEnabled] = createSignal(false)
-const [camEnabled, setCamEnabled] = createSignal(false)
-const [screenEnabled, setScreenEnabled] = createSignal(false)
-const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
+export const [micEnabled, setMicEnabled] = createSignal(false)
+export const [camEnabled, setCamEnabled] = createSignal(false)
+export const [screenEnabled, setScreenEnabled] = createSignal(false)
+export const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
 
 
 function NotReady() { throw new Error('<VideoCall /> not mounted') }
 
-let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
-let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
-let toggleMaxVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
-let toggleScreenShare: () => void = () => NotReady()
+export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+export let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+export let toggleMaxVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
+export let toggleScreenShare: () => void = () => NotReady()
 export let ConnectVideo: (conId: string, polite: boolean) => void = (conId: string, polite: boolean): void => NotReady()
 export let DisconnectVideo: (conId: string) => void = (conId: string): void => NotReady()
 
@@ -319,65 +318,6 @@ function PeerVideo(props: { name: string, peer: PeerConnection, stream: MediaStr
 				/>
 			</div>
 		</Show>
-	</div>
-}
-
-
-export function VideoCallToolbar() {
-	const userClicked = (e: MouseEvent) => {
-		menu.Clear()
-		menu.AddItem(new MenuItem({
-			text: `Settings`,
-			onTextClick: () => {
-				ShowSettings()
-				menu.Clear()
-			}
-		}))
-		menu.AddSeparator()
-		menu.AddItem(new MenuItem({
-			text: `Logout ${server.self().identity.name}`,
-			onTextClick: () => server.becomeAnonymous(),
-		}))
-		menu.ShowFor((e.target as HTMLElement).parentElement)
-	}
-
-	let menu: FigmentMenu
-	onMount(() => {
-		menu = new FigmentMenu()
-	})
-
-	return <div class="avatar button">
-		<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={userClicked} />
-		<div class="name" onclick={userClicked}>{server.self()?.identity.name}</div>
-
-		<MediaButton
-			className="audio"
-			enabled={micEnabled}
-			onClick={() => toggleMic()}
-			enabledIcon="microphone"
-			disabledIcon="microphone_muted"
-		/>
-		<MediaButton
-			className="video"
-			enabled={camEnabled}
-			onClick={() => toggleVideo()}
-			enabledIcon="camera"
-			disabledIcon="camera_muted"
-		/>
-		<MediaButton
-			className="screen"
-			enabled={screenEnabled}
-			onClick={() => toggleScreenShare()}
-			enabledIcon="share_screen"
-			disabledIcon="share_screen"
-		/>
-		<MediaButton
-			className="max-video"
-			enabled={maxVideoEnabled}
-			onClick={() => toggleMaxVideo()}
-			enabledIcon="users"
-			disabledIcon="users_rays"
-		/>
 	</div>
 }
 
