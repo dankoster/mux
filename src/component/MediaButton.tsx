@@ -1,4 +1,4 @@
-import { Accessor, Switch, Match, Show, createSignal } from "solid-js";
+import { Accessor, Switch, Match, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { svgIcon, SvgIcon } from "../SvgIcon";
 
 import './MediaButton.css'
@@ -30,29 +30,36 @@ export function MediaButton(props: {
 export function IconButton(props: { action: () => void, keyChar?: string, icon: svgIcon; }) {
 	return <div class={`media-button`} onclick={props.action}>
 		<SvgIcon icon={props.icon} />
-		<Show when={props.keyChar}>
-			<KeyBind char={props.keyChar} action={props.action} />
-		</Show>
+		<KeyBind char={props.keyChar} action={props.action} />
 	</div>
 }
 
 function KeyBind(props: { char: string, action: () => void }) {
 
-	console.log('INIT KeyBind', `ctrl+${props.char}`)
+	if (!props.char) return;
 
-	const [altDown, setCtrlDown] = createSignal(false)
+	const [ctrlDown, setCtrlDown] = createSignal(false)
 
-	document.addEventListener('keyup', (e: KeyboardEvent) => {
+	const onKeyUp = (e: KeyboardEvent) => {
 		setCtrlDown(e.ctrlKey)
-		// console.log('keyup', e)
-	})
-	document.addEventListener('keydown', (e: KeyboardEvent) => {
+	}
+	const onKeyDown = (e: KeyboardEvent) => {
 		setCtrlDown(e.ctrlKey)
-		// console.log('keydown', e)
 		if (e.ctrlKey && e.key === props.char) {
 			props.action()
 		}
+	}
+
+	onMount(() => {
+		document.addEventListener('keyup', onKeyUp)
+		document.addEventListener('keydown', onKeyDown)
+	})
+	onCleanup(() => {
+		document.removeEventListener('keyup', onKeyUp)
+		document.removeEventListener('keydown', onKeyDown)
 	})
 
-	return <Show when={altDown()}>{props.char}</Show>
+	return <Show when={ctrlDown()}>
+		<span>{props.char}</span>
+	</Show>
 }
