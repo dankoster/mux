@@ -8,7 +8,7 @@ import VideoCall, * as videoCall from "./VideoCall";
 import * as server from "./data/data";
 
 import "./main.css"
-import Welcome from "./Welcome";
+import Welcome, { welcomeVisible } from "./Welcome";
 import { UserToolbar } from "./UserToolbar";
 
 render(() => <App />, document.body)
@@ -37,7 +37,9 @@ function App() {
 			<Welcome />
 			<VideoCall />
 			<Planet />
-			<UserToolbar />
+			<Show when={!welcomeVisible()}>
+				<UserToolbar />
+			</Show>
 			<Settings />
 		</Show>
 	</>

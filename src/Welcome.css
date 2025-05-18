@@ -16,9 +16,17 @@
 			margin-block: auto;
 		}
 
-		.buttons {
+		.welcome-options {
 			display: flex;
-			justify-content: space-between;
+			flex-wrap: wrap;
+			justify-content: space-evenly;
+			gap: 1rem;
+			row-gap: 2rem;
+
+			.welcome-option {
+				display: grid;
+				gap: 0.75rem;
+			}
 		}
 	}
 }
