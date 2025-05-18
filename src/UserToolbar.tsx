@@ -50,9 +50,10 @@ export function UserToolbar() {
 					<div class="name" onclick={showMenu}>{server.self()?.identity.name}</div>
 				</Show>
 
-				<IconButton icon="users" action={() => ShowSettings()} />
-				<IconButton icon="users" action={() => addArea()} keyChar="b" />
+				<IconButton icon="gear" action={() => ShowSettings()} keyChar="s" />
+				<IconButton icon="hammer" action={() => addArea()} keyChar="b" />
 				<MediaButton
+					keyChar="m"
 					className="audio"
 					enabled={VideoCall.micEnabled}
 					action={() => VideoCall.toggleMic()}
