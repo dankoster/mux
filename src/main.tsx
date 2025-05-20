@@ -3,7 +3,7 @@ import { Show } from "solid-js";
 import { render } from "solid-js/web";
 import { onDistanceToAvatarChanged, Planet } from "./planet/planet";
 import { Avatar } from './planet/avatar';
-import Settings from "./Settings";
+import Settings, { settingsVisible } from "./Settings";
 import VideoCall, * as videoCall from "./VideoCall";
 import * as server from "./data/data";
 
@@ -37,7 +37,7 @@ function App() {
 			<Welcome />
 			<VideoCall />
 			<Planet />
-			<Show when={!welcomeVisible()}>
+			<Show when={!welcomeVisible() && !settingsVisible()}>
 				<UserToolbar />
 			</Show>
 			<Settings />

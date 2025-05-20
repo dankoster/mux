@@ -58,6 +58,10 @@ export function GetSetting(name: SettingName): Setting {
 	return { name, value: GetSettingValue(name) }
 }
 
+const [settingsVisible, setSettingsVisible] = createSignal(false)
+
+export { settingsVisible }
+
 export default function Settings() {
 	let dialog: HTMLDialogElement
 
@@ -65,11 +69,13 @@ export default function Settings() {
 		//override the exported show functino! 
 		ShowSettings = () => {
 			dialog.showModal()
+			setSettingsVisible(true)
 		}
 	})
 
 	const closeSettings = () => {
 		dialog.close()
+		setSettingsVisible(false)
 	}
 
 	const onClick = (e) => {
