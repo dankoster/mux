@@ -75,8 +75,8 @@ export function UserToolbar() {
 					className="max-video"
 					enabled={VideoCall.maxVideoEnabled}
 					action={() => VideoCall.toggleMaxVideo()}
-					enabledIcon="users"
-					disabledIcon="users_rays" />
+					enabledIcon="compress"
+					disabledIcon="expand" />
 			</div>
 		</div>
 	</div>
