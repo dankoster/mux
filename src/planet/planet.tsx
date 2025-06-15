@@ -19,7 +19,7 @@ import { Area } from './area'
 function NotReady() { throw new Error('<Planet /> not mounted') }
 
 export let addArea: () => void = () => NotReady()
-
+export let becomeAnynomous: () => void = () => NotReady()
 
 const distanceChangedHandlers: DistanceChangedHandler[] = []
 export type DistanceChangedHandler = (av: Avatar) => void
@@ -66,6 +66,11 @@ export function Planet() {
 		
 		return avatar
 	}
+
+	becomeAnynomous = () => {
+		console.log(`planet.becomeAnonymous()`)
+		selfAvatar.label = shortId(selfAvatar.connection?.id)
+	}
 	
 	addArea = () => {
 		if(!selfAvatar) throw new Error("selfAvatar not ready!")
@@ -77,9 +82,7 @@ export function Planet() {
 			scene.add(area.mesh)
 		}
 		if(!scene)
-			console.trace('scene not ready!', area)	
-
-		//TODO: move area to surface of sphere!!!!
+			console.trace('scene not ready!', area)
 	}
 
 	//add/remove avatars when connection status changes

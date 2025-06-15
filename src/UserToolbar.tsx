@@ -4,10 +4,10 @@ import { MenuItem, FigmentMenu } from "./Menu";
 import { ShowSettings } from "./Settings";
 
 import * as server from "./data/data";
+import * as planet from "./planet/planet";
 import * as VideoCall from "./VideoCall";
 import { ServerStats } from "./ServerStats";
 import { GitHubSvg } from "./GitHubSvg";
-import { addArea } from "./planet/planet";
 
 
 export function UserToolbar() {
@@ -23,7 +23,11 @@ export function UserToolbar() {
 		menu.AddSeparator();
 		menu.AddItem(new MenuItem({
 			text: `Logout ${server.self().identity.name}`,
-			onTextClick: () => server.becomeAnonymous(),
+			onTextClick: () => {
+				server.becomeAnonymous()
+				planet.becomeAnynomous()
+				menu.Clear()
+			},
 		}));
 		menu.ShowFor((e.target as HTMLElement).parentElement);
 	};
@@ -51,32 +55,34 @@ export function UserToolbar() {
 				</Show>
 
 				<IconButton icon="gear" action={() => ShowSettings()} keyChar="s" />
-				<IconButton icon="hammer" action={() => addArea()} keyChar="b" />
-				<MediaButton
-					keyChar="m"
-					className="audio"
-					enabled={VideoCall.micEnabled}
-					action={() => VideoCall.toggleMic()}
-					enabledIcon="microphone"
-					disabledIcon="microphone_muted" />
-				<MediaButton
-					className="video"
-					enabled={VideoCall.camEnabled}
-					action={() => VideoCall.toggleVideo()}
-					enabledIcon="camera"
-					disabledIcon="camera_muted" />
-				<MediaButton
-					className="screen"
-					enabled={VideoCall.screenEnabled}
-					action={() => VideoCall.toggleScreenShare()}
-					enabledIcon="share_screen"
-					disabledIcon="share_screen" />
-				<MediaButton
-					className="max-video"
-					enabled={VideoCall.maxVideoEnabled}
-					action={() => VideoCall.toggleMaxVideo()}
-					enabledIcon="compress"
-					disabledIcon="expand" />
+				<IconButton icon="hammer" action={() => planet.addArea()} keyChar="b" />
+				<Show when={VideoCall.isConnected()}>
+					<MediaButton
+						keyChar="m"
+						className="audio"
+						enabled={VideoCall.micEnabled}
+						action={() => VideoCall.toggleMic()}
+						enabledIcon="microphone"
+						disabledIcon="microphone_muted" />
+					<MediaButton
+						className="video"
+						enabled={VideoCall.camEnabled}
+						action={() => VideoCall.toggleVideo()}
+						enabledIcon="camera"
+						disabledIcon="camera_muted" />
+					<MediaButton
+						className="screen"
+						enabled={VideoCall.screenEnabled}
+						action={() => VideoCall.toggleScreenShare()}
+						enabledIcon="share_screen"
+						disabledIcon="share_screen" />
+					<MediaButton
+						className="max-video"
+						enabled={VideoCall.maxVideoEnabled}
+						action={() => VideoCall.toggleMaxVideo()}
+						enabledIcon="compress"
+						disabledIcon="expand" />
+				</Show>
 			</div>
 		</div>
 	</div>

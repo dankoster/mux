@@ -29,6 +29,13 @@ type Stats = {
 	offline: number;
 }
 
+type SSEventPayload = {
+	event: SSEvent;
+	data?: string;
+	id?: string;
+	retry?: string;
+}
+
 
 const [connections, setConnections] = createStore<Connection[]>([])
 const [friendRequests, setFriendRequests] = createStore<FriendRequest[]>([])
@@ -122,13 +129,6 @@ async function initSSE(route: string, token: string) {
 	}
 }
 
-type SSEventPayload = {
-	event: SSEvent;
-	data?: string;
-	id?: string;
-	retry?: string;
-}
-
 export function githubAuthUrl() {
 	//https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#web-application-flow
 
@@ -164,12 +164,16 @@ export async function becomeAnonymous() {
 	const response = await POST(apiRoute.becomeAnonymous)
 	if (response.ok) {
 		const myId = id()
-
 		const index = connections.findIndex(con => con.id === myId)
-		if (!(index >= 0)) throw new Error('ID not found!')
+		if (!(index >= 0)) {
+			console.log('no identity to remove')
+			return
+		}
 		setConnections({ from: index, to: index }, "identity", undefined)
 		setFriends([])
 		setFriendRequests([])
+		
+		//TODO: remove local storage
 	}
 }
 
@@ -240,8 +244,8 @@ function handleSseEvent(event: SSEventPayload) {
 			const update = JSON.parse(event.data) as Update
 			//console.log('SSE', event.event, update)
 			if (update.field === 'identity') {
-				console.log('parsing identity...')
 				update.value = update.value && JSON.parse(update.value)
+				console.log('parsed identity...', update.value || 'anonymous')
 			}
 			const index = connections.findIndex(con => con.id === update.connectionId)
 			if (!(index >= 0)) throw new Error(`${update.connectionId} not found in connections`)

@@ -2,10 +2,17 @@
 	border: 1px solid var(--button-outline-color);
 	border-radius: 5px;
 	padding: initial;
-	
+
 	&::backdrop {
 		backdrop-filter: blur(2px) brightness(0.5);
 	}
+
+	svg {
+		fill: var(--text-color);
+		width: 2rem;
+		vertical-align: middle;
+	}
+
 
 	.layout {
 		display: grid;
@@ -28,5 +35,42 @@
 				gap: 0.75rem;
 			}
 		}
+	}
+
+	.slider-container {
+		display: inline-flex;
+		height: 1.2em;
+		overflow: hidden;
+
+		.slider {
+			position: relative;
+			animation: slide-vertically infinite 8s 0s;
+			animation-timing-function: cubic-bezier(1, 0, 0.5, 1);
+			list-style: none;
+			padding: 0;
+			margin: 0;
+			padding-inline: 0.3em;
+			line-height: 1.2em;
+			margin-top: 0.2em;
+		}
+	}
+
+}
+
+@keyframes slide-vertically {
+	0% {
+		bottom: 0;
+	}
+
+	33.3% {
+		bottom: 1.2em;
+	}
+
+	66.6% {
+		bottom: 2.4em;
+	}
+
+	100% {
+		bottom: 3.6em;
 	}
 }

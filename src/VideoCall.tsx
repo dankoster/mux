@@ -11,11 +11,12 @@ import "./VideoCall.css"
 
 const peersById = new Map<string, PeerConnection>()
 let localStream: MediaStream
+
 export const [micEnabled, setMicEnabled] = createSignal(false)
 export const [camEnabled, setCamEnabled] = createSignal(false)
 export const [screenEnabled, setScreenEnabled] = createSignal(false)
 export const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
-
+export const [isConnected, setIsConnected] = createSignal(false)
 
 function NotReady() { throw new Error('<VideoCall /> not mounted') }
 
@@ -34,6 +35,8 @@ export default function VideoCall() {
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
 	const [outlineColor, setOutlineColor] = createSignal('')
+
+	
 
 	//both sides need to call this funciton
 	// the callee is polite, the caller is not
@@ -211,6 +214,7 @@ export default function VideoCall() {
 	const isAlone = createMemo(() => {
 		const peerList = peers()
 		const alone = Array.isArray(peerList) ? peerList.length === 0 : true
+		setIsConnected(!alone)
 		return alone
 	})
 
