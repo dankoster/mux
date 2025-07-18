@@ -17,12 +17,12 @@ onDistanceToAvatarChanged((avatar: Avatar) => {
 	const proxRange = 3
 
 	//approaching
-	if (avatar.prevDistance > proxRange && avatar.distanceFromSelf < proxRange) {
+	if (avatar.prevDistanceFromSelf > proxRange && avatar.distanceFromSelf < proxRange) {
 		videoCall.ConnectVideo(avatar.connection?.id, false)
 	}
 
 	//leaving
-	else if (avatar.prevDistance < proxRange && avatar.distanceFromSelf > proxRange) {
+	else if (avatar.prevDistanceFromSelf < proxRange && avatar.distanceFromSelf > proxRange) {
 		videoCall.DisconnectVideo(avatar.connection?.id)
 	}
 })

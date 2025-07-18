@@ -6,7 +6,7 @@ import { connections, getSelf } from '../data/data'
 import { Connection } from '../../server/types'
 import { displayName, shortId } from '../helpers'
 import { makeSphere } from './makeSphere'
-import { Avatar, AvatarEvents } from './avatar'
+import { Avatar } from './avatar'
 import { calculateThirdPersonCamera, placeCameraPastTargetFromPosition } from './thirdPersonCamera'
 
 import * as THREE from 'three'
@@ -31,7 +31,6 @@ export function onDistanceToAvatarChanged(handler: DistanceChangedHandler) {
 	distanceChangedHandlers.push(handler)
 }
 
-
 export function Planet() {
 
 	let planetCanvas: HTMLCanvasElement
@@ -50,10 +49,6 @@ export function Planet() {
 			avatar.connection = con
 			avatar.label = displayName(con) || shortId(con.id)
 			avatar.setPositionAndLook({ position: con.position, lookTarget: sphere?.position })
-			avatar.addEventListener(AvatarEvents.AvatarPositionChanged, () => {
-				if (avatar !== selfAvatar)
-					avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar?.mesh?.position)
-			})
 			avatarsById.set(con.id, avatar)
 		}
 		
@@ -105,42 +100,54 @@ export function Planet() {
 		const con = connections.find(con => con.id === message.id)
 		if (con?.status !== 'online')
 			return
-
-		//add avatar for this position
-		let avatar = getAvatar(con)
+		
+		//get the avatar for this position (add, if necessary)
+		let avatar = getAvatar(con)		
 		avatar.setPositionAndLook({
 			position: message.position,
 			lookTarget: sphere?.position
 		})
-
-		//calculate distance from self
-		if (selfAvatar && avatar != selfAvatar && !avatar.distanceFromSelf)
-			avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+		
+		updateDistanceFromSelf(avatar)
 	})
 
-	let lastBroadcastPosition = new THREE.Vector3()
+	function setSelfAvatarPosition(position: THREE.Vector3, lookTarget: THREE.Vector3) {
+		if (!selfAvatar?.mesh?.position) return
+
+		selfAvatar.setPositionAndLook({ position, lookTarget })
+
+		//our distance to all other avatars has now changed, so update them!
+		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
+	}
+
+	function updateDistanceFromSelf(avatar: Avatar, minDistanceMoved: number = 0.25) {
+		if(avatar == selfAvatar) return
+		
+		avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
+
+		if(avatar.distanceFromSelf > avatar.lastBroadcastDistanceFromSelf + minDistanceMoved
+			|| avatar.distanceFromSelf < avatar.lastBroadcastDistanceFromSelf - minDistanceMoved
+		) {
+			distanceToAvatarChanged(avatar)
+			avatar.lastBroadcastDistanceFromSelf = avatar.distanceFromSelf
+		}
+	}
+
 	function broadcastPosition(avatar: Avatar, minDistanceMoved: number = 0.25) {
-		if (avatar?.mesh?.position.distanceTo(lastBroadcastPosition) > minDistanceMoved) {
+		if (!selfAvatar) return
+		
+		if (avatar?.mesh?.position.distanceTo(selfAvatar.lastBroadcastPosition) > minDistanceMoved) {
 			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position)
-			if (broadcasted)
-				lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
+			if (broadcasted) {
+				if (selfAvatar.lastBroadcastPosition) selfAvatar.lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
+				else selfAvatar.lastBroadcastPosition = selfAvatar.mesh.position
+			}
 		}
 	}
 
 	setInterval(() => {
 		broadcastPosition(selfAvatar)
 	}, 25)
-
-	function updateDistanceFromSelfToAllOtherAvatars() {
-		avatarsById.forEach(avatar => {
-			if (avatar == selfAvatar) return
-
-			avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
-
-			//TODO: debounce! Use same minDistanceMoved check as broadcastPosition
-			distanceToAvatarChanged(avatar)
-		})
-	}
 
 	function BuildSceneAndStartRendering() {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
@@ -174,13 +181,8 @@ export function Planet() {
 			prevTime = time
 
 			//move our avatar to be under the camera
-			if (selfAvatar?.mesh?.position) {
-				const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				selfAvatar?.setPositionAndLook({
-					position: thirdPersonCamera.currentPosition,
-					lookTarget: thirdPersonCamera.currentLookat
-				})
-			}
+			const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
+			setSelfAvatarPosition(thirdPersonCamera.currentPosition, thirdPersonCamera.currentLookat)
 
 			//move the camera around the scene origin
 			orbit.update()
@@ -207,7 +209,6 @@ export function Planet() {
 
 		getSelf.then((con) => {
 			selfAvatar = getAvatar(con)
-			selfAvatar.addEventListener(AvatarEvents.AvatarPositionChanged, updateDistanceFromSelfToAllOtherAvatars)
 			placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
 		})
 

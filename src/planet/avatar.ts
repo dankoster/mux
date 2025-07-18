@@ -2,42 +2,37 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { Connection } from '../../server/types';
 
-
-type AvatarEvent = "AvatarPositionChanged"
-export const AvatarEvents: { [Property in AvatarEvent]: Property } = {
-	AvatarPositionChanged: 'AvatarPositionChanged'
-}
-
-const AvatarPositionChanged = new Event(AvatarEvents.AvatarPositionChanged);
-
 export class Avatar extends EventTarget {
-	mesh: THREE.Mesh;
-	connection?: Connection;
-	prevDistance: number = 0;
-	labelDiv: HTMLDivElement;
-	private distance: number = 0;
+	mesh: THREE.Mesh
+	connection?: Connection
+	prevDistanceFromSelf: number = undefined
+	prevDistanceLocation: THREE.Vector3 = undefined
+	lastBroadcastPosition: THREE.Vector3 = new THREE.Vector3
+	lastBroadcastDistanceFromSelf: number = 0
+	labelDiv: HTMLDivElement
+	private _distanceFromSelf: number = 0
 
 	constructor(size: number, color?: number, x: number = 0) {
-		super();
+		super()
 		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
-		const boxGeometry = new THREE.BoxGeometry(size, size, size);
-		const mesh = new THREE.Mesh(boxGeometry, material);
-		mesh.position.x = x;
+		const boxGeometry = new THREE.BoxGeometry(size, size, size)
+		const mesh = new THREE.Mesh(boxGeometry, material)
+		mesh.position.x = x
 
-		const labelDiv = document.createElement('div');
-		labelDiv.className = 'label';
-		labelDiv.textContent = '';
-		labelDiv.style.backgroundColor = 'transparent';
-		labelDiv.style.pointerEvents = 'none';
+		const labelDiv = document.createElement('div')
+		labelDiv.className = 'label'
+		labelDiv.textContent = ''
+		labelDiv.style.backgroundColor = 'transparent'
+		labelDiv.style.pointerEvents = 'none'
 
-		const label = new CSS2DObject(labelDiv);
-		label.position.set(1.5 * size, 0, 0);
-		label.center.set(0, 1);
-		mesh.add(label);
-		label.layers.set(0);
+		const label = new CSS2DObject(labelDiv)
+		label.position.set(1.5 * size, 0, 0)
+		label.center.set(0, 1)
+		mesh.add(label)
+		label.layers.set(0)
 
-		this.labelDiv = labelDiv;
-		this.mesh = mesh;
+		this.labelDiv = labelDiv
+		this.mesh = mesh
 	}
 
 	setPositionAndLook({ position, lookTarget }: { position: THREE.Vector3Like, lookTarget?: THREE.Vector3 }) {
@@ -48,7 +43,6 @@ export class Avatar extends EventTarget {
 
 		if (!this.mesh?.position?.equals(position)) {
 			this.mesh.position.copy(position)
-			this.dispatchEvent(AvatarPositionChanged)
 		}
 
 		if (lookTarget)
@@ -63,14 +57,16 @@ export class Avatar extends EventTarget {
 	}
 
 	set distanceFromSelf(value: number) {
-		this.prevDistance = this.distance;
-		this.distance = value;
+		this.prevDistanceFromSelf = this._distanceFromSelf;
+		this.prevDistanceLocation = this.mesh.position;
 
-		this.labelDiv.style.opacity = `${100 - (this.distance * 3)}%`;
+		this._distanceFromSelf = value;
+
+		this.labelDiv.style.opacity = `${100 - (this._distanceFromSelf * 3)}%`;
 	}
 
 	get distanceFromSelf() {
-		return this.distance;
+		return this._distanceFromSelf;
 	}
 
 	delete() {
