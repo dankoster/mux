@@ -50,12 +50,12 @@ export {
 	id, pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
-let resolvePromiseToGetSelf: (con: Connection) => void
-export const getSelf = new Promise<Connection>((resolve) => resolvePromiseToGetSelf = resolve)
+let resolvePromiseToGetSelfConnection: (con: Connection) => void
+export const selfConnection = new Promise<Connection>((resolve) => resolvePromiseToGetSelfConnection = resolve)
 createEffect(() => {
 	const value = self()
 	if (value) {
-		resolvePromiseToGetSelf(value)
+		resolvePromiseToGetSelfConnection(value)
 	}
 })
 

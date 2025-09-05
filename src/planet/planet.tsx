@@ -2,7 +2,7 @@ import { createEffect, onMount } from 'solid-js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 
-import { connections, getSelf } from '../data/data'
+import { connections, selfConnection } from '../data/data'
 import { Connection } from '../../server/types'
 import { displayName, shortId } from '../helpers'
 import { makeSphere } from './makeSphere'
@@ -180,9 +180,13 @@ export function Planet() {
 			const deltaTime = time - prevTime
 			prevTime = time
 
-			//move our avatar to be under the camera
-			const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-			setSelfAvatarPosition(thirdPersonCamera.currentPosition, thirdPersonCamera.currentLookat)
+			if (selfAvatar) {
+				//move our avatar to be under the camera
+				const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
+				setSelfAvatarPosition(thirdPersonCamera.currentPosition, thirdPersonCamera.currentLookat)
+			} else {
+				initSelfAvatar()
+			}
 
 			//move the camera around the scene origin
 			orbit.update()
@@ -203,15 +207,14 @@ export function Planet() {
 		requestAnimationFrame(render)
 	}
 
+	async function initSelfAvatar() {
+		selfAvatar = getAvatar(await selfConnection)		
+		placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
+	}
 
 	onMount(() => {
+		initSelfAvatar()
 		BuildSceneAndStartRendering()
-
-		getSelf.then((con) => {
-			selfAvatar = getAvatar(con)
-			placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
-		})
-
 	})
 
 	return <div class="planet-container">
