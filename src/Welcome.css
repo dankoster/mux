@@ -7,9 +7,10 @@
 		backdrop-filter: blur(2px) brightness(0.5);
 	}
 
-	svg {
+	& svg {
 		fill: var(--text-color);
 		width: 2rem;
+		min-width: 2rem;
 		vertical-align: middle;
 	}
 
@@ -29,12 +30,18 @@
 			justify-content: space-evenly;
 			gap: 1rem;
 			row-gap: 2rem;
+			margin-block-start: 2rem;
 
 			.welcome-option {
 				display: grid;
 				gap: 0.75rem;
 			}
 		}
+	}
+
+	.instruction {
+		display: flex;
+		gap: 1.5rem;
 	}
 
 	.slider-container {

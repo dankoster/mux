@@ -55,24 +55,23 @@ export default function Welcome() {
 		<div class="layout">
 			<Show when={!server.self()?.identity}>
 				<h1>Welcome!</h1>
-				<span>Please enjoy this silly and totally impractical way to ccommunicate!</span>
-				<div>
-					<span>This is you</span> <SvgIcon icon="person_running" />
-				</div>
-				<div>
+				<h4>Please enjoy this silly and totally impractical way to ccommunicate!</h4>
+				<div class="instruction">
 					<SvgIcon icon="hand_pointer" /> <span>Drag to navigate around the world</span>
 				</div>
-				<div>
+				<div class="instruction">
 					<SvgIcon icon="chat" />
+					<span>Move near other people to securely
 					<div class="slider-container">
-						<span>Move near other people to securely</span>
-						<ul class="slider">
+						{/* the css animation for slider needs to have one keyframe for each list item */}
+						<ul class="slider"> 
 							<li>chat</li>
 							<li>video call</li>
 							<li>screen share</li>
 							<li>chat</li>
 						</ul>
 					</div>
+					</span>
 				</div>
 				<div class="welcome-options">
 					<button class="room-button" onclick={onClickAnonymous} >
