@@ -89,7 +89,7 @@ export default function VideoCall() {
 
 		if(peersById.size == 0) {
 			console.log('DisconnectVideo: no peers! Stopping local stream tracks...')
-			localStream.getTracks().forEach(track => track.stop())
+			localStream?.getTracks().forEach(track => track.stop())
 			localStream = null
 			localVideo.srcObject = null
 		}
@@ -190,7 +190,7 @@ export default function VideoCall() {
 		onVisibilityChange(visible => {
 			const shouldMute = GetSettingValue('Mute when focus is lost')
 			const shouldUnMute = GetSettingValue('Restore mute state when refocused')
-			if (!visible && shouldMute) {
+			if (localStream && !visible && shouldMute) {
 				savedMuteState = {
 					micEnabled: micEnabled(),
 					camEnabled: camEnabled()
@@ -199,7 +199,7 @@ export default function VideoCall() {
 				toggleVideo(false)
 				toggleMic(false)
 			}
-			if (visible && shouldUnMute && savedMuteState) {
+			if (localStream && visible && shouldUnMute && savedMuteState) {
 				console.log('restore state', savedMuteState)
 				toggleMic(savedMuteState.micEnabled)
 				toggleVideo(savedMuteState.camEnabled)
