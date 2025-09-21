@@ -86,6 +86,13 @@ export default function VideoCall() {
 		peersById.delete(conId)
 
 		setPeers(Array.from(peersById.values()))
+
+		if(peersById.size == 0) {
+			console.log('DisconnectVideo: no peers! Stopping local stream tracks...')
+			localStream.getTracks().forEach(track => track.stop())
+			localStream = null
+			localVideo.srcObject = null
+		}
 	}
 
 	toggleMaxVideo = (enabled?: boolean) => {
