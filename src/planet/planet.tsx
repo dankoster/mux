@@ -160,7 +160,8 @@ export function Planet() {
 		scene.add(sphere)
 
 		const orbit = new OrbitControls(camera, renderer.domElement)
-		orbit.enableZoom = true
+		orbit.enableZoom = false
+		orbit.enablePan = false
 		orbit.enableDamping = true
 		orbit.dampingFactor = 0.04
 
