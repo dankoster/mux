@@ -55,7 +55,7 @@ export default function Welcome() {
 		<div class="layout">
 			<Show when={!server.self()?.identity}>
 				<h1>Welcome!</h1>
-				<h4>Please enjoy this silly and totally impractical way to ccommunicate!</h4>
+				<h4>Please enjoy this silly and totally impractical way to communicate!</h4>
 				<div class="instruction">
 					<SvgIcon icon="hand_pointer" /> <span>Drag to navigate around the world</span>
 				</div>
