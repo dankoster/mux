@@ -50,7 +50,11 @@ for (const setting of SettingsData) {
 		setting.value = JSON.parse(value)
 }
 
-export function GetSettingValue(name: SettingName) {
+export function GetSettingValue(name: SettingName) {	
+	//setting hasn't been changed from the default, so get the default
+	if(localStorage.getItem(name) == null) 
+		return SettingsData.find(s => s.name == name)?.value
+
 	return !!JSON.parse(localStorage.getItem(name))
 }
 
