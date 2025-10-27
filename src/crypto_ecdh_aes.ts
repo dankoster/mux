@@ -98,7 +98,7 @@ export async function encryptMessage(message: string, sharedKey: CryptoKey) {
 	}, sharedKey, messageBytes);
 
 	const data = await bufferToBase64(encrypted_ArrayBuffer)
-	const iv = await bufferToBase64(iv_Uint8Array)
+	const iv = await bufferToBase64(iv_Uint8Array.buffer)
 
 	return { iv, data }
 }
