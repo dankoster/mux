@@ -53,7 +53,7 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }: { delt
 		const idealLookat = firstIntersectedSphereGeometry.normal;
 
 		const t = 1.0 - Math.pow(0.001, _elapsedSec);
-		if (_currentPosition && _currentLookat) {
+		if (_currentPosition && _currentLookat && !Number.isNaN(_currentPosition.x)) {
 			_currentPosition?.lerp(idealPosition, t);
 			_currentLookat?.lerp(idealLookat, t);
 		}
