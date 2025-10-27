@@ -3,7 +3,6 @@ import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
 import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest, PositionMessage, Position } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
-import { MediaType } from "jsr:@oak/commons@^1.0/media_types";
 
 export { api }
 

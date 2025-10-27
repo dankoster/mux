@@ -2,12 +2,15 @@ import {
 	Application,
 	Middleware,
 	Router,
-} from "jsr:@oak/oak@17";
+} from "jsr:@oak/oak";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { api } from "./api.ts";
 import { github } from "./github.ts";
 
-//@ts-ignore
+//Number.parseInt(undefined) = Number.NaN
+//Number.parseInt("asdf") = Number.NaN
+//Number.NaN || 8080 = 8080
+//@ts-ignore 
 const PORT = Number.parseInt(Deno.env.get("SERVER_PORT")) || 8080;
 
 const logRouteDuration: Middleware = async (ctx, next) => {
