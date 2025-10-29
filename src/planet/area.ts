@@ -1,33 +1,38 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { Connection } from '../../server/types';
+import { Labeled } from './Labeled';
+import { Interactable } from './Interactable';
+
+export type AreaParams = { 
+	id?: string,
+	size: number, 
+	position?: THREE.Vector3Like,
+	lookTarget?: THREE.Vector3,
+	color?: number, 
+	labelText?: string,
+	labelClick?: (this: GlobalEventHandlers, ev: PointerEvent) => any,
+}
 
 export class Area {
 	mesh: THREE.Mesh;
 	connection?: Connection;
-	prevDistance: number = 0;
-	labelDiv: HTMLDivElement;
+	id: string
+	label: Labeled
+	interactable: Interactable
 
-	constructor({size, color, x = 0}: {size: number, color?: number, x?: number}) {
-		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
-		const boxGeometry = new THREE.BoxGeometry(size, size, size);
-		const mesh = new THREE.Mesh(boxGeometry, material);
-		mesh.position.x = x;
+	constructor(params : AreaParams) {	
+		this.id = params.id ?? crypto.randomUUID()
 
-		const labelDiv = document.createElement('div');
-		labelDiv.className = 'label';
-		labelDiv.textContent = '';
-		labelDiv.style.backgroundColor = 'transparent';
-		labelDiv.style.pointerEvents = 'none';
+		const material = params.color ? new THREE.MeshPhongMaterial({ color:params.color }) : new THREE.MeshNormalMaterial();
+		const boxGeometry = new THREE.BoxGeometry(params.size, params.size, params.size);
+		this.mesh = new THREE.Mesh(boxGeometry, material);
 
-		const label = new CSS2DObject(labelDiv);
-		label.position.set(1.5 * size, 0, 0);
-		label.center.set(0, 1);
-		mesh.add(label);
-		label.layers.set(0);
+		this.label = new Labeled(this.mesh, params.labelText)
+		this.label.labelDiv.onclick = params.labelClick
+		this.label.labelDiv.style.pointerEvents = params.labelClick ? 'auto' : 'none';
 
-		this.labelDiv = labelDiv;
-		this.mesh = mesh;
+		this.interactable = new Interactable(this.mesh, params.size)
 	}
 
 	setPositionAndLook({ position, lookTarget }: { position: THREE.Vector3Like, lookTarget?: THREE.Vector3 }) {
@@ -44,16 +49,13 @@ export class Area {
 			this.mesh.lookAt(lookTarget)
 	}
 
-	get label() {
-		return this.labelDiv.textContent;
-	}
-	set label(value: string) {
-		this.labelDiv.textContent = value;
+	set distanceFromSelf(value: number) {
+		this.label.labelDiv.style.opacity = `${100 - (value * 3)}%`;
 	}
 
 	delete() {
-		console.log('area delete!', this.connection.identity?.name);
+		console.log('area delete!', this.connection?.identity?.name);
 		this.mesh.removeFromParent();
-		this.labelDiv.remove();
+		this.label.labelDiv.remove();
 	}
 }

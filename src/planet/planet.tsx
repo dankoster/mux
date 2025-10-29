@@ -14,22 +14,17 @@ import * as positionSocket from '../data/positionSocket'
 
 import './planet.css'
 import { resizeRendererToDisplaySize } from './resizeRenderer'
-import { Area } from './area'
+import { Area, AreaParams } from './area'
+import { Intersections } from './Intersections'
 
-function NotReady() { throw new Error('<Planet /> not mounted') }
+function NotReady():any { throw new Error('<Planet /> not ready!') }
 
-export let addArea: () => void = () => NotReady()
+export let addArea: (ap: AreaParams) => Area = () => NotReady()
+export let removeArea: (id: string) => Area | undefined = () => NotReady()
 export let becomeAnynomous: () => void = () => NotReady()
-
-const distanceChangedHandlers: DistanceChangedHandler[] = []
-export type DistanceChangedHandler = (av: Avatar) => void
-function distanceToAvatarChanged(av: Avatar) {
-	distanceChangedHandlers.forEach(handler => handler(av))
-}
-
-export function onDistanceToAvatarChanged(handler: DistanceChangedHandler) {
-	distanceChangedHandlers.push(handler)
-}
+export let getSelfAvatarPosition: () => THREE.Vector3Like = () => NotReady()
+ 
+export const intersections = new Intersections()
 
 export function Planet() {
 
@@ -40,6 +35,7 @@ export function Planet() {
 	let sphere: THREE.Group<THREE.Object3DEventMap>
 	let selfAvatar: Avatar
 	const avatarsById = new Map<string, Avatar>()
+	const areas: Area[] = []
 
 	function getAvatar(con: Connection): Avatar | undefined {
 		let avatar = avatarsById.get(con.id)
@@ -47,7 +43,7 @@ export function Planet() {
 		if (!avatar) {
 			avatar = new Avatar(1)
 			avatar.connection = con
-			avatar.label = displayName(con) || shortId(con.id)
+			avatar.label.text = displayName(con) || shortId(con.id)
 			avatar.setPositionAndLook({ position: con.position, lookTarget: sphere?.position })
 			avatarsById.set(con.id, avatar)
 		}
@@ -64,20 +60,33 @@ export function Planet() {
 
 	becomeAnynomous = () => {
 		console.log(`planet.becomeAnonymous()`)
-		selfAvatar.label = shortId(selfAvatar.connection?.id)
+		selfAvatar.label.text = shortId(selfAvatar.connection?.id)
 	}
+
+	getSelfAvatarPosition = () => selfAvatar.mesh.position
 	
-	addArea = () => {
-		if(!selfAvatar) throw new Error("selfAvatar not ready!")
-		const area = new Area({size: 2})
-		area.setPositionAndLook({ position: selfAvatar.mesh.position, lookTarget: sphere?.position })
+	addArea = (params: AreaParams) => {
+		const area = new Area(params)		
+		area.setPositionAndLook({ position: params.position, lookTarget: sphere?.position })
 		
 		console.log('addArea', area)
 		if(scene && !scene.children.includes(area.mesh)){
 			scene.add(area.mesh)
+			areas.push(area)
 		}
 		if(!scene)
 			console.trace('scene not ready!', area)
+
+		return area
+	}
+
+	removeArea = (id: string) => {
+		const index = areas.findIndex(a => a.id === id)
+		if(index >= 0) {
+			const area = areas.splice(index,1)[0]
+			area.delete()
+			return area
+		}
 	}
 
 	//add/remove avatars when connection status changes
@@ -118,6 +127,7 @@ export function Planet() {
 
 		//our distance to all other avatars has now changed, so update them!
 		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
+		areas.forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh.position))
 	}
 
 	function updateDistanceFromSelf(avatar: Avatar, minDistanceMoved: number = 0.25) {
@@ -128,7 +138,6 @@ export function Planet() {
 		if(avatar.distanceFromSelf > avatar.lastBroadcastDistanceFromSelf + minDistanceMoved
 			|| avatar.distanceFromSelf < avatar.lastBroadcastDistanceFromSelf - minDistanceMoved
 		) {
-			distanceToAvatarChanged(avatar)
 			avatar.lastBroadcastDistanceFromSelf = avatar.distanceFromSelf
 		}
 	}
@@ -199,6 +208,13 @@ export function Planet() {
 				camera.aspect = canvas.clientWidth / canvas.clientHeight
 				camera.updateProjectionMatrix()
 			}
+
+			//check for collisions
+			areas.forEach(area => intersections.update(area, selfAvatar.interactable.intersects(area.interactable)))
+			avatarsById.forEach((avatar) => {
+				if(avatar != selfAvatar)
+					intersections.update(avatar, selfAvatar.interactable.intersects(avatar.interactable))
+			})
 
 			renderer.render(scene, camera)
 			labelRenderer.render(scene, camera)

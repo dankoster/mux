@@ -17,7 +17,9 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	publicKey: "publicKey",
 	dmHistory: "dmHistory",
 	dmUnread: "dmUnread",
-	position: "position"
+	position: "position",
+	broadcastJson: "broadcastJson",
+	initiateCall: "initiateCall"
 };
 
 export async function GET(route: ApiRoute, subRoute?: string) {

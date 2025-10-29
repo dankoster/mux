@@ -1,9 +1,11 @@
 import { API_URI } from "../API_URI";
 import { createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage } from "../../server/types";
+import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult } from "../../server/types";
 import { apiRoute, POST } from "./http";
 import { handleNewDirectMessage, getAllUnread, sharePrivateKey } from "./directMessages";
+import { AreaParams, } from "../planet/area";
+import * as Planet from "../planet/planet";
 
 const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
@@ -19,7 +21,8 @@ const sse: { [Property in SSEvent]: Property } = {
 	friendList: "friendList",
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
-	dm: "dm"
+	dm: "dm",
+	broadcastJson: "broadcastJson"
 }
 
 export const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -148,6 +151,23 @@ export function githubAuthUrl() {
 	return url
 }
 
+type JsonMessage = {
+	command: "addArea" | "removeArea",
+	payload: any,
+	sender?: string //set by the server
+}
+
+export async function broadcastJson(message: JsonMessage) {
+	const json = JSON.stringify(message);
+	console.log("broadcastJson", json)
+	return await POST(apiRoute.broadcastJson, { body: json })
+}
+
+export async function initiateCall(con: Connection): Promise<initiateCallResult> {
+	var result = (await POST(apiRoute.initiateCall, { body: con.id }))
+	return await result.json() as initiateCallResult
+}
+
 export async function sendFriendRequest(con: Connection) {
 	return await POST(apiRoute.friendRequest, { body: con.id })
 }
@@ -231,7 +251,7 @@ function handleSseEvent(event: SSEventPayload) {
 			setConnections(conData)
 			if (id() && connections) setSelf(connections.find(con => con.id === id()))
 			onConnectionsChanged()
-			getAllUnread(friends, connections)
+			//getAllUnread(friends, connections)
 			//console.log('SSE', event.event, conData);
 			break;
 		case sse.reconnect:
@@ -303,6 +323,23 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
 			handleNewDirectMessage(dm);
+			break;
+
+		case sse.broadcastJson:
+			const json = JSON.parse(event.data) as JsonMessage
+			console.log(`SSE`, sse.broadcastJson, json)
+
+			switch(json.command) {
+				case "addArea":
+					Planet.addArea(json.payload as AreaParams);
+					break;
+				case "removeArea":
+					const ap = json.payload as AreaParams
+					Planet.removeArea(ap.id)
+					break;
+				default: 
+					throw `${json.command} not supported!`
+			}
 			break;
 
 		default:

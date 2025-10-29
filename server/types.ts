@@ -14,7 +14,9 @@ export type ApiRoute = "sse" |
 	"dmHistory" |
 	"dmUnread" |
 	"publicKey" |
-	"position";
+	"broadcastJson" |
+	"position" | 
+	"initiateCall";
 
 export type SSEvent = "pk" |
 	"id" |
@@ -29,7 +31,10 @@ export type SSEvent = "pk" |
 	"friendRequests" |
 	"friendList" |
 	"friendRequestAccepted" |
+	"broadcastJson" |
 	"dm";
+
+export type initiateCallResult = {["polite"]:boolean|undefined}
 
 export type Identity = {
 	id?: string;

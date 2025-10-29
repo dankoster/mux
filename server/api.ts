@@ -1,7 +1,7 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest, PositionMessage, Position } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest, PositionMessage, Position, initiateCallResult } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
@@ -20,7 +20,8 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	friendList: "friendList",
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
-	dm: "dm"
+	dm: "dm",
+	broadcastJson: "broadcastJson"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -40,7 +41,9 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmHistory: "dmHistory",
 	dmUnread: "dmUnread",
 	publicKey: "publicKey",
-	position: "position"
+	position: "position",
+	broadcastJson: "broadcastJson",
+	initiateCall: "initiateCall"
 }
 
 
@@ -94,7 +97,7 @@ function sseMessage(event: SSEvent, data?: string, id?: string) {
 	return new TextEncoder().encode(msg);
 }
 
-function notifyAllConnections(event: SSEvent, update: Update | Connection, options?: { excludeUUID?: string }) {
+function notifyAllConnections(event: SSEvent, update: any, options?: { excludeUUID?: string }) {
 	updateFunctionByUUID.forEach((fn, uuidToUpdate) => {
 		if (!options?.excludeUUID || options?.excludeUUID !== uuidToUpdate) {
 			console.log('NOTIFY ALL ➤', event.toUpperCase(), uuidToUpdate, update)
@@ -181,7 +184,7 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 			position: con.position
 		}
 		const messageString = JSON.stringify(pm)
-		
+
 		//broadcast the message to all other connected clients
 		lastWsMessageByUUID.set(socketUuid, messageString)
 		wsByUUID.forEach((ws, uuid) => {
@@ -345,6 +348,55 @@ api.post(`/${apiRoute.setText}`, async (ctx) => {
 	} catch (err) {
 		console.error(err, ctx.request)
 		ctx.response.status = 400
+	}
+})
+
+const calls: {from:string,to:string}[] = []
+
+api.post(`/${apiRoute.initiateCall}`, async ctx => {
+	try {
+		const { con } = getConnection(ctx.request)
+		const caller = con.id
+		const callee = await ctx.request.body.json()
+
+		const result: initiateCallResult = { polite: undefined }
+
+		const pendingCall = calls.find(c => c.to == caller)
+
+		if(pendingCall){
+			calls.splice(calls.indexOf(pendingCall),1)
+			result.polite = true
+		}
+		else {
+			calls.push({from: caller, to: callee})
+			result.polite = false
+		}
+
+		console.log('initiate call from', caller, 'to', callee, result)
+		
+
+		ctx.response.body = JSON.stringify(result)
+		ctx.response.status = 200
+	} catch(err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 400
+	}
+})
+
+api.post(`/${apiRoute.broadcastJson}`, async (ctx) => {
+	try {
+		const { uuid, con } = getConnection(ctx.request)
+		const json = await ctx.request.body.json()
+		console.log(apiRoute.broadcastJson, uuid, json)
+		json.sender = uuid
+
+		notifyAllConnections(sseEvent.broadcastJson, json, {
+			excludeUUID: uuid
+		})
+		ctx.response.status = 200
+	} catch(err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 500
 	}
 })
 
@@ -561,13 +613,13 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
 			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
 
-			if (connection.identity?.id) {
-				const friends = db.getFriendsByIdentityId(connection.identity?.id)
-				controller.enqueue(sseMessage(sseEvent.friendList, JSON.stringify(friends)))
+			// if (connection.identity?.id) {
+			// 	const friends = db.getFriendsByIdentityId(connection.identity?.id)
+			// 	controller.enqueue(sseMessage(sseEvent.friendList, JSON.stringify(friends)))
 
-				const friendRequests = db.getFriendRequestsByIdentityId(connection.identity?.id)
-				controller.enqueue(sseMessage(sseEvent.friendRequests, JSON.stringify(friendRequests)))
-			}
+			// 	const friendRequests = db.getFriendRequestsByIdentityId(connection.identity?.id)
+			// 	controller.enqueue(sseMessage(sseEvent.friendRequests, JSON.stringify(friendRequests)))
+			// }
 
 			if (isNewConnection) {
 				notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })

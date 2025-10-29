@@ -1,8 +1,7 @@
 
 import { Show } from "solid-js";
 import { render } from "solid-js/web";
-import { onDistanceToAvatarChanged, Planet } from "./planet/planet";
-import { Avatar } from './planet/avatar';
+import { Planet } from "./planet/planet";
 import Settings, { settingsVisible } from "./Settings";
 import VideoCall, * as videoCall from "./VideoCall";
 import * as server from "./data/data";
@@ -10,22 +9,9 @@ import * as server from "./data/data";
 import "./main.css"
 import Welcome, { welcomeVisible } from "./Welcome";
 import { UserToolbar } from "./UserToolbar";
+import ProximityWatcher from "./ProximityWatcher";
 
 render(() => <App />, document.body)
-
-onDistanceToAvatarChanged((avatar: Avatar) => {
-	const proxRange = 3
-
-	//approaching
-	if (avatar.prevDistanceFromSelf > proxRange && avatar.distanceFromSelf < proxRange) {
-		videoCall.ConnectVideo(avatar.connection?.id, false)
-	}
-
-	//leaving
-	else if (avatar.prevDistanceFromSelf < proxRange && avatar.distanceFromSelf > proxRange) {
-		videoCall.DisconnectVideo(avatar.connection?.id)
-	}
-})
 
 function App() {
 	return <>
@@ -37,6 +23,7 @@ function App() {
 			<Welcome />
 			<VideoCall />
 			<Planet />
+			<ProximityWatcher />
 			<Show when={!welcomeVisible() && !settingsVisible()}>
 				<UserToolbar />
 			</Show>

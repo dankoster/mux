@@ -1,6 +1,7 @@
-import * as THREE from 'three';
-import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { Connection } from '../../server/types';
+import * as THREE from 'three'
+import { Connection } from '../../server/types'
+import { Labeled } from './Labeled'
+import { Interactable } from './Interactable'
 
 export class Avatar extends EventTarget {
 	mesh: THREE.Mesh
@@ -9,30 +10,20 @@ export class Avatar extends EventTarget {
 	prevDistanceLocation: THREE.Vector3 = undefined
 	lastBroadcastPosition: THREE.Vector3 = new THREE.Vector3
 	lastBroadcastDistanceFromSelf: number = 0
-	labelDiv: HTMLDivElement
+	
+	interactable: Interactable
+	label: Labeled
+	
 	private _distanceFromSelf: number = 0
 
 	constructor(size: number, color?: number, x: number = 0) {
 		super()
 		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial();
 		const boxGeometry = new THREE.BoxGeometry(size, size, size)
-		const mesh = new THREE.Mesh(boxGeometry, material)
-		mesh.position.x = x
-
-		const labelDiv = document.createElement('div')
-		labelDiv.className = 'label'
-		labelDiv.textContent = ''
-		labelDiv.style.backgroundColor = 'transparent'
-		labelDiv.style.pointerEvents = 'none'
-
-		const label = new CSS2DObject(labelDiv)
-		label.position.set(1.5 * size, 0, 0)
-		label.center.set(0, 1)
-		mesh.add(label)
-		label.layers.set(0)
-
-		this.labelDiv = labelDiv
-		this.mesh = mesh
+		this.mesh = new THREE.Mesh(boxGeometry, material)
+		this.mesh.position.x = x
+		this.interactable = new Interactable(this.mesh, size)
+		this.label = new Labeled(this.mesh, )
 	}
 
 	setPositionAndLook({ position, lookTarget }: { position: THREE.Vector3Like, lookTarget?: THREE.Vector3 }) {
@@ -49,20 +40,13 @@ export class Avatar extends EventTarget {
 			this.mesh.lookAt(lookTarget)
 	}
 
-	get label() {
-		return this.labelDiv.textContent;
-	}
-	set label(value: string) {
-		this.labelDiv.textContent = value;
-	}
-
 	set distanceFromSelf(value: number) {
 		this.prevDistanceFromSelf = this._distanceFromSelf;
 		this.prevDistanceLocation = this.mesh.position;
 
 		this._distanceFromSelf = value;
 
-		this.labelDiv.style.opacity = `${100 - (this._distanceFromSelf * 3)}%`;
+		this.label.opacity = `${100 - (this._distanceFromSelf * 3)}%`;
 	}
 
 	get distanceFromSelf() {
@@ -72,6 +56,6 @@ export class Avatar extends EventTarget {
 	delete() {
 		console.log('avatar delete!', this.connection.identity?.name);
 		this.mesh.removeFromParent();
-		this.labelDiv.remove();
+		this.label.remove();
 	}
 }
