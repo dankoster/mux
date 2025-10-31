@@ -24,23 +24,32 @@ export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotRe
 export let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
 export let toggleMaxVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
 export let toggleScreenShare: () => void = () => NotReady()
-export let ConnectVideo: (conId: string, polite: boolean) => void = (conId: string, polite: boolean): void => NotReady()
+export let ConnectVideo: (params: ConnectParams) => void = (params: ConnectParams): void => NotReady()
 export let DisconnectVideo: (conId: string) => void = (conId: string): void => NotReady()
+
+type ConnectParams = {
+	conId: string, 
+	rtcConfig: RTCConfiguration, 
+	polite: boolean
+}
 
 export default function VideoCall() {
 	let videoContainer: HTMLDivElement
 	let localVideoContainer: HTMLDivElement
 	let observer: MutationObserver
 	let localVideo: HTMLVideoElement
+	let screenShareStream: MediaStream
+	let config: RTCConfiguration
+	let connectParams: ConnectParams
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
 	const [outlineColor, setOutlineColor] = createSignal('')
 
-	
-
 	//both sides need to call this funciton
 	// the callee is polite, the caller is not
-	ConnectVideo = async (conId: string, polite: boolean = true) => {
+	ConnectVideo = async ({conId, rtcConfig, polite = true}: ConnectParams) => {
+		config = rtcConfig
+		polite = polite
 		console.log('ConnectVideo', conId, { polite })
 
 		if (peersById.has(conId)) {
@@ -51,6 +60,7 @@ export default function VideoCall() {
 		const peer = new PeerConnection({
 			conId,
 			polite,
+			config,
 			onDisconnect: () => DisconnectVideo(conId)
 		})
 
@@ -130,8 +140,6 @@ export default function VideoCall() {
 		}
 	}
 
-	let screenShareStream: MediaStream
-
 	toggleScreenShare = async () => {
 		const enabled = !screenEnabled()
 		
@@ -174,7 +182,7 @@ export default function VideoCall() {
 
 		server.onWebRtcMessage((message) => {
 			if (!peersById.has(message.senderId)) {
-				ConnectVideo(message.senderId, false)
+				ConnectVideo(connectParams)
 			}
 
 			peersById.get(message.senderId)?.handleMessage(JSON.parse(message.message))

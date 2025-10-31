@@ -1,3 +1,10 @@
+// @ts-types="npm:@types/webrtc"
+import type * as webrtc from "npm:/@types/webrtc"
+
+export type initiateCallResult = {
+	["polite"]:boolean|undefined,
+	peerConfig: RTCConfiguration
+}
 
 export type AuthTokenName = "Authorization";
 export type ApiRoute = "sse" |
@@ -33,8 +40,6 @@ export type SSEvent = "pk" |
 	"friendRequestAccepted" |
 	"broadcastJson" |
 	"dm";
-
-export type initiateCallResult = {["polite"]:boolean|undefined}
 
 export type Identity = {
 	id?: string;

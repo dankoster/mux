@@ -1,41 +1,9 @@
 import * as server from "./data/data";
 
-//TODO: get this from the TURN server for each client, obviously
-const servers: RTCConfiguration = {
-	iceServers: [
-		{
-			urls: [
-				'stun:stun.relay.metered.ca:80',
-				'stun:stun1.l.google.com:19302',
-				'stun:stun2.l.google.com:19302'
-			],
-		},
-		{
-			urls: "turn:global.relay.metered.ca:80",
-			username: "20cd52d0dc022700b2755c26",
-			credential: "MNMabfdDEZeLlOFU",
-		},
-		{
-			urls: "turn:global.relay.metered.ca:80?transport=tcp",
-			username: "20cd52d0dc022700b2755c26",
-			credential: "MNMabfdDEZeLlOFU",
-		},
-		{
-			urls: "turn:global.relay.metered.ca:443",
-			username: "20cd52d0dc022700b2755c26",
-			credential: "MNMabfdDEZeLlOFU",
-		},
-		{
-			urls: "turns:global.relay.metered.ca:443?transport=tcp",
-			username: "20cd52d0dc022700b2755c26",
-			credential: "MNMabfdDEZeLlOFU",
-		},
-	],
-	iceCandidatePoolSize: 10,
-};
 type pcInit = {
 	conId: string;
 	polite: boolean;
+	config: RTCConfiguration,
 	onTrack?: (track: MediaStreamTrack) => void;
 	onDisconnect: () => void;
 };
@@ -52,11 +20,11 @@ export class PeerConnection extends EventTarget {
 
 	onDisconnect: () => void;
 
-	constructor({ conId, polite, onDisconnect }: pcInit) {
+	constructor({ conId, polite, onDisconnect, config }: pcInit) {
 		super()
 
 		this.conId = conId;
-		this.pc = new RTCPeerConnection(servers);
+		this.pc = new RTCPeerConnection(config);
 		this.polite = polite;
 		this.onDisconnect = onDisconnect;
 

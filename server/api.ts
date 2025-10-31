@@ -353,13 +353,50 @@ api.post(`/${apiRoute.setText}`, async (ctx) => {
 
 const calls: {from:string,to:string}[] = []
 
+//TODO: get this from cloudflare
+const peerConfig: RTCConfiguration = {
+	iceServers: [
+		{
+			urls: [
+				'stun:stun.relay.metered.ca:80',
+				'stun:stun1.l.google.com:19302',
+				'stun:stun2.l.google.com:19302'
+			],
+		},
+		{
+			urls: "turn:global.relay.metered.ca:80",
+			username: "20cd52d0dc022700b2755c26",
+			credential: "MNMabfdDEZeLlOFU",
+		},
+		{
+			urls: "turn:global.relay.metered.ca:80?transport=tcp",
+			username: "20cd52d0dc022700b2755c26",
+			credential: "MNMabfdDEZeLlOFU",
+		},
+		{
+			urls: "turn:global.relay.metered.ca:443",
+			username: "20cd52d0dc022700b2755c26",
+			credential: "MNMabfdDEZeLlOFU",
+		},
+		{
+			urls: "turns:global.relay.metered.ca:443?transport=tcp",
+			username: "20cd52d0dc022700b2755c26",
+			credential: "MNMabfdDEZeLlOFU",
+		},
+	],
+	iceCandidatePoolSize: 10,
+};
+
 api.post(`/${apiRoute.initiateCall}`, async ctx => {
 	try {
 		const { con } = getConnection(ctx.request)
 		const caller = con.id
 		const callee = await ctx.request.body.json()
 
-		const result: initiateCallResult = { polite: undefined }
+		const result: initiateCallResult = { 
+			polite: undefined,
+			peerConfig
+		}
 
 		const pendingCall = calls.find(c => c.to == caller)
 
@@ -372,8 +409,7 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 			result.polite = false
 		}
 
-		console.log('initiate call from', caller, 'to', callee, result)
-		
+		console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
 
 		ctx.response.body = JSON.stringify(result)
 		ctx.response.status = 200

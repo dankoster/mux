@@ -14,9 +14,14 @@ export default function ProximityWatcher() {
 		
 		if (e.detail instanceof Avatar) {
 			var avatar = e.detail as Avatar
+
 			const callResult = await initiateCall(avatar.connection)
-			uiLog(`Start Call: ${avatar.label.text} ${JSON.stringify(callResult)}`)
-			videoCall.ConnectVideo(avatar.connection?.id, callResult.polite)
+			uiLog(`Start Call: ${avatar.label.text}`)
+			videoCall.ConnectVideo({
+				conId: avatar.connection?.id, 
+				rtcConfig: callResult.peerConfig, 
+				polite: callResult.polite
+			})
 		}
 		else if(e.detail instanceof Area) {
 			var area = e.detail as Area
