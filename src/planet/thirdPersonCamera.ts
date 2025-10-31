@@ -48,7 +48,6 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }: { delt
 	if (firstIntersectedSphereGeometry) {
 
 		//move away from the sphere origin by ... half a normal vector?
-		// TODO: this should place the position on the surface of the target object
 		const idealPosition = firstIntersectedSphereGeometry?.point.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5);
 		const idealLookat = firstIntersectedSphereGeometry.normal;
 
@@ -60,7 +59,26 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }: { delt
 		else {
 			_currentPosition = idealPosition;
 			_currentLookat = idealLookat;
+			
+			// uiLog(`INIT CP ${JSON.stringify(_currentPosition)}`)
 		}
+		
+		//stay on the surface of the sphere
+		var sphere = firstIntersectedSphereGeometry.object as THREE.Mesh
+		const dist = _currentPosition?.distanceTo(sphere.position)
+		const radius = sphere?.geometry?.boundingSphere?.radius
+		const diff = (dist && radius) ? radius - dist : 0
+		if(diff > 0)
+		{
+			_currentPosition.addScaledVector(firstIntersectedSphereGeometry.normal, diff)
+		}
+		
+		// uiLog(`CP x is NaN? ${Number.isNaN(_currentPosition.x)}`)
+		// uiLog(`IP x is NaN? ${Number.isNaN(_currentLookat.x)}`)
+		// if (_currentPosition.x) {
+		// 	_currentPosition = undefined
+		// 	uiLog(`CP undefined!`)
+		// }
 
 		return {
 			currentPosition: _currentPosition,
