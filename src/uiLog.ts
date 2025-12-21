@@ -1,21 +1,23 @@
 
-export function uiLog(value: string) {
-	let logElement = document.getElementById('logger')
+var logs = new Map<number, HTMLElement>()
+var timeoutMs: number = 5000
 
-	if (!logElement) {
-		logElement = document.createElement('div')
-		logElement.id = 'logger'
-		logElement.style.position = 'absolute'
-		logElement.style.backdropFilter = "blur(10px)"
-		logElement.style.maxHeight = '10rem'
-		logElement.style.overflow = 'hidden'
-		logElement.style.opacity = '0.7'
+export function uiLog(value: string, logId: number = undefined) {
+	let logElement = getLogElement()
 
-		document.body.appendChild(logElement)
+	if(logs.has(logId)) {
+		clearTimeout(logId)
+		const logElement = logs.get(logId)
+		logs.delete(logId)
+		// logElement.textContent = `[${logId}]${value}`
+		logElement.textContent = value
+		logId = setTimeout(() => {
+			logElement.remove()
+			logs.delete(logId)
+		}, timeoutMs);
+		logs.set(logId, logElement)
+		return logId
 	}
-
-	if(logElement.children.length > 10)
-		logElement.children[0].remove()
 
 	const logEntry = document.createElement('pre')
 	logEntry.style.margin = "0"
@@ -23,7 +25,35 @@ export function uiLog(value: string) {
 	logElement.appendChild(logEntry)
 	logEntry.scrollIntoView() //{behavior: "smooth"})
 
-	setTimeout(() => {
+	const id = setTimeout(() => {
 		logEntry.remove()
-	}, 3000);
+		logs.delete(id)
+	}, timeoutMs);
+
+	if(logs.has(id as number)) 
+		throw new Error(`${id} already exists in logs`)
+
+	logs.set(id, logEntry);
+
+	return id
 }
+
+function getLogElement() {
+	let logElement = document.getElementById('logger')
+
+	if (!logElement) {
+		logElement = document.createElement('div')
+		logElement.id = 'logger'
+		logElement.style.position = 'absolute'
+		logElement.style.backdropFilter = "blur(10px)"
+		logElement.style.maxHeight = '100svh' 
+		logElement.style.maxWidth = '100svw' 
+		logElement.style.overflowY = 'auto'
+		logElement.style.overflowX = 'hidden'
+		logElement.style.opacity = '0.7'
+
+		document.body.appendChild(logElement)
+	}
+	return logElement
+}
+
