@@ -12,6 +12,7 @@ const sse: { [Property in SSEvent]: Property } = {
 	id: "id",
 	webRTC: "webRTC",
 	connections: "connections",
+	connectionsCount: "connectionsCount",
 	refresh: "refresh",
 	reconnect: "reconnect",
 	update: "update",
@@ -41,6 +42,7 @@ type SSEventPayload = {
 
 
 const [connections, setConnections] = createStore<Connection[]>([])
+const [connectionsCount, setConnectionsCount] = createSignal(0)
 const [friendRequests, setFriendRequests] = createStore<FriendRequest[]>([])
 const [friends, setFriends] = createStore<Friend[]>([])
 const [id, setId] = createSignal("")
@@ -50,7 +52,7 @@ const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
 export {
-	id, pk, connections, self, stats, serverOnline, friendRequests, friends
+	id, pk, connections, connectionsCount, self, stats, serverOnline, friendRequests, friends
 }
 
 let resolvePromiseToGetSelfConnection: (con: Connection) => void
@@ -246,6 +248,9 @@ function handleSseEvent(event: SSEventPayload) {
 			if (id() && connections) setSelf(connections.find(con => con.id === event.data))
 			//console.log('SSE', event.event, event.data);
 			break;
+		case sse.connectionsCount:
+			setConnectionsCount(Number.parseInt(event.data))
+			break;
 		case sse.connections:
 			const conData = JSON.parse(event.data) as Connection[]
 			setConnections(conData)
@@ -378,10 +383,9 @@ function onConnectionsChanged() {
 		}
 	})
 
-	setStats({
-		online: connections.reduce((total, conn) => total += (conn.status === "online" ? 1 : 0), 0),
-		offline: connections.reduce((total, conn) => total += (conn.status !== "online" ? 1 : 0), 0)
-	});
+	const online = connections.length
+	const total = connectionsCount()
+	setStats({ online, offline: total - online });
 }
 
 export async function setColor(color: string, key?: string) {

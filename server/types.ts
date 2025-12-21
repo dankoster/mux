@@ -29,6 +29,7 @@ export type SSEvent = "pk" |
 	"id" |
 	"webRTC" |
 	"connections" |
+	"connectionsCount" |
 	"new_connection" |
 	"delete_connection" |
 	"update" |
@@ -49,11 +50,12 @@ export type Identity = {
 	avatar_url?: string;
 };
 
+export type ConnectionStatus = ""|"online"
 export type Connection = {
 	id: string;
 	color?: string;
 	text?: string;
-	status?: string | null;
+	status?: ConnectionStatus;
 	kind?: string;
 	publicKey?: string;
 	identity?: Identity;

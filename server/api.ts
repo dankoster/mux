@@ -11,6 +11,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	id: "id",
 	webRTC: "webRTC",
 	connections: "connections",
+	connectionsCount: "connectionsCount",
 	refresh: "refresh",
 	reconnect: "reconnect",
 	new_connection: "new_connection",
@@ -647,7 +648,9 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			//console.log("SSE connection   ", uuid, connection)
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
-			controller.enqueue(sseMessage(sseEvent.connections, JSON.stringify(Array.from(connectionByUUID.values()))))
+			controller.enqueue(sseMessage(sseEvent.connectionsCount, connectionByUUID?.size.toString()))
+			controller.enqueue(sseMessage(sseEvent.connections, 
+				JSON.stringify(Array.from(connectionByUUID.values().filter(con => con.status == "online")))))
 
 			// if (connection.identity?.id) {
 			// 	const friends = db.getFriendsByIdentityId(connection.identity?.id)
