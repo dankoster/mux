@@ -1,4 +1,4 @@
-import { createEffect, onMount } from 'solid-js'
+import { createEffect, onCleanup, onMount } from 'solid-js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 
@@ -28,6 +28,7 @@ export const intersections = new Intersections()
 
 export function Planet() {
 
+	let stopRendering = false
 	let planetCanvas: HTMLCanvasElement
 	let planetLabels: HTMLDivElement
 	let scene: THREE.Scene
@@ -187,6 +188,8 @@ export function Planet() {
 	
 		let prevTime: number
 		function render(time: number) {
+			if (stopRendering) return
+
 			const deltaTime = time - prevTime
 			prevTime = time
 
@@ -232,6 +235,11 @@ export function Planet() {
 	onMount(() => {
 		initSelfAvatar()
 		BuildSceneAndStartRendering()
+	})
+	
+	onCleanup(() => {
+		console.log(`planet cleanup`)
+		stopRendering = true
 	})
 
 	return <div class="planet-container">
