@@ -1,8 +1,12 @@
 
 var logs = new Map<number, HTMLElement>()
-var timeoutMs: number = 5000
 
-export function uiLog(value: string, logId: number = undefined) {
+export type uiLogOptions = {
+	logId?: number,
+	timeoutMs?: number,
+}
+
+export function uiLog(value: string, { logId, timeoutMs = 5000 }: uiLogOptions = {}) {
 	let logElement = getLogElement()
 
 	if(logs.has(logId)) {
