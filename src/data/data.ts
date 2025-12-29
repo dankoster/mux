@@ -1,8 +1,8 @@
 import { API_URI } from "../API_URI";
-import { createEffect, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult } from "../../server/types";
-import { apiRoute, POST } from "./http";
+import { apiRoute, GET, POST } from "./http";
 import { handleNewDirectMessage, getAllUnread, sharePrivateKey } from "./directMessages";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
@@ -11,8 +11,6 @@ const sse: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
 	webRTC: "webRTC",
-	connections: "connections",
-	connectionsCount: "connectionsCount",
 	refresh: "refresh",
 	reconnect: "reconnect",
 	update: "update",
@@ -51,24 +49,31 @@ const [pk, setPk] = createSignal(localStorage.getItem(AUTH_TOKEN_HEADER_NAME))
 const [serverOnline, setServerOnline] = createSignal(false)
 const [stats, setStats] = createSignal<Stats>()
 
-export {
-	id, pk, connections, connectionsCount, self, stats, serverOnline, friendRequests, friends
-}
-
 let resolvePromiseToGetSelfConnection: (con: Connection) => void
 export const selfConnection = new Promise<Connection>((resolve) => resolvePromiseToGetSelfConnection = resolve)
-createEffect(() => {
-	const value = self()
-	if (value) {
-		resolvePromiseToGetSelfConnection(value)
-	}
-})
+export {
+	pk, connections, connectionsCount, self, stats, serverOnline, friendRequests, friends
+}
+
+const SetSelfAndResolve = function (con: Connection) {
+	setSelf(con)
+	resolvePromiseToGetSelfConnection(con)
+}
 
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
 }
 
-initSSE(`${API_URI}/${apiRoute.sse}`, pk())
+startup()
+
+async function startup() {	
+	const result = await GET(apiRoute.connections)
+	const conData = await result.json() as Connection[]
+	setConnections(conData)
+	onConnectionsChanged()
+	initSSE(`${API_URI}/${apiRoute.sse}`, pk())
+}
+
 
 async function initSSE(route: string, token: string) {
 	let retries = 0
@@ -245,19 +250,13 @@ function handleSseEvent(event: SSEventPayload) {
 			break;
 		case sse.id:
 			setId(event.data);
-			if (id() && connections) setSelf(connections.find(con => con.id === event.data))
-			//console.log('SSE', event.event, event.data);
-			break;
-		case sse.connectionsCount:
-			setConnectionsCount(Number.parseInt(event.data))
-			break;
-		case sse.connections:
-			const conData = JSON.parse(event.data) as Connection[]
-			setConnections(conData)
-			if (id() && connections) setSelf(connections.find(con => con.id === id()))
-			onConnectionsChanged()
-			//getAllUnread(friends, connections)
-			//console.log('SSE', event.event, conData);
+			if(!id()) throw new Error("failed to set ID")
+			if(!connections) throw new Error("connections not initialized") 
+			
+			const con = connections.find(con => con.id === id())
+			if(!con) throw new Error('failed to find self in connections')
+				
+			SetSelfAndResolve(con)
 			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
@@ -367,8 +366,10 @@ export function sendWebRtcMessage(userId: string, message: string) {
 
 function onConnectionsChanged() {
 	//do we have another connection with the same identity as myself?
+	const me = self()
+	if(!me) return
+
 	connections.forEach(con => {
-		const me = self()
 		if (me.identity &&
 			con.id !== me.id &&
 			con.status === 'online' &&

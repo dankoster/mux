@@ -1,16 +1,22 @@
-import { Position, PositionMessage, PositionMessageHandler } from "../../server/types"
+import { Connection, Position, PositionMessage, PositionMessageHandler } from "../../server/types"
 import { API_URI } from "../API_URI"
-import { id, pk } from "./data"
+import { pk, selfConnection } from "./data"
 import { apiRoute } from "./http"
 
+let self: Connection
 let socket: WebSocket
 const handlers: PositionMessageHandler[] = []
 
 connectSocket()
-function connectSocket() {
+async function connectSocket() {
+	self = await selfConnection
+
+	const uuid = pk()
+	if(!uuid) throw new Error(`failed to get UUID from pk()`)
+
 	socket = new WebSocket(`${API_URI}/${apiRoute.position}`);
 	socket.onopen = () => {
-		socket.send(pk()) //auth by sending UUID as first message
+		socket.send(uuid) //auth by sending UUID as first message
 	}
 
 	//reconnect on close!
@@ -22,7 +28,7 @@ function connectSocket() {
 
 export function broadcastPosition(position: Position) {
 	//TODO: queue up this broadcast to be sent when we're ready
-	if(!id() || socket.readyState != WebSocket.OPEN) 
+	if(!self || socket.readyState != WebSocket.OPEN) 
 		return false
 
 	socket.send(JSON.stringify(position))
@@ -31,7 +37,7 @@ export function broadcastPosition(position: Position) {
 
 export function onGotPosition(handler: PositionMessageHandler) {
 	handlers.push(handler) //save it for reconnection
-	socket.addEventListener('message', (ev) => {
+	socket?.addEventListener('message', (ev) => {
 		const message = JSON.parse(ev.data) as PositionMessage
 		handler(message)
 	})

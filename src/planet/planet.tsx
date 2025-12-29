@@ -2,13 +2,13 @@ import { createEffect, onCleanup, onMount } from 'solid-js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 
-import { connections, selfConnection } from '../data/data'
 import { Connection } from '../../server/types'
 import { displayName, shortId } from '../helpers'
 import { makeSphere } from './makeSphere'
 import { Avatar } from './avatar'
 import { calculateThirdPersonCamera, placeCameraPastTargetFromPosition } from './thirdPersonCamera'
 
+import * as Data from '../data/data'
 import * as THREE from 'three'
 import * as positionSocket from '../data/positionSocket'
 
@@ -16,6 +16,7 @@ import './planet.css'
 import { resizeRendererToDisplaySize } from './resizeRenderer'
 import { Area, AreaParams } from './area'
 import { Intersections } from './Intersections'
+import { uiLog } from '../uiLog'
 
 function NotReady():any { throw new Error('<Planet /> not ready!') }
 
@@ -39,13 +40,19 @@ export function Planet() {
 	const areas: Area[] = []
 
 	function getAvatar(con: Connection): Avatar | undefined {
+		// uiLog(`getAvatar: ${con.identity?.name ?? con.id}`)
+		// console.trace(`getAvatar`, con.identity?.name ?? con.id)
+		if(!con) return 
+		
 		let avatar = avatarsById.get(con.id)
 		
 		if (!avatar) {
-			avatar = new Avatar(1)
+			avatar = new Avatar()
 			avatar.connection = con
 			avatar.label.text = displayName(con) || shortId(con.id)
-			avatar.setPositionAndLook({ position: con.position, lookTarget: sphere?.position })
+			if (con.position) {
+				avatar.setPositionAndLook(new THREE.Vector3(con.position.x, con.position.y, con.position.z))
+			}
 			avatarsById.set(con.id, avatar)
 		}
 		
@@ -92,7 +99,7 @@ export function Planet() {
 
 	//add/remove avatars when connection status changes
 	createEffect(() => {
-		for (const con of connections) {
+		for (const con of Data.connections) {
 			if (con.status === 'online' && con.position && !avatarsById.has(con.id))
 				getAvatar(con)
 
@@ -107,24 +114,25 @@ export function Planet() {
 	})
 
 	positionSocket.onGotPosition((message) => {
-		const con = connections.find(con => con.id === message.id)
+		const con = Data.connections.find(con => con.id === message.id)
 		if (con?.status !== 'online')
 			return
 		
 		//get the avatar for this position (add, if necessary)
-		let avatar = getAvatar(con)		
-		avatar.setPositionAndLook({
-			position: message.position,
-			lookTarget: sphere?.position
-		})
+		let avatar = getAvatar(con)
+		if(avatar == selfAvatar)
+		{
+			console.log("got selfAvatar position")
+		}
 		
+		avatar.setPositionAndLook(new THREE.Vector3(message.position.x, message.position.y, message.position.z))
 		updateDistanceFromSelf(avatar)
 	})
 
-	function setSelfAvatarPosition(position: THREE.Vector3, lookTarget: THREE.Vector3) {
+	function setSelfAvatarPosition(position: THREE.Vector3) {
 		if (!selfAvatar?.mesh?.position) return
 
-		selfAvatar.setPositionAndLook({ position, lookTarget })
+		selfAvatar.setPositionAndLook(position)
 
 		//our distance to all other avatars has now changed, so update them!
 		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
@@ -159,7 +167,7 @@ export function Planet() {
 		broadcastPosition(selfAvatar)
 	}, 25)
 
-	function BuildSceneAndStartRendering() {
+	async function BuildSceneAndStartRendering() {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
 		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
 		scene = new THREE.Scene()
@@ -195,10 +203,9 @@ export function Planet() {
 
 			if (selfAvatar) {
 				//move our avatar to be under the camera
-				const thirdPersonCamera = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				setSelfAvatarPosition(thirdPersonCamera.currentPosition, thirdPersonCamera.currentLookat)
-			} else {
-				initSelfAvatar()
+				const c = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
+				if(c?.currentPosition.distanceTo(c.idealPosition) > 0.01)
+					setSelfAvatarPosition(c.currentPosition)
 			}
 
 			//move the camera around the scene origin
@@ -216,7 +223,7 @@ export function Planet() {
 			areas.forEach(area => intersections.update(area, selfAvatar.interactable.intersects(area.interactable)))
 			avatarsById.forEach((avatar) => {
 				if(avatar != selfAvatar)
-					intersections.update(avatar, selfAvatar.interactable.intersects(avatar.interactable))
+					intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
 			})
 
 			renderer.render(scene, camera)
@@ -228,13 +235,16 @@ export function Planet() {
 	}
 
 	async function initSelfAvatar() {
-		selfAvatar = getAvatar(await selfConnection)		
+		const con = await Data.selfConnection
+		uiLog(`initSelfAvatar ${con.id}`, { timeoutMs: 30000 })
+		selfAvatar = getAvatar(con)		
 		placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
 	}
 
-	onMount(() => {
-		initSelfAvatar()
+	onMount(async () => {
+		uiLog(`planet mounted`)
 		BuildSceneAndStartRendering()
+		await initSelfAvatar()
 	})
 	
 	onCleanup(() => {

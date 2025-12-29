@@ -19,7 +19,8 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmUnread: "dmUnread",
 	position: "position",
 	broadcastJson: "broadcastJson",
-	initiateCall: "initiateCall"
+	initiateCall: "initiateCall",
+	connections: "connections"
 };
 
 export async function GET(route: ApiRoute, subRoute?: string) {

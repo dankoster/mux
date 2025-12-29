@@ -1,7 +1,7 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, Update, DM, DMRequest, PositionMessage, Position, initiateCallResult } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, DM, DMRequest, PositionMessage, Position, initiateCallResult } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
@@ -10,8 +10,6 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	pk: "pk",
 	id: "id",
 	webRTC: "webRTC",
-	connections: "connections",
-	connectionsCount: "connectionsCount",
 	refresh: "refresh",
 	reconnect: "reconnect",
 	new_connection: "new_connection",
@@ -28,6 +26,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
+	connections: "connections",
 	sse: "sse",
 	setColor: "setColor",
 	setText: "setText",
@@ -163,7 +162,7 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 			socketUuid = m.data as string;
 			if (!connectionByUUID.has(socketUuid)) {
 				socket.close(1011, 'first message must be auth token')
-				console.log("WS - first message was not UUID")
+				console.log("WS - first message was not UUID", socketUuid)
 				return
 			}
 			wsByUUID.set(socketUuid, socket)
@@ -601,6 +600,17 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 	}
 });
 
+api.get(`/${apiRoute.connections}`, async (ctx) => {
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME)
+	if(!uuid) {
+		ctx.response.status = 401
+		return
+	}
+
+	console.log("CONNECTIONS", uuid)
+	ctx.response.body = JSON.stringify(Array.from(connectionByUUID.values()))
+})
+
 api.get(`/${apiRoute.sse}`, async (context) => {
 	//https://deno.com/blog/deploy-streams
 	//get the user's bearer token or create a new one
@@ -648,9 +658,6 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			//console.log("SSE connection   ", uuid, connection)
 			controller.enqueue(sseMessage(sseEvent.id, connection.id))
 			controller.enqueue(sseMessage(sseEvent.pk, uuid))
-			controller.enqueue(sseMessage(sseEvent.connectionsCount, connectionByUUID?.size.toString()))
-			controller.enqueue(sseMessage(sseEvent.connections, 
-				JSON.stringify(Array.from(connectionByUUID.values().filter(con => con.status == "online")))))
 
 			// if (connection.identity?.id) {
 			// 	const friends = db.getFriendsByIdentityId(connection.identity?.id)
