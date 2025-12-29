@@ -31,8 +31,15 @@ export function placeCameraPastTargetFromPosition({ target, camera, position }: 
 	camera.lookAt(position);
 }
 
+export type cameraInfo = {
+	currentPosition: THREE.Vector3,
+	currentLookat: THREE.Vector3,
+	idealPosition: THREE.Vector3,
+	idealLookat: THREE.Vector3
+}
 
-export function calculateThirdPersonCamera({ deltaTime, target, camera }: { deltaTime: number; target: THREE.Group; camera: THREE.PerspectiveCamera; }) {
+export function calculateThirdPersonCamera({ deltaTime, target, camera }: 
+	{ deltaTime: number; target: THREE.Group; camera: THREE.PerspectiveCamera; }): cameraInfo {
 	const _elapsedSec = deltaTime * 0.001; // convert time to seconds
 
 	//direction vector from camera to sphere
