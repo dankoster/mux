@@ -40,7 +40,6 @@ type SSEventPayload = {
 
 
 const [connections, setConnections] = createStore<Connection[]>([])
-const [connectionsCount, setConnectionsCount] = createSignal(0)
 const [friendRequests, setFriendRequests] = createStore<FriendRequest[]>([])
 const [friends, setFriends] = createStore<Friend[]>([])
 const [id, setId] = createSignal("")
@@ -52,7 +51,7 @@ const [stats, setStats] = createSignal<Stats>()
 let resolvePromiseToGetSelfConnection: (con: Connection) => void
 export const selfConnection = new Promise<Connection>((resolve) => resolvePromiseToGetSelfConnection = resolve)
 export {
-	pk, connections, connectionsCount, self, stats, serverOnline, friendRequests, friends
+	pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
 const SetSelfAndResolve = function (con: Connection) {
@@ -384,8 +383,8 @@ function onConnectionsChanged() {
 		}
 	})
 
-	const online = connections.length
-	const total = connectionsCount()
+	const online = connections.filter(c => c.status == "online").length
+	const total = connections.length
 	setStats({ online, offline: total - online });
 }
 
