@@ -52,14 +52,15 @@ export type Identity = {
 
 export type ConnectionStatus = ""|"online"
 export type Connection = {
-	id: string;
-	color?: string;
-	text?: string;
-	status?: ConnectionStatus;
-	kind?: string;
-	publicKey?: string;
-	identity?: Identity;
-	position?: Position;
+	id: string
+	color?: string
+	text?: string
+	status?: ConnectionStatus
+	kind?: string
+	publicKey?: string
+	identity?: Identity
+	position?: Position
+	quaternion?: QuaternionTuple
 };
 
 export type Position = {
@@ -67,7 +68,9 @@ export type Position = {
     readonly y: number
     readonly z: number
 }
-export type PositionMessage = { id: string, position: Position }
+export type QuaternionTuple = [x: number, y: number, z: number, w: number]
+
+export type PositionMessage = { id: string, position: Position, quaternion?: QuaternionTuple }
 export type PositionMessageHandler = (message: PositionMessage) => void
 
 export type Update = {

@@ -1,7 +1,7 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, DM, DMRequest, PositionMessage, Position, initiateCallResult } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, DM, DMRequest, PositionMessage, Position, initiateCallResult, QuaternionTuple } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 
 export { api }
@@ -177,11 +177,15 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		const con = connectionByUUID.get(socketUuid)
 		if (!con) throw new Error("no connection found by UUID for web socket")
 
-		con.position = JSON.parse(m.data) as Position
+		const message = JSON.parse(m.data) as { position: Position, quaternion: QuaternionTuple }
+		con.position = message.position
+		con.quaternion = message.quaternion
+
 		db.persistConnection(socketUuid, con)
 		const pm: PositionMessage = {
 			id: con.id,
-			position: con.position
+			position: con.position,
+			quaternion: con.quaternion
 		}
 		const messageString = JSON.stringify(pm)
 

@@ -143,6 +143,7 @@ export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, ti
 
 AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
 AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'quaternion', columnType: 'TEXT' }) //store quaternion as JSON [1,2,3,4]
 
 function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableName: string, columnName: string, columnType: "TEXT" }) {
 	const transaction = db.transaction(() => {
@@ -194,8 +195,8 @@ export function persistPosition({ uuid, position }: { uuid: string, position: st
 const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
 
 const upsertConnection = db.prepare(`INSERT INTO connection 
-	(uuid, id, identityId, color, text, status, kind, publicKey, position) 
-	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey, :position)
+	(uuid, id, identityId, color, text, status, kind, publicKey, position, quaternion) 
+	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey, :position, :quaternion)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
 		id = excluded.id,
@@ -205,7 +206,8 @@ const upsertConnection = db.prepare(`INSERT INTO connection
 		status = excluded.status,
 		kind = excluded.kind,
 		publicKey = excluded.publicKey,
-		position = excluded.position
+		position = excluded.position,
+		quaternion = excluded.quaternion
 	RETURNING *;`
 )
 

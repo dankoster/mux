@@ -1,4 +1,4 @@
-import { Connection, Position, PositionMessage, PositionMessageHandler } from "../../server/types"
+import { Connection, Position, PositionMessage, PositionMessageHandler, QuaternionLike } from "../../server/types"
 import { API_URI } from "../API_URI"
 import { pk, selfConnection } from "./data"
 import { apiRoute } from "./http"
@@ -26,12 +26,13 @@ async function connectSocket() {
 	handlers.forEach(h => onGotPosition(h))
 }
 
-export function broadcastPosition(position: Position) {
+export function broadcastPosition(position: Position, quaternion?: QuaternionLike) {
 	//TODO: queue up this broadcast to be sent when we're ready
 	if(!self || socket.readyState != WebSocket.OPEN) 
 		return false
 
-	socket.send(JSON.stringify(position))
+	const message = { position, quaternion }
+	socket.send(JSON.stringify(message))
 	return true
 }
 

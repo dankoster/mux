@@ -143,21 +143,25 @@ export class Avatar extends EventTarget {
 		}
 	}
 
-	setPositionAndLook(position: THREE.Vector3) {
+	setPositionAndLook(position: THREE.Vector3, quaternion?: THREE.QuaternionTuple) {
 		if (!position) {
 			uiLog(`Tried to set position with ${position}`)
 			console.warn(`Tried to set position with ${position}`, this)
 			return
 		}
-
+	
 		if (!this.mesh?.position?.equals(position)) {
-			//this.logipos = uiLog(`set position ${JSON.stringify(position)}`, { logId: this.logipos })
 			this.mesh.position.copy(position)
 			//this.addMarker(position)
 		}
 
+		if (Array.isArray(quaternion)) {
+			this.mesh.quaternion.fromArray(quaternion)
+			return //don't calculate a quaternion if we already have one (from the server, probably)
+		}
+
 		if (!this.prevPositions.length || position.distanceTo(this.prevPositions[this.prevPositions.length - 1]) > 0.1)
-			this.prevPositions.push(position.clone())
+			this.prevPositions.push(position.clone())	
 
 		if (this.prevPositions.length > 2) {
 			var quat = this.calcMeshQuaterionAlongPath()
@@ -187,27 +191,20 @@ export class Avatar extends EventTarget {
 
 	//https://garden.bradwoods.io/notes/javascript/three-js/animate-a-mesh-on-a-spheres-surface
 	calcMeshQuaterionAlongPath() {
-		// const spline
-		// const point
-		// const t
 
-		const start = 0
-		const end = 1
-		const t = end
-
-		const point = this.mesh.position.clone()
 		const spline = new THREE.CatmullRomCurve3(this.prevPositions)
-		const sphereCenter = this.mesh.parent.position // new THREE.Vector3(...config.meshes.sphere.position)
+		const sphereCenter = this.mesh.parent.position
 
 		// Create a unit vector that points forward (along the direction of movement) using the tangent at time 't' along the spline.
 		// We'll use this so the mesh's +Z points toward the target.
 		// Making the mesh face fowards as it travels the spline.
-		const forward = spline.getTangent(t).normalize()
+		const endOfSpline = 1
+		const forward = spline.getTangent(endOfSpline).normalize()
 		// Create a unit vector from the center of the sphere to the mesh’s position.
 		// A normal vector. Indicates which direction a surface is facing.
 		// We'll use this so the mesh's +Y points away from the center of the sphere.
 		// Making the mesh sit up-right on the surface of the sphere.
-		const up = point.clone().sub(sphereCenter).normalize()
+		const up = this.mesh.position.clone().sub(sphereCenter).normalize()
 		// Calculate a vector to use for the mesh's +X by calculating a direction perpendicular to both up and forward.
 		// Required for creating a rotation matrix.
 		const right = new THREE.Vector3().crossVectors(up, forward).normalize()

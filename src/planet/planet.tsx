@@ -51,7 +51,8 @@ export function Planet() {
 			avatar.connection = con
 			avatar.label.text = displayName(con) || shortId(con.id)
 			if (con.position) {
-				avatar.setPositionAndLook(new THREE.Vector3(con.position.x, con.position.y, con.position.z))
+				const position = new THREE.Vector3(con.position.x, con.position.y, con.position.z)
+				avatar.setPositionAndLook(position, con.quaternion)
 			}
 			avatarsById.set(con.id, avatar)
 		}
@@ -122,22 +123,14 @@ export function Planet() {
 		let avatar = getAvatar(con)
 		if(avatar == selfAvatar)
 		{
-			console.log("got selfAvatar position")
+			console.log("got selfAvatar position", message.quaternion)
 		}
 		
-		avatar.setPositionAndLook(new THREE.Vector3(message.position.x, message.position.y, message.position.z))
+		const position = new THREE.Vector3(message.position.x, message.position.y, message.position.z)
+		const quaternion = message.quaternion;
+		avatar.setPositionAndLook(position, quaternion)
 		updateDistanceFromSelf(avatar)
 	})
-
-	function setSelfAvatarPosition(position: THREE.Vector3) {
-		if (!selfAvatar?.mesh?.position) return
-
-		selfAvatar.setPositionAndLook(position)
-
-		//our distance to all other avatars has now changed, so update them!
-		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
-		areas.forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh.position))
-	}
 
 	function updateDistanceFromSelf(avatar: Avatar, minDistanceMoved: number = 0.25) {
 		if(avatar == selfAvatar) return
@@ -155,7 +148,7 @@ export function Planet() {
 		if (!selfAvatar) return
 		
 		if (avatar?.mesh?.position.distanceTo(selfAvatar.lastBroadcastPosition) > minDistanceMoved) {
-			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position)
+			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position, selfAvatar?.mesh?.quaternion)
 			if (broadcasted) {
 				if (selfAvatar.lastBroadcastPosition) selfAvatar.lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
 				else selfAvatar.lastBroadcastPosition = selfAvatar.mesh.position
@@ -204,8 +197,16 @@ export function Planet() {
 			if (selfAvatar) {
 				//move our avatar to be under the camera
 				const c = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				if(c?.currentPosition.distanceTo(c.idealPosition) > 0.01)
-					setSelfAvatarPosition(c.currentPosition)
+				if(c?.currentPosition.distanceTo(c.idealPosition) > 0.01) {
+					if (!selfAvatar?.mesh?.position) return
+
+					selfAvatar.setPositionAndLook(c.currentPosition)
+
+					//TODO: don't do this in then render thread!
+					//our distance to all other avatars has now changed, so update them!
+					avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
+					areas.forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh.position))
+				}
 			}
 
 			//move the camera around the scene origin
@@ -234,17 +235,12 @@ export function Planet() {
 		requestAnimationFrame(render)
 	}
 
-	async function initSelfAvatar() {
+	onMount(async () => {
+		BuildSceneAndStartRendering()
+
 		const con = await Data.selfConnection
-		uiLog(`initSelfAvatar ${con.id}`, { timeoutMs: 30000 })
 		selfAvatar = getAvatar(con)		
 		placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
-	}
-
-	onMount(async () => {
-		uiLog(`planet mounted`)
-		BuildSceneAndStartRendering()
-		await initSelfAvatar()
 	})
 	
 	onCleanup(() => {
