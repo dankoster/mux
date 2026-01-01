@@ -1,4 +1,4 @@
-import { Connection, Position, PositionMessage, PositionMessageHandler, QuaternionLike } from "../../server/types"
+import { Connection, Position, PositionMessage, PositionMessageHandler, QuaternionTuple } from "../../server/types"
 import { API_URI } from "../API_URI"
 import { pk, selfConnection } from "./data"
 import { apiRoute } from "./http"
@@ -26,13 +26,18 @@ async function connectSocket() {
 	handlers.forEach(h => onGotPosition(h))
 }
 
-export function broadcastPosition(position: Position, quaternion?: QuaternionLike) {
+export function broadcastPosition(position: Position, quaternion?: QuaternionTuple) {
 	//TODO: queue up this broadcast to be sent when we're ready
 	if(!self || socket.readyState != WebSocket.OPEN) 
 		return false
 
 	const message = { position, quaternion }
-	socket.send(JSON.stringify(message))
+	socket.send(JSON.stringify(message, (key, value) => {
+		//reduce precision so we send less data
+		if(typeof value === 'number') 
+			return Number(value.toPrecision(6)) 
+		return value
+	}))
 	return true
 }
 

@@ -148,7 +148,7 @@ export function Planet() {
 		if (!selfAvatar) return
 		
 		if (avatar?.mesh?.position.distanceTo(selfAvatar.lastBroadcastPosition) > minDistanceMoved) {
-			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position, selfAvatar?.mesh?.quaternion)
+			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position, selfAvatar?.mesh?.quaternion.toArray())
 			if (broadcasted) {
 				if (selfAvatar.lastBroadcastPosition) selfAvatar.lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
 				else selfAvatar.lastBroadcastPosition = selfAvatar.mesh.position
