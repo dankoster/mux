@@ -13,7 +13,6 @@ export type ApiRoute =
 	"sse" |
 	"becomeAnonymous" |
 	"setColor" |
-	"setText" |
 	"clear" |
 	"log" |
 	"discardKey" |
@@ -54,7 +53,6 @@ export type ConnectionStatus = ""|"online"
 export type Connection = {
 	id: string
 	color?: string
-	text?: string
 	status?: ConnectionStatus
 	kind?: string
 	publicKey?: string

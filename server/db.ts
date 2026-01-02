@@ -49,12 +49,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS connection (
 		id TEXT NOT NULL,
 		identityId INTEGER,
 		color TEXT,
-		text TEXT,
 		status TEXT,
 		kind TEXT,
 		FOREIGN KEY(identityId) REFERENCES identity(id)
 	);`
 )
+
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
+AddColumn_IfNotExists({ tableName: 'connection', columnName: 'quaternion', columnType: 'TEXT' }) //store quaternion as JSON [1,2,3,4]
+DropColumn({tableName: 'connection', columnName: 'text'})
+DropColumn({tableName: 'connection', columnName: 'roomId'})
 
 db.exec(`CREATE TABLE IF NOT EXISTS directMessage (
 	id INTEGER PRIMARY KEY,
@@ -141,10 +146,6 @@ export function getDriectMessagesAfterTimestamp(uuid1: string, uuid2: string, ti
 	return selectAllDmsAfterTimestamp.all({ uuid1, uuid2, timestamp: subsecondTimestamp })
 }
 
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'quaternion', columnType: 'TEXT' }) //store quaternion as JSON [1,2,3,4]
-
 function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableName: string, columnName: string, columnType: "TEXT" }) {
 	const transaction = db.transaction(() => {
 		const getColumns = db.prepare(
@@ -172,6 +173,33 @@ function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableNam
 	transaction()
 }
 
+function DropColumn({ tableName, columnName }: { tableName: string, columnName: string }) {
+	const transaction = db.transaction(() => {
+		const getColumns = db.prepare(
+			`SELECT ti.name AS 'column'
+			FROM sqlite_schema AS m,
+			pragma_table_info(m.name) AS ti
+			WHERE m.type='table'
+			AND m.name = :tableName
+			`
+		)
+		const columns = getColumns.all<{ ['column']: string }>({ tableName })
+
+		if (columns.length === 0) {
+			console.log('DROP COLUMN', `ERROR: table ${tableName} has no existing columns!`)
+			return
+		}
+		if (!columns.some(c => c.column === columnName)) {
+			console.log('DROP COLUMN', `column already gone: ${tableName}.${columnName}`)
+			return
+		}
+
+		console.log('DROP COLUMN', `${tableName}.${columnName}...`)
+		db.exec(`ALTER TABLE ${tableName} DROP COLUMN ${columnName}`)
+	})
+	transaction()
+}
+
 const updatePublicKey = db.prepare(
 	`UPDATE connection 
 	SET publicKey = :publicKey 
@@ -195,14 +223,13 @@ export function persistPosition({ uuid, position, quaternion }: { uuid: string, 
 const deleteConnectionByUUID = db.prepare(`DELETE FROM connection WHERE uuid = :uuid`)
 
 const upsertConnection = db.prepare(`INSERT INTO connection 
-	(uuid, id, identityId, color, text, status, kind, publicKey, position, quaternion) 
-	VALUES (:uuid, :id, :identityId, :color, :text, :status, :kind, :publicKey, :position, :quaternion)
+	(uuid, id, identityId, color, status, kind, publicKey, position, quaternion) 
+	VALUES (:uuid, :id, :identityId, :color, :status, :kind, :publicKey, :position, :quaternion)
 	ON CONFLICT(uuid)
 	DO UPDATE SET 
 		id = excluded.id,
 		identityId = excluded.identityId,
 		color = excluded.color,
-		text = excluded.text,
 		status = excluded.status,
 		kind = excluded.kind,
 		publicKey = excluded.publicKey,

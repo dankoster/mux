@@ -28,7 +28,6 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	connections: "connections",
 	sse: "sse",
 	setColor: "setColor",
-	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
 	webRTC: "webRTC",
@@ -320,27 +319,6 @@ api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 			connectionId: con.id,
 			field: "identity",
 			value: "",
-		})
-		ctx.response.status = 200
-	} catch (err) {
-		console.error(err, ctx.request)
-		ctx.response.status = 400
-	}
-})
-
-api.post(`/${apiRoute.setText}`, async (ctx) => {
-	try {
-		const text = await ctx.request.body.text()
-		if (text.length > 123)
-			throw new Error("invalid text")
-
-		const { uuid, con } = getConnection(ctx.request)
-		con.text = text
-		db.persistConnection(uuid, con)
-		notifyAllConnections(sseEvent.update, {
-			connectionId: con.id,
-			field: 'text',
-			value: text
 		})
 		ctx.response.status = 200
 	} catch (err) {
