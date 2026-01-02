@@ -112,6 +112,10 @@ async function startup() {
 	
 	const connectionsResult = await GET(apiRoute.connections)
 	const connectionsData = await connectionsResult.json() as Connection[]
+	connectionsData.forEach(con => {
+		con.position = parseJsonDeep(con.position)
+		con.quaternion = parseJsonDeep(con.quaternion)
+	})
 	setConnections(connectionsData)
 	onConnectionsChanged()
 
@@ -120,9 +124,6 @@ async function startup() {
 
 	con.position = parseJsonDeep(con.position)
 	con.quaternion = parseJsonDeep(con.quaternion)
-
-	console.log('authJson.self', authJson.self)
-	console.log('con', con)
 
 	setSelf(con)
 	resolvePromiseToGetSelfConnection(con)
