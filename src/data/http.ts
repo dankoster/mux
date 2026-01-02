@@ -3,6 +3,7 @@ import { API_URI } from "../API_URI";
 import { AUTH_TOKEN_HEADER_NAME, pk } from "./data";
 
 export const apiRoute: { [Property in ApiRoute]: Property } = {
+	auth: "auth",
 	sse: "sse",
 	webRTC: "webRTC",
 	setColor: "setColor",
@@ -20,7 +21,7 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	position: "position",
 	broadcastJson: "broadcastJson",
 	initiateCall: "initiateCall",
-	connections: "connections"
+	connections: "connections",
 };
 
 export async function GET(route: ApiRoute, subRoute?: string) {

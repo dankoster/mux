@@ -7,8 +7,6 @@ import { onLocalBuild } from "./localHelper.ts";
 export { api }
 
 const sseEvent: { [Property in SSEvent]: Property } = {
-	pk: "pk",
-	id: "id",
 	webRTC: "webRTC",
 	refresh: "refresh",
 	reconnect: "reconnect",
@@ -26,6 +24,7 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
+	auth: "auth", 
 	connections: "connections",
 	sse: "sse",
 	setColor: "setColor",
@@ -611,18 +610,42 @@ api.get(`/${apiRoute.connections}`, async (ctx) => {
 		return
 	}
 
-	console.log("CONNECTIONS", uuid)
 	ctx.response.body = JSON.stringify(Array.from(connectionByUUID.values()))
 })
 
-api.get(`/${apiRoute.sse}`, async (context) => {
-	//https://deno.com/blog/deploy-streams
+api.post(`/${apiRoute.auth}`, async context => {
 	//get the user's bearer token or create a new one
 	const oldKey = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
 	const uuid = oldKey ?? crypto.randomUUID()
 
 	const old = connectionByUUID.has(uuid)
-	console.log("SSE", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+	console.log("AUTH", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
+	let connection = connectionByUUID.get(uuid)
+
+	if (!connection) {
+		connection = {
+			id: Date.now().toString()
+		}
+		connectionByUUID.set(uuid, connection)
+	}
+
+	context.response.body = JSON.stringify({uuid, self: connection})
+})
+
+api.get(`/${apiRoute.sse}`, async (context) => {
+	const uuid = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
+	if(!uuid) {
+		context.response.status = 400 //bad request
+		context.response.body = `missing ${AUTH_TOKEN_HEADER_NAME} header`
+		return
+	}
+		
+	if(!connectionByUUID.has(uuid)) {
+		context.response.status = 401 //unauthorized
+		return
+	}
+
+	console.log("SSE", `Connect`, uuid, context.request.ip, context.request.userAgent.os.name)
 	let connection = connectionByUUID.get(uuid)
 
 	context.response.headers.append("Content-Type", "text/event-stream");
@@ -660,8 +683,8 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			//The user has connected!  Send them a bunch of stuff!
 			//console.log("SSE connection   ", uuid, connection)
-			controller.enqueue(sseMessage(sseEvent.id, connection.id))
-			controller.enqueue(sseMessage(sseEvent.pk, uuid))
+			// controller.enqueue(sseMessage(sseEvent.id, connection.id))
+			// controller.enqueue(sseMessage(sseEvent.pk, uuid))
 
 			// if (connection.identity?.id) {
 			// 	const friends = db.getFriendsByIdentityId(connection.identity?.id)

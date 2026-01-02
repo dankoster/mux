@@ -8,8 +8,6 @@ import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
 
 const sse: { [Property in SSEvent]: Property } = {
-	pk: "pk",
-	id: "id",
 	webRTC: "webRTC",
 	refresh: "refresh",
 	reconnect: "reconnect",
@@ -54,22 +52,81 @@ export {
 	pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
-const SetSelfAndResolve = function (con: Connection) {
-	setSelf(con)
-	resolvePromiseToGetSelfConnection(con)
-}
-
 export function isSelf(con: Connection) {
 	return con.identity && con.identity?.id === self().identity?.id
 }
 
-startup()
+type AuthData = {
+	uuid: string,
+	self: Connection
+}
 
-async function startup() {	
-	const result = await GET(apiRoute.connections)
-	const conData = await result.json() as Connection[]
-	setConnections(conData)
+function parseJsonDeep(obj) {
+	switch (typeof (obj)) {
+		case 'object':
+			for(const prop in obj) {
+				const result = parseJsonDeep(obj[prop])
+				obj[prop] = result
+			}
+			break
+		case 'string':
+			try {
+				return JSON.parse(obj)
+			} catch {
+				return obj
+			}
+	}
+	return obj
+}
+
+startup()
+async function startup() {
+	const authResult = await POST(apiRoute.auth)
+	const authJson = await authResult.json() as AuthData
+	//parseJsonDeep(authJson)
+	
+	if(!authJson.uuid) throw new Error(`auth failed to get uuid`)
+	if(!authJson.self) throw new Error(`auth failed to get self`)
+
+	setPk(authJson.uuid)
+
+	const oldKey = localStorage.getItem(AUTH_TOKEN_HEADER_NAME)
+	localStorage.setItem(AUTH_TOKEN_HEADER_NAME, authJson.uuid)
+	if (oldKey && oldKey !== authJson.uuid) {
+		console.log(apiRoute.discardKey, { newKey: authJson.uuid, oldKey });
+		POST(apiRoute.discardKey, { subRoute: oldKey })
+	}
+
+	//for debugging: remember old auth tokens
+	// const OLD_KEYS = `${AUTH_TOKEN_HEADER_NAME}History`
+	// const oldKeys = localStorage.getItem(OLD_KEYS)
+	// const updatedOldKeys = [authJson.uuid, oldKeys?.split(',') ?? '']
+	// 	.flat()
+	// 	.filter(k => k)
+	// 	.reduce((acc, cur) => {
+	// 		!acc.includes(cur) && acc.push(cur)
+	// 		return acc
+	// 	}, [])
+	// 	.join()
+	// localStorage.setItem(OLD_KEYS, updatedOldKeys)
+	
+	const connectionsResult = await GET(apiRoute.connections)
+	const connectionsData = await connectionsResult.json() as Connection[]
+	setConnections(connectionsData)
 	onConnectionsChanged()
+
+	const con = connections.find(c => c.id == authJson.self.id)
+	if(!con) throw new Error(`failed to find self connection ${authJson.self.id}`)
+
+	con.position = parseJsonDeep(con.position)
+	con.quaternion = parseJsonDeep(con.quaternion)
+
+	console.log('authJson.self', authJson.self)
+	console.log('con', con)
+
+	setSelf(con)
+	resolvePromiseToGetSelfConnection(con)
+
 	initSSE(`${API_URI}/${apiRoute.sse}`, pk())
 }
 
@@ -220,43 +277,6 @@ export function onWebRtcMessage(callback: (message: { senderId: string, message:
 
 function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
-		case sse.pk:
-			const newKey = event.data
-			setPk(newKey);
-			const oldKey = localStorage.getItem(AUTH_TOKEN_HEADER_NAME)
-			if (oldKey && oldKey !== newKey) {
-				//oh hey, I had this old bearer token but 
-				// I'll use the new one instead so go ahead
-				// and cleanup that old trash kthxbye
-				console.log(apiRoute.discardKey, { newKey, oldKey });
-				POST(apiRoute.discardKey, { subRoute: oldKey })
-			}
-
-			localStorage.setItem(AUTH_TOKEN_HEADER_NAME, newKey)
-
-			const OLD_KEYS = `${AUTH_TOKEN_HEADER_NAME}History`
-			const oldKeys = localStorage.getItem(OLD_KEYS)
-			const updatedOldKeys = [newKey, oldKeys?.split(',') ?? '']
-				.flat()
-				.filter(k => k)
-				.reduce((acc, cur) => {
-					!acc.includes(cur) && acc.push(cur)
-					return acc
-				}, [])
-				.join()
-			localStorage.setItem(OLD_KEYS, updatedOldKeys)
-			//console.log('SSE', event.event, newKey, { history: updatedOldKeys.split(',') });
-			break;
-		case sse.id:
-			setId(event.data);
-			if(!id()) throw new Error("failed to set ID")
-			if(!connections) throw new Error("connections not initialized") 
-			
-			const con = connections.find(con => con.id === id())
-			if(!con) throw new Error('failed to find self in connections')
-				
-			SetSelfAndResolve(con)
-			break;
 		case sse.reconnect:
 			throw "reconnect requested by server"
 		case sse.refresh:
@@ -379,7 +399,7 @@ function onConnectionsChanged() {
 			const dateCreated = new Date(Number.parseInt(con.id))
 			const kind = con.id === me.id ? "myself" : con.kind
 			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()}`)
-			sharePrivateKey(me.id, con)
+			//sharePrivateKey(me.id, con)
 		}
 	})
 

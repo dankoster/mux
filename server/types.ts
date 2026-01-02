@@ -8,6 +8,7 @@ export type initiateCallResult = {
 
 export type AuthTokenName = "Authorization";
 export type ApiRoute = 
+	"auth" |
 	"connections" | 
 	"sse" |
 	"becomeAnonymous" |
@@ -27,8 +28,7 @@ export type ApiRoute =
 	"position" | 
 	"initiateCall";
 
-export type SSEvent = "pk" |
-	"id" |
+export type SSEvent = 
 	"webRTC" |
 	"new_connection" |
 	"delete_connection" |
