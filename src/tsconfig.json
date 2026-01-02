@@ -4,5 +4,6 @@
 		"module": "Preserve",
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
+		"types": []
 	}
 }
