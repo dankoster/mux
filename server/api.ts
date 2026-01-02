@@ -589,7 +589,12 @@ api.get(`/${apiRoute.connections}`, async (ctx) => {
 api.post(`/${apiRoute.auth}`, async context => {
 	//get the user's bearer token or create a new one
 	const oldKey = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
-	const uuid = oldKey ?? crypto.randomUUID()
+	let uuid = oldKey ?? crypto.randomUUID()
+
+	if(!uuid || uuid.length !== 36) {
+		console.warn(`uuid cannot be ${typeof uuid} ${uuid}`)
+		uuid = crypto.randomUUID()
+	}
 
 	const old = connectionByUUID.has(uuid)
 	console.log("AUTH", `Connect (${old ? "old" : "new"})`, uuid, context.request.ip, context.request.userAgent.os.name)
@@ -600,6 +605,7 @@ api.post(`/${apiRoute.auth}`, async context => {
 			id: Date.now().toString()
 		}
 		connectionByUUID.set(uuid, connection)
+		notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
 	}
 
 	context.response.body = JSON.stringify({uuid, self: connection})
@@ -619,20 +625,16 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 	}
 
 	console.log("SSE", `Connect`, uuid, context.request.ip, context.request.userAgent.os.name)
-	let connection = connectionByUUID.get(uuid)
+	const connection = connectionByUUID.get(uuid)
+	if(!connection) {
+		console.error(`connection not found for ${uuid}`)
+		context.response.status = 500
+		return
+	}
 
 	context.response.headers.append("Content-Type", "text/event-stream");
 	context.response.body = new ReadableStream({
 		async start(controller) {
-			let isNewConnection = false
-			if (!connection) {
-				connection = {
-					id: Date.now().toString(),
-					status: "online"
-				}
-				connectionByUUID.set(uuid, connection)
-				isNewConnection = true
-			}
 
 			connection.status = "online"
 			connection.kind = context.request.userAgent.os.name
@@ -653,23 +655,6 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 					}
 				}
 			})
-
-			//The user has connected!  Send them a bunch of stuff!
-			//console.log("SSE connection   ", uuid, connection)
-			// controller.enqueue(sseMessage(sseEvent.id, connection.id))
-			// controller.enqueue(sseMessage(sseEvent.pk, uuid))
-
-			// if (connection.identity?.id) {
-			// 	const friends = db.getFriendsByIdentityId(connection.identity?.id)
-			// 	controller.enqueue(sseMessage(sseEvent.friendList, JSON.stringify(friends)))
-
-			// 	const friendRequests = db.getFriendRequestsByIdentityId(connection.identity?.id)
-			// 	controller.enqueue(sseMessage(sseEvent.friendRequests, JSON.stringify(friendRequests)))
-			// }
-
-			if (isNewConnection) {
-				notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
-			}
 
 			notifyAllConnections(sseEvent.update, {
 				connectionId: connection.id,
