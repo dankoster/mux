@@ -18,14 +18,18 @@ const sharedJwkByConnectionId = new Map<string, string>(localStorage_GetMap(SHAR
 sharedJwkByConnectionId.forEach(async (value, key) =>
 	sharedKeyByConnectionId.set(key, await jwkToCryptoKey(JSON.parse(value), ['deriveBits'])))
 
-getLocalKeyPair().then(async keypair => {
-	myKeys = keypair
-	await broadcastPublicKey(keypair.publicKey);
-}).catch((error) => {
-	console.error(error)
-})
+async function InitPublicKey() {
+	getLocalKeyPair().then(async keypair => {
+		myKeys = keypair
+		await broadcastPublicKey(keypair.publicKey);
+	}).catch((error) => {
+		console.error(error)
+	})
+}
 
+console.trace(`directMessages`)
 async function broadcastPublicKey(publicKey: CryptoKey) {
+	console.trace(`broadcastPublicKey`)
 	const jwk = await exportJWK(publicKey)
 	const result = await POST(apiRoute.publicKey, { body: JSON.stringify(jwk) });
 	if (!result.ok) {

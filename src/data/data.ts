@@ -3,9 +3,9 @@ import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult } from "../../server/types";
 import { apiRoute, GET, POST } from "./http";
-import { handleNewDirectMessage, getAllUnread, sharePrivateKey } from "./directMessages";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
+import { uiLog } from "../uiLog";
 
 const sse: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",
@@ -340,13 +340,15 @@ function handleSseEvent(event: SSEventPayload) {
 		case sse.friendList:
 			const friendsList = JSON.parse(event.data) as Friend[]
 			setFriends(friendsList)
-			getAllUnread(friends, connections)
+			// getAllUnread(friends, connections)
+			uiLog(`SSE ${event.event}: ${friendsList}`)
 			//console.log('SSE', event.event, friends)
 			break;
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			handleNewDirectMessage(dm);
+			// handleNewDirectMessage(dm);
+			uiLog(`SSE ${event.event}: ${dm}`)
 			break;
 
 		case sse.broadcastJson:
