@@ -414,8 +414,3 @@ function onConnectionsChanged() {
 export async function setColor(color: string, key?: string) {
 	return await POST(apiRoute.setColor, { body: color, authToken: key })
 }
-
-export async function setText(text: string, key?: string) {
-	return await POST(apiRoute.setText, { body: text, authToken: key })
-}
-
