@@ -6,6 +6,7 @@ import { apiRoute, GET, POST } from "./http";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
 import { uiLog } from "../uiLog";
+import * as PositionSocket from "./positionSocket";
 
 const sse: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",
@@ -81,9 +82,11 @@ function parseJsonDeep(obj) {
 
 startup()
 async function startup() {
+	console.log(`data pipeline startup`)
+	
 	const authResult = await POST(apiRoute.auth)
 	const authJson = await authResult.json() as AuthData
-	//parseJsonDeep(authJson)
+	console.log(`auth`, authJson.uuid, authJson.self?.id, authJson.self.identity?.name)
 	
 	if(!authJson.uuid) throw new Error(`auth failed to get uuid`)
 	if(!authJson.self) throw new Error(`auth failed to get self`)
@@ -96,22 +99,10 @@ async function startup() {
 		console.log(apiRoute.discardKey, { newKey: authJson.uuid, oldKey });
 		POST(apiRoute.discardKey, { subRoute: oldKey })
 	}
-
-	//for debugging: remember old auth tokens
-	// const OLD_KEYS = `${AUTH_TOKEN_HEADER_NAME}History`
-	// const oldKeys = localStorage.getItem(OLD_KEYS)
-	// const updatedOldKeys = [authJson.uuid, oldKeys?.split(',') ?? '']
-	// 	.flat()
-	// 	.filter(k => k)
-	// 	.reduce((acc, cur) => {
-	// 		!acc.includes(cur) && acc.push(cur)
-	// 		return acc
-	// 	}, [])
-	// 	.join()
-	// localStorage.setItem(OLD_KEYS, updatedOldKeys)
 	
 	const connectionsResult = await GET(apiRoute.connections)
 	const connectionsData = await connectionsResult.json() as Connection[]
+	console.log(`got ${connectionsData?.length} connections`)
 	connectionsData.forEach(con => {
 		con.position = parseJsonDeep(con.position)
 		con.quaternion = parseJsonDeep(con.quaternion)
@@ -128,20 +119,33 @@ async function startup() {
 	setSelf(con)
 	resolvePromiseToGetSelfConnection(con)
 
-	initSSE(`${API_URI}/${apiRoute.sse}`, pk())
+	initSSE(`${API_URI}/${apiRoute.sse}`).then(res => {
+		if(res.status == 401) //not authorized
+			location.reload()
+	})
+
+	PositionSocket.connectSocket()
 }
 
 
-async function initSSE(route: string, token: string) {
+async function initSSE(route: string): Promise<Response> {
 	let retries = 0
 	const interval = 500
 	const maxInterval = 15000
 	while (true) {
 		try {
+			const uuid = pk()
+			console.log(`init sse`, uuid)
 			const headers = new Headers()
 			headers.set('Content-Type', 'text/event-stream')
-			if (token) headers.set(AUTH_TOKEN_HEADER_NAME, token)
+			if (uuid) headers.set(AUTH_TOKEN_HEADER_NAME, uuid)
 			const response = await fetch(route, { method: 'GET', headers })
+
+			if(!response.ok){ 
+				console.log(`SSE not ok!`, response)
+				return response
+			}
+
 			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
 			setServerOnline(true)
 			retries = 0
@@ -314,7 +318,7 @@ function handleSseEvent(event: SSEventPayload) {
 			console.log(connections)
 			break;
 		case sse.delete_connection:
-			const conId = event.data
+			const conId = JSON.parse(event.data)
 			console.log('SSE', event.event, conId)
 			setConnections(connections.filter(con => con.id !== conId))
 			onConnectionsChanged()
