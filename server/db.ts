@@ -324,6 +324,8 @@ export function acceptFriendRequest(id: string) {
 }
 
 export function serverInitAndCleanup() {
+	const result = db.exec(`DELETE FROM connection WHERE position IS NULL`)
+	console.log(`Deleted ${result} from table connection with NULL position`)
 	return db.exec(`UPDATE connection SET status = NULL`)
 }
 

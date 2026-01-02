@@ -673,12 +673,21 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			//console.log("SSE Disconnect   ", uuid, connection)
 			connection.status = ""
-
-			notifyAllConnections(sseEvent.update, {
-				connectionId: connection.id,
-				field: "status",
-				value: ""
-			})
+			
+			//cleanup
+			if (!connection.position) {
+				console.log(`cleanup`, uuid, connection)
+				db.deleteConnection(uuid)
+				connectionByUUID.delete(uuid)
+				notifyAllConnections(sseEvent.delete_connection, connection.id)
+			}
+			else {
+				notifyAllConnections(sseEvent.update, {
+					connectionId: connection.id,
+					field: "status",
+					value: ""
+				})
+			}
 		}
 	});
 });
