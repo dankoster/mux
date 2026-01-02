@@ -13,7 +13,7 @@ Because learning and building stuff is fun.
 ---
 
 ### Proof of concept 
-https://tinyplanet.chat/\
+https://tinyplanet.chat/ \
 It's all very work-in-progress, but it DOES work.
 #### POC features
 - a tiny 3d planet!
