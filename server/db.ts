@@ -172,22 +172,22 @@ function AddColumn_IfNotExists({ tableName, columnName, columnType }: { tableNam
 	transaction()
 }
 
+const updatePublicKey = db.prepare(
+	`UPDATE connection 
+	SET publicKey = :publicKey 
+	WHERE uuid = :uuid
+	RETURNING *;`)
 export function persistPublicKey({ uuid, publicKey }: { uuid: string, publicKey: string }) {
-	const updatePublicKey = db.prepare(
-		`UPDATE connection 
-		SET publicKey = :publicKey 
-		WHERE uuid = :uuid
-		RETURNING *;`)
 	return updatePublicKey.all({ uuid, publicKey })
 }
 
-export function persistPosition({ uuid, position }: { uuid: string, position: string }) {
-	const updatePublicKey = db.prepare(
-		`UPDATE connection 
-		SET position = :position 
-		WHERE uuid = :uuid
-		RETURNING *;`)
-	return updatePublicKey.all({ uuid, position })
+const updatePosition = db.prepare(
+	`UPDATE connection 
+	SET position = :position, quaternion = :quaternion
+	WHERE uuid = :uuid
+	RETURNING *;`)
+export function persistPosition({ uuid, position, quaternion }: { uuid: string, position: string, quaternion: string }) {
+	return updatePosition.run({ uuid, position, quaternion })
 }
 
 

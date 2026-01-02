@@ -180,7 +180,12 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		con.position = message.position
 		con.quaternion = message.quaternion
 
-		db.persistConnection(socketUuid, con)
+		db.persistPosition({
+			uuid: socketUuid, 
+			position: JSON.stringify(message.position), 
+			quaternion: JSON.stringify(message.quaternion)
+		})
+
 		const pm: PositionMessage = {
 			id: con.id,
 			position: con.position,
