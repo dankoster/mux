@@ -146,9 +146,6 @@ function event(req: Request) {
 
 const api = new Router();
 
-
-const lastWsMessageByUUID = new Map<string, string>()
-
 api.get(`/${apiRoute.position}`, async (ctx) => {
 
 	if (!ctx.isUpgradable) {
@@ -165,11 +162,6 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 				return
 			}
 			wsByUUID.set(socketUuid, socket)
-
-			//send current state (even to self, so we remember our position)
-			lastWsMessageByUUID.forEach((message) => {
-				socket.send(message)
-			})
 			return
 		}
 
@@ -191,13 +183,11 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 			position: con.position,
 			quaternion: con.quaternion
 		}
-		const messageString = JSON.stringify(pm)
 
 		//broadcast the message to all other connected clients
-		lastWsMessageByUUID.set(socketUuid, messageString)
 		wsByUUID.forEach((ws, uuid) => {
 			if (uuid !== socketUuid) {
-				ws.send(messageString)
+				ws.send(JSON.stringify(pm))
 			}
 		})
 	};

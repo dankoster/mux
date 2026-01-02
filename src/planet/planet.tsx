@@ -40,10 +40,13 @@ export function Planet() {
 	const areas: Area[] = []
 
 	function getAvatar(con: Connection): Avatar | undefined {
-		// uiLog(`getAvatar: ${con.identity?.name ?? con.id}`)
-		// console.trace(`getAvatar`, con.identity?.name ?? con.id)
-		if(!con) return 
+		if(!con) throw new Error(`cannot getAvatar for ${con}`) 
 		
+		if(!scene){
+			console.warn('scene not ready!')
+			return
+		}
+
 		let avatar = avatarsById.get(con.id)
 		
 		if (!avatar) {
@@ -60,9 +63,6 @@ export function Planet() {
 		if(scene && !scene.children.includes(avatar.mesh)){
 			scene.add(avatar.mesh)
 		}
-		
-		if(!scene)
-			console.trace('scene not ready!', avatar)
 		
 		return avatar
 	}
@@ -116,16 +116,11 @@ export function Planet() {
 
 	positionSocket.onGotPosition((message) => {
 		const con = Data.connections.find(con => con.id === message.id)
-		if (con?.status !== 'online')
-			return
+
+		if (con?.status !== 'online') console.warn(`got position for ${con.id} with status ${con.status}`)
 		
 		//get the avatar for this position (add, if necessary)
-		let avatar = getAvatar(con)
-		if(avatar == selfAvatar)
-		{
-			console.log("got selfAvatar position", message.quaternion)
-		}
-		
+		let avatar = getAvatar(con)		
 		const position = new THREE.Vector3(message.position.x, message.position.y, message.position.z)
 		const quaternion = message.quaternion;
 		avatar.setPositionAndLook(position, quaternion)
