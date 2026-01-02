@@ -6,6 +6,7 @@ import { apiRoute, GET, POST } from "./http";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
 import { uiLog } from "../uiLog";
+import { sharePrivateKey } from "./directMessages";
 import * as PositionSocket from "./positionSocket";
 
 const sse: { [Property in SSEvent]: Property } = {
@@ -406,7 +407,7 @@ function onConnectionsChanged() {
 			const dateCreated = new Date(Number.parseInt(con.id))
 			const kind = con.id === me.id ? "myself" : con.kind
 			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()}`)
-			//sharePrivateKey(me.id, con)
+			sharePrivateKey(me.id, con)
 		}
 	})
 

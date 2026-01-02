@@ -18,7 +18,7 @@ const sharedJwkByConnectionId = new Map<string, string>(localStorage_GetMap(SHAR
 sharedJwkByConnectionId.forEach(async (value, key) =>
 	sharedKeyByConnectionId.set(key, await jwkToCryptoKey(JSON.parse(value), ['deriveBits'])))
 
-async function InitPublicKey() {
+async function InitKeys() {
 	getLocalKeyPair().then(async keypair => {
 		myKeys = keypair
 		await broadcastPublicKey(keypair.publicKey);
@@ -27,7 +27,6 @@ async function InitPublicKey() {
 	})
 }
 
-console.trace(`directMessages`)
 async function broadcastPublicKey(publicKey: CryptoKey) {
 	console.trace(`broadcastPublicKey`)
 	const jwk = await exportJWK(publicKey)
@@ -229,6 +228,12 @@ async function getSharedKey(privateKey: CryptoKey, sharedKeyId: string, publicJw
 }
 
 export async function sharePrivateKey(myId: string, con: Connection) {
+	console.warn(`sharePrivateKey from ${myId} to ${con.id}`)
+
+	//TODO: create a two step process: 
+	// send a pin number to the other connection then
+	// require that number to be confirmed on this side
+
 	const privateJwk = await exportJWK(myKeys.privateKey)
 	const publicJwk = await exportJWK(myKeys.publicKey)
 	sendDm({
