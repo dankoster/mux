@@ -7,20 +7,40 @@ let self: Connection
 let socket: WebSocket
 const handlers: PositionMessageHandler[] = []
 
-connectSocket()
-async function connectSocket() {
-	self = await selfConnection
+let retries = 0
+const interval = 500
+const maxInterval = 15000
 
+export async function connectSocket() {
+	
+	console.log('position socket waiting for self connection')
+	self = await selfConnection
+	console.log('position socket got self connection')
+	
 	const uuid = pk()
+	
 	if(!uuid) throw new Error(`failed to get UUID from pk()`)
 
 	socket = new WebSocket(`${API_URI}/${apiRoute.position}`);
 	socket.onopen = () => {
 		socket.send(uuid) //auth by sending UUID as first message
+		console.log(`position socket connected`)
 	}
 
 	//reconnect on close!
-	socket.addEventListener('close', connectSocket)
+	socket.addEventListener('close', async (ev: CloseEvent) => {
+		console.log(`position socket closed`, ev.code, ev.reason)
+
+		if (retries * interval < maxInterval)
+			retries++
+
+		const timeout = retries * interval
+
+		console.log('position socket waiting', timeout)
+
+		await new Promise<void>(resolve => setTimeout(() => resolve(), timeout))
+		connectSocket()
+	})
 
 	//reconnect any old handlers
 	handlers.forEach(h => onGotPosition(h))
