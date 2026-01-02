@@ -39,9 +39,14 @@ export function Planet() {
 	const avatarsById = new Map<string, Avatar>()
 	const areas: Area[] = []
 
-	function getAvatar(con: Connection): Avatar | undefined {
-		if(!con) throw new Error(`cannot getAvatar for ${con}`) 
+	let sceneIsReady: (scene: THREE.Scene) => void
+	const sceneReady = new Promise<THREE.Scene>(resolve => sceneIsReady = resolve)
+
+	async function getAvatar(con: Connection): Promise<Avatar | undefined> {
+		if(!con) console.warn(`cannot getAvatar for ${con}`) 
 		
+		await sceneReady
+
 		if(!scene){
 			console.warn('scene not ready!')
 			return
@@ -99,10 +104,11 @@ export function Planet() {
 	}
 
 	//add/remove avatars when connection status changes
-	createEffect(() => {
+	createEffect(async () => {
 		for (const con of Data.connections) {
-			if (con.status === 'online' && con.position && !avatarsById.has(con.id))
-				getAvatar(con)
+			if (con.status === 'online' && con.position && !avatarsById.has(con.id)) {
+				await getAvatar(con)
+			}
 
 			//solid-js wierdness: if the following two conditionals are swapped
 			// this effect does not fire. 
@@ -114,13 +120,13 @@ export function Planet() {
 		}
 	})
 
-	positionSocket.onGotPosition((message) => {
+	positionSocket.onGotPosition(async (message) => {
 		const con = Data.connections.find(con => con.id === message.id)
 
-		if (con?.status !== 'online') console.warn(`got position for ${con.id} with status ${con.status}`)
+		if (con?.status !== 'online') console.warn(`got position for ${con?.id} with status ${con?.status}`)
 		
 		//get the avatar for this position (add, if necessary)
-		let avatar = getAvatar(con)		
+		let avatar = await getAvatar(con)		
 		const position = new THREE.Vector3(message.position.x, message.position.y, message.position.z)
 		const quaternion = message.quaternion;
 		avatar.setPositionAndLook(position, quaternion)
@@ -181,6 +187,8 @@ export function Planet() {
 		for (const light of lights) {
 			scene.add(light)
 		}
+
+		sceneIsReady(scene)
 	
 		let prevTime: number
 		function render(time: number) {
@@ -234,7 +242,7 @@ export function Planet() {
 		BuildSceneAndStartRendering()
 
 		const con = await Data.selfConnection
-		selfAvatar = getAvatar(con)		
+		selfAvatar = await getAvatar(con)		
 		placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
 	})
 	
