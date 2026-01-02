@@ -55,7 +55,7 @@ export function UserToolbar() {
 				</Show>
 
 				<IconButton icon="gear" action={() => ShowSettings()} keyChar="s" />
-				<IconButton icon="hammer" action={() => planet.addArea()} keyChar="b" />
+				{/* <IconButton icon="hammer" action={() => build({size: 3, labelText:'test area'})} keyChar="b" /> */}
 				<Show when={VideoCall.isConnected()}>
 					<MediaButton
 						keyChar="m"
