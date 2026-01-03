@@ -183,7 +183,7 @@ export class Avatar extends EventTarget {
 	}
 
 	delete() {
-		console.log('avatar delete!', this.connection.identity?.name);
+		console.log('avatar delete!', this.connection.identity?.name ?? this.connection.id);
 		this.mesh.removeFromParent();
 		this.label.remove();
 	}
