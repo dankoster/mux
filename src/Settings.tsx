@@ -75,11 +75,12 @@ export default function Settings() {
 			dialog.showModal()
 			setSettingsVisible(true)
 		}
+
+		dialog.addEventListener('close', () => setSettingsVisible(false))
 	})
 
 	const closeSettings = () => {
 		dialog.close()
-		setSettingsVisible(false)
 	}
 
 	const onClick = (e) => {
