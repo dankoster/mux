@@ -129,8 +129,10 @@ export class Avatar extends EventTarget {
 		this.chatBubble.pushText("hello")
 	}
 
-	addMarker(position: THREE.Vector3) {
+	addMarker(position: THREE.Vector3, minDistance: number = 0.5, maxMarkers: number = 40) {
 		if (!this.mesh?.parent) return
+
+		if(this.markers.some(m => m.position.distanceTo(position) < minDistance)) return
 
 		const sphereGeometry = new THREE.SphereGeometry(0.2)
 		const marker = new THREE.Mesh(sphereGeometry, new THREE.MeshNormalMaterial())
@@ -138,7 +140,16 @@ export class Avatar extends EventTarget {
 		this.mesh.parent.add(marker)
 		this.markers.push(marker)
 
-		while (this.markers.length > 100) {
+		this.markers.forEach(m => {
+			const geodata = m.geometry.toJSON()
+			const radius = geodata["radius"]
+			if(radius){
+				m.geometry.dispose()
+				m.geometry = new THREE.SphereGeometry(radius * 0.96)
+			}
+		})
+
+		while (this.markers.length > maxMarkers) {
 			this.mesh.parent.remove(this.markers.shift())
 		}
 	}
@@ -152,16 +163,17 @@ export class Avatar extends EventTarget {
 	
 		if (!this.mesh?.position?.equals(position)) {
 			this.mesh.position.copy(position)
-			//this.addMarker(position)
+			this.addMarker(position)
 		}
-
+		
 		if (Array.isArray(quaternion)) {
 			this.mesh.quaternion.fromArray(quaternion)
 			return //don't calculate a quaternion if we already have one (from the server, probably)
 		}
-
-		if (!this.prevPositions.length || position.distanceTo(this.prevPositions[this.prevPositions.length - 1]) > 0.1)
-			this.prevPositions.push(position.clone())	
+		
+		if (!this.prevPositions.length || position.distanceTo(this.prevPositions[this.prevPositions.length - 1]) > 0.1) {
+			this.prevPositions.push(position.clone())
+		}
 
 		if (this.prevPositions.length > 2) {
 			var quat = this.calcMeshQuaterionAlongPath()
