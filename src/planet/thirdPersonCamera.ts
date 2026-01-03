@@ -1,10 +1,9 @@
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 //third person camera inspired by simondev
-const raycaster = new THREE.Raycaster();
-let _currentPosition: THREE.Vector3;
-let _currentLookat: THREE.Vector3;
-const tmpVec3 = new THREE.Vector3();
+const raycaster = new THREE.Raycaster()
+let _currentPosition: THREE.Vector3
+const tmpVec3 = new THREE.Vector3()
 
 		// //tilt camera as we lose altitude above the sphere
 		// orbit.addEventListener('change', (e) => {
@@ -25,49 +24,41 @@ export function placeCameraPastTargetFromPosition({ target, camera, position }: 
 	//calculate camera direction relative to avatar position and distance from position
 	tmpVec3.subVectors(target, position)
 		.normalize()
-		.multiplyScalar(camera.position.distanceTo(position));
+		.multiplyScalar(camera.position.distanceTo(position))
 
-	camera.position.copy(tmpVec3);
-	camera.lookAt(position);
+	camera.position.copy(tmpVec3)
+	camera.lookAt(position)
 }
 
 export type cameraInfo = {
 	currentPosition: THREE.Vector3,
-	currentLookat: THREE.Vector3,
 	idealPosition: THREE.Vector3,
-	idealLookat: THREE.Vector3
 }
 
 export function calculateThirdPersonCamera({ deltaTime, target, camera }: 
 	{ deltaTime: number; target: THREE.Group; camera: THREE.PerspectiveCamera; }): cameraInfo {
-	const _elapsedSec = deltaTime * 0.001; // convert time to seconds
+	const _elapsedSec = deltaTime * 0.001 // convert time to seconds
 
 	//direction vector from camera to sphere
-	tmpVec3.subVectors(target.position, camera.position).normalize();
+	tmpVec3.subVectors(target.position, camera.position).normalize()
 
 	//find intersection point(s) on surface of sphere
-	raycaster.set(camera.position, tmpVec3);
-	const intersections = raycaster.intersectObject(target);
+	raycaster.set(camera.position, tmpVec3)
+	const intersections = raycaster.intersectObject(target)
 
 	//find intersection with the surface of the sphere
 	//@ts-expect-error Property 'geometry' does not exist on type 'Object3D<Object3DEventMap>'.
-	const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry');
+	const firstIntersectedSphereGeometry = intersections?.find(i => i.object?.geometry?.type === 'SphereGeometry')
 	if (firstIntersectedSphereGeometry) {
 
-		//move away from the sphere origin by ... half a normal vector?
-		const idealPosition = firstIntersectedSphereGeometry?.point.addScaledVector(firstIntersectedSphereGeometry.normal, 0.5);
-		const idealLookat = firstIntersectedSphereGeometry.normal;
+		const idealPosition = firstIntersectedSphereGeometry?.point
 
-		const t = 1.0 - Math.pow(0.001, _elapsedSec);
-		if (_currentPosition && _currentLookat && !Number.isNaN(_currentPosition.x)) {
-			_currentPosition?.lerp(idealPosition, t);
-			_currentLookat?.lerp(idealLookat, t);
+		const t = 1.0 - Math.pow(0.001, _elapsedSec)
+		if (_currentPosition && !Number.isNaN(_currentPosition.x)) {
+			_currentPosition?.lerp(idealPosition, t)
 		}
 		else {
-			_currentPosition = idealPosition;
-			_currentLookat = idealLookat;
-			
-			// uiLog(`INIT CP ${JSON.stringify(_currentPosition)}`)
+			_currentPosition = idealPosition
 		}
 		
 		//stay on the surface of the sphere
@@ -79,19 +70,10 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }:
 		{
 			_currentPosition.addScaledVector(firstIntersectedSphereGeometry.normal, diff)
 		}
-		
-		// uiLog(`CP x is NaN? ${Number.isNaN(_currentPosition.x)}`)
-		// uiLog(`IP x is NaN? ${Number.isNaN(_currentLookat.x)}`)
-		// if (_currentPosition.x) {
-		// 	_currentPosition = undefined
-		// 	uiLog(`CP undefined!`)
-		// }
 
 		return {
 			currentPosition: _currentPosition,
-			currentLookat: _currentLookat,
 			idealPosition,
-			idealLookat
-		};
+		}
 	}
 }
