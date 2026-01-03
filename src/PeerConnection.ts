@@ -80,7 +80,8 @@ export class PeerConnection extends EventTarget {
 		stream.getTracks().forEach((track) => {
 			console.log(`adding ${track.enabled ? "enabled" : "disabled"} local ${track.kind} track to peer connection:`, track.label);
 			// this.logTrackEvents(track, 'local');
-			this.pc.addTrack(track, stream)
+			if(this.pc.signalingState != 'closed')
+				this.pc.addTrack(track, stream)
 		});
 	}
 	
