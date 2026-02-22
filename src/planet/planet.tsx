@@ -223,19 +223,23 @@ export function Planet() {
 				camera.updateProjectionMatrix()
 			}
 
-			//check for collisions
-			areas.forEach(area => intersections.update(area, selfAvatar.interactable.intersects(area.interactable)))
-			avatarsById.forEach((avatar) => {
-				if(avatar != selfAvatar)
-					intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
-			})
-
 			renderer.render(scene, camera)
 			labelRenderer.render(scene, camera)
+
+			//check for collisions (but don't wait for the async to finish)
+			checkForCollisions()
 
 			requestAnimationFrame(render)
 		}
 		requestAnimationFrame(render)
+	}
+
+	async function checkForCollisions() {
+		areas.forEach(area => intersections.update(area, selfAvatar.interactable.intersects(area.interactable)))
+		avatarsById.forEach((avatar) => {
+			if(avatar != selfAvatar)
+				intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
+		})
 	}
 
 	onMount(async () => {
