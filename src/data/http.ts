@@ -7,7 +7,6 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	sse: "sse",
 	webRTC: "webRTC",
 	setColor: "setColor",
-	setText: "setText",
 	clear: "clear",
 	discardKey: "discardKey",
 	becomeAnonymous: "becomeAnonymous",
