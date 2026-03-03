@@ -209,6 +209,12 @@ export class Avatar extends EventTarget {
 	//https://garden.bradwoods.io/notes/javascript/three-js/animate-a-mesh-on-a-spheres-surface
 	calcMeshQuaterionAlongPath() {
 
+		if (!this.mesh?.parent) {
+			console.warn(`calcMeshQuaterionAlongPath: this.mesh.parent is`, this.mesh.parent)
+			debugger
+			return
+		}
+
 		const spline = new THREE.CatmullRomCurve3(this.prevPositions)
 		const sphereCenter = this.mesh.parent.position
 
