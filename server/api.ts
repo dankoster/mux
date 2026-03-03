@@ -132,18 +132,6 @@ function getConnectionById(id: string) {
 	return con;
 }
 
-function objectFrom<V>(map: Map<string, V>) {
-	const obj: { [key: string]: V } = {};
-	for (const [key, val] of map) {
-		obj[key] = val;
-	}
-	return obj;
-}
-
-function event(req: Request) {
-	return `${req.method} ${req.url.pathname}`.toUpperCase()
-}
-
 const api = new Router();
 
 api.get(`/${apiRoute.position}`, async (ctx) => {
@@ -232,27 +220,6 @@ api.post(`/${apiRoute.webRTC}/:userId`, async (ctx) => {
 	ctx.response.status = 200 //success!
 })
 
-//nuke it from orbit
-api.post(`/${apiRoute.clear}/:key`, async (ctx) => {
-	//do we have the correct bearer token for this?
-	if (ctx.params.key !== Deno.env.get("KV_CLEAR_KEY")) {
-		ctx.response.status = 401 //unauthorized
-		return
-	}
-
-	//here's what we're deleting...
-	const oldData = objectFrom(connectionByUUID);
-	console.log("CLEAR", oldData)
-	ctx.response.body = oldData
-
-	connectionByUUID.forEach((con, uuid) => db.deleteConnection(uuid))
-
-	//reinit with empty everything
-	connectionByUUID.clear()
-
-	//tell all clients to reconnect
-	updateFunctionByUUID.forEach(updater => updater.update(sseEvent.reconnect))
-})
 
 api.post(`/${apiRoute.friendRequest}`, async (ctx) => {
 	const { uuid, con: requestor } = getConnection(ctx.request);
