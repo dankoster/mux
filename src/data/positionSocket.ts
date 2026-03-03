@@ -19,7 +19,8 @@ export async function connectSocket() {
 	socket = new WebSocket(`${API_URI}/${apiRoute.position}`);
 	socket.onopen = () => {
 		socket.send(uuid) //auth by sending UUID as first message
-		console.log(`position socket connected`, uuid)
+		console.log(`position socket connected`, `${retries} retries`, uuid)
+		retries = 0
 	}
 
 	//reconnect on close!
@@ -31,7 +32,7 @@ export async function connectSocket() {
 
 		const timeout = retries * interval
 
-		console.log('position socket waiting', timeout)
+		console.log('position socket waiting', `${timeout}ms`)
 
 		await new Promise<void>(resolve => setTimeout(() => resolve(), timeout))
 		connectSocket()
