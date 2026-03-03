@@ -6,6 +6,7 @@ import { uiLog } from '../uiLog'
 
 import { GLTF, GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import { selfConnection } from '../data/data'
 
 export class Avatar extends EventTarget {
 	mesh: THREE.Mesh
@@ -194,7 +195,11 @@ export class Avatar extends EventTarget {
 		return this._distanceFromSelf;
 	}
 
-	delete() {
+	async delete() {
+
+		if(this.connection?.id === (await selfConnection).id)
+			console.warn('deleting self avatar!')
+
 		console.log('avatar delete!', this.connection.identity?.name ?? this.connection.id);
 		this.mesh.removeFromParent();
 		this.label.remove();
