@@ -27,9 +27,14 @@ export function CtrlKeyBind(props: { char: string, action: () => void }) {
 		document.removeEventListener('keydown', onKeyDown)
 	})
 
-	return <Show when={ctrlDown()}>
-		<span class="keybind">{props.char}</span>
-	</Show>
+	return <>
+		<Show when={ctrlDown()}>
+			<span class="keybind outlined">{props.char}</span>
+		</Show>
+		<Show when={!ctrlDown()}>
+			<div class="keybind outlined">ctrl</div>
+		</Show>
+	</>
 }
 
 export function KeyBind(props: { char: string, action: () => void }) {
@@ -47,5 +52,5 @@ export function KeyBind(props: { char: string, action: () => void }) {
 		document.removeEventListener('keydown', onKeyDown)
 	})
 
-	return <></>
+	return <span class="keybind outlined">{props.char}</span>
 }

@@ -1,6 +1,6 @@
 import { Accessor, Switch, Match, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { svgIcon, SvgIcon } from "../SvgIcon";
-import { CtrlKeyBind } from "./KeyBind";
+import { CtrlKeyBind, KeyBind } from "./KeyBind";
 
 import './MediaButton.css'
 
@@ -11,6 +11,7 @@ export function MediaButton(props: {
 	action: () => void,
 	enabledIcon: svgIcon,
 	disabledIcon: svgIcon,
+	ctrlKeyChar?: string,
 	keyChar?: string,
 }) {
 	return <div class={`media-button ${props.className} ${props.enabled() ? 'active' : 'muted'}`} onclick={props.action}>
@@ -22,15 +23,23 @@ export function MediaButton(props: {
 				<SvgIcon icon={props.disabledIcon} />
 			</Match>
 		</Switch>
+		<Show when={props.ctrlKeyChar}>
+			<CtrlKeyBind char={props.ctrlKeyChar} action={props.action} />
+		</Show>
 		<Show when={props.keyChar}>
-			<CtrlKeyBind char={props.keyChar} action={props.action} />
+			<KeyBind char={props.keyChar} action={props.action} />
 		</Show>
 	</div>
 }
 
-export function IconButton(props: { action: () => void, keyChar?: string, icon: svgIcon; }) {
+export function IconButton(props: { action: () => void, keyChar?: string, ctrlKeyChar?: string, icon: svgIcon; }) {
 	return <div class={`media-button`} onclick={props.action}>
 		<SvgIcon icon={props.icon} />
-		<CtrlKeyBind char={props.keyChar} action={props.action} />
+		<Show when={!!props.ctrlKeyChar}>
+			<CtrlKeyBind char={props.ctrlKeyChar} action={props.action} />
+		</Show>
+		<Show when={!!props.keyChar}>
+			<KeyBind char={props.keyChar} action={props.action} />
+		</Show>
 	</div>
 }
