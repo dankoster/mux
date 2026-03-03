@@ -8,6 +8,7 @@ import { onVisibilityChange } from "./onVisibilityChange";
 import { MediaButton } from "./component/MediaButton";
 
 import "./VideoCall.css"
+import { uiLog } from "./uiLog";
 
 const peersById = new Map<string, PeerConnection>()
 let localStream: MediaStream
@@ -160,7 +161,10 @@ export default function VideoCall() {
 	}
 
 	async function startLocalVideo() {
+		const start = Date.now()
 		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+		const duration = Date.now() - start;
+		uiLog(`getUserMedia in ${duration}ms`)
 
 		localVideo.srcObject = localStream;
 		localVideo.muted = true;
