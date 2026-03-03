@@ -121,15 +121,6 @@ export class Avatar extends EventTarget {
 		// this.mesh.add( shadowCameraHelper );
 	}
 
-	showChatBubble() {
-		uiLog('avatar.showChatBubble')
-
-		if (!this.chatBubble)
-			this.chatBubble = new Labeled(this.mesh, { className: 'chat-bubble' })
-
-		this.chatBubble.pushText("hello")
-	}
-
 	addMarker(position: THREE.Vector3, minDistance: number = 0.5, maxMarkers: number = 40) {
 		if (!this.mesh?.parent) return
 
