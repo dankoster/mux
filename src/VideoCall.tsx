@@ -99,7 +99,7 @@ export default function VideoCall() {
 
 		if(peersById.size == 0) {
 			console.log('DisconnectVideo: no peers! Stopping local stream tracks...')
-			localStream?.getTracks()
+			const tracks = localStream?.getTracks()
 			if(!tracks || tracks.length == 0) console.log('DisconnectVideo: no tracks to stop')
 			tracks?.forEach(track => track.stop())
 			localStream = null
