@@ -15,7 +15,7 @@ export default function ProximityWatcher() {
 		if (e.detail instanceof Avatar) {
 			var avatar = e.detail as Avatar
 
-			const callResult = await initiateCall(avatar.connection)
+			const callResult = await initiateCall(avatar.connection.id)
 			uiLog(`Start Call: ${avatar.label.text}`)
 			videoCall.ConnectVideo({
 				conId: avatar.connection?.id, 

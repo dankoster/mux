@@ -18,7 +18,8 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
 	dm: "dm",
-	broadcastJson: "broadcastJson"
+	broadcastJson: "broadcastJson",
+	initiateCall: "initiateCall"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -386,6 +387,14 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 		}
 
 		console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
+		console.log(typeof(callee), `${callee}`)
+
+		const toUuid = getUUID(`${callee}`)
+		console.log('initiate call to UUID', toUuid)
+		if(toUuid){
+			const updateFn = updateFunctionByUUID.get(toUuid)
+			updateFn?.update(sseEvent.initiateCall, caller)
+		}
 
 		ctx.response.body = JSON.stringify(result)
 		ctx.response.status = 200

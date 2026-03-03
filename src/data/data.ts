@@ -21,7 +21,8 @@ const sse: { [Property in SSEvent]: Property } = {
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
 	dm: "dm",
-	broadcastJson: "broadcastJson"
+	broadcastJson: "broadcastJson",
+	initiateCall: "initiateCall"
 }
 
 export const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -232,8 +233,8 @@ export async function broadcastJson(message: JsonMessage) {
 	return await POST(apiRoute.broadcastJson, { body: json })
 }
 
-export async function initiateCall(con: Connection): Promise<initiateCallResult> {
-	var result = (await POST(apiRoute.initiateCall, { body: con.id }))
+export async function initiateCall(conId: string): Promise<initiateCallResult> {
+	var result = (await POST(apiRoute.initiateCall, { body: conId }))
 	return await result.json() as initiateCallResult
 }
 
@@ -371,6 +372,11 @@ function handleSseEvent(event: SSEventPayload) {
 				default: 
 					throw `${json.command} not supported!`
 			}
+			break;
+
+		case sse.initiateCall:
+			uiLog(`SSE: ${event.event} ${JSON.parse(event.data)}`)
+			console.log(`SSE`, event.event, JSON.parse(event.data))
 			break;
 
 		default:

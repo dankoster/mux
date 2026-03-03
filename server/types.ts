@@ -28,6 +28,7 @@ export type ApiRoute =
 	"initiateCall";
 
 export type SSEvent = 
+	"initiateCall" |
 	"webRTC" |
 	"new_connection" |
 	"delete_connection" |
