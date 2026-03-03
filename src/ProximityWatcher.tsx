@@ -2,7 +2,7 @@ import { onCleanup, onMount } from "solid-js";
 import { Avatar } from "./planet/avatar"
 import { uiLog } from "./uiLog"
 import * as videoCall from "./VideoCall";
-import { intersections } from "./planet/planet";
+import * as planet from "./planet/planet";
 import { IntersectionTarget } from "./planet/Intersections";
 import { Area } from "./planet/area";
 import { initiateCall } from "./data/data";
@@ -17,13 +17,14 @@ export default function ProximityWatcher() {
 
 			const callResult = await initiateCall(avatar.connection.id)
 			uiLog(`Start Call: ${avatar.label.text}`)
-			videoCall.ConnectVideo({
+			await videoCall.ConnectVideo({
 				conId: avatar.connection?.id, 
 				rtcConfig: callResult.peerConfig, 
 				polite: callResult.polite
 			})
+			uiLog(`Started Call: ${avatar.label.text}`)
 		}
-		else if(e.detail instanceof Area) {
+		else if (e.detail instanceof Area) {
 			var area = e.detail as Area
 			uiLog(`Entered Area: ${area.label.text}`)
 		}
@@ -43,12 +44,12 @@ export default function ProximityWatcher() {
 	}
 	
 	onMount(() => {
-		intersections.addEventListener(intersections.event.enter, onStartIntersection)	
-		intersections.addEventListener(intersections.event.exit, onEndIntersection)
+		planet.intersections.addEventListener(planet.intersections.event.enter, onStartIntersection)
+		planet.intersections.addEventListener(planet.intersections.event.exit, onEndIntersection)
 	})
 	onCleanup(() => {
-		intersections.removeEventListener(intersections.event.enter, onStartIntersection)	
-		intersections.removeEventListener(intersections.event.exit, onEndIntersection)
+		planet.intersections.removeEventListener(planet.intersections.event.enter, onStartIntersection)
+		planet.intersections.removeEventListener(planet.intersections.event.exit, onEndIntersection)
 	})
 
 	return <></>

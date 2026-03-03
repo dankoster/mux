@@ -5,7 +5,7 @@ type pcInit = {
 	polite: boolean;
 	config: RTCConfiguration,
 	onTrack?: (track: MediaStreamTrack) => void;
-	onDisconnect: () => void;
+	onDisconnect: () => Promise<void>;
 };
 export class PeerConnection extends EventTarget {
 	abortControllers: AbortController[] = [];
@@ -18,7 +18,7 @@ export class PeerConnection extends EventTarget {
 	makingOffer = false;
 	ignoreOffer = false;
 
-	onDisconnect: () => void;
+	onDisconnect: () => Promise<void>;
 
 	constructor({ conId, polite, onDisconnect, config }: pcInit) {
 		super()

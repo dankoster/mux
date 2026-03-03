@@ -19,13 +19,14 @@ export const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
 export const [isConnected, setIsConnected] = createSignal(false)
 
 function NotReady() { throw new Error('<VideoCall /> not mounted') }
+async function NotReadyAsync() { throw new Error('<VideoCall /> not mounted') }
 
 export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
 export let toggleVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
 export let toggleMaxVideo: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
 export let toggleScreenShare: () => void = () => NotReady()
-export let ConnectVideo: (params: ConnectParams) => void = (params: ConnectParams): void => NotReady()
-export let DisconnectVideo: (conId: string) => void = (conId: string): void => NotReady()
+export let ConnectVideo: (params: ConnectParams) => Promise<void> = (params: ConnectParams): Promise<void> => NotReadyAsync()
+export let DisconnectVideo: (conId: string) => Promise<void> = (conId: string): Promise<void> => NotReadyAsync()
 
 type ConnectParams = {
 	conId: string, 
@@ -83,7 +84,7 @@ export default function VideoCall() {
 		setPeers(Array.from(peersById.values()))
 	}
 
-	DisconnectVideo = (conId: string) => {
+	DisconnectVideo = async (conId: string) => {
 		const peer = peersById.get(conId)
 
 		if (!peer) {
