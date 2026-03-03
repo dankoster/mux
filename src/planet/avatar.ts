@@ -178,7 +178,8 @@ export class Avatar extends EventTarget {
 
 		if (this.prevPositions.length > 2) {
 			var quat = this.calcMeshQuaterionAlongPath()
-			this.mesh.quaternion.copy(quat)
+			if(quat)
+				this.mesh.quaternion.copy(quat)
 		}
 	}
 
