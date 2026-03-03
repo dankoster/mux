@@ -1,6 +1,6 @@
 import { createSignal, onMount, Show } from "solid-js"
 import { self } from "./data/data"
-import { GetSetting, GetSettingValue, SettingCheckBox } from "./Settings"
+import * as Settings from "./Settings"
 import * as server from "./data/data";
 
 import { GitHubSvg } from "./GitHubSvg";
@@ -31,7 +31,7 @@ export default function Welcome() {
 			setWelcomeVisible(true)
 		}
 
-		const shouldShow = GetSettingValue('Show welcome')
+		const shouldShow = Settings.GetSettingValue('Show welcome')
 		if (shouldShow) {
 			dialog.showModal()
 			setWelcomeVisible(true)
@@ -89,7 +89,7 @@ export default function Welcome() {
 					<li>TODO: unread messages <SvgIcon icon="chat" /></li>
 				</ul>
 				<ServerStats />
-				<SettingCheckBox setting={GetSetting('Show welcome')} />
+				<Settings.SettingCheckBox setting={Settings.GetSetting('Show welcome')} />
 				<div class="buttons">
 					<button onclick={() => dialog.close()}>Close</button>
 					<span class="status"></span>
