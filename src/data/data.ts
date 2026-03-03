@@ -282,7 +282,7 @@ export function onWebRtcMessage(callback: (message: { senderId: string, message:
 	return ac
 }
 
-function handleSseEvent(event: SSEventPayload) {
+async function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.reconnect:
 			throw "reconnect requested by server"
