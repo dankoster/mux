@@ -22,14 +22,17 @@ export function makeSphere(radius: number, color: number) {
 	const sphereWireGeo = new THREE.EdgesGeometry(sphereGeo);
 	const sphereLineMat = new THREE.LineBasicMaterial({
 		color: 0xffffff,
+		side: THREE.FrontSide,
 		transparent: true,
 		opacity: 0.2
 	});
 	const meshMaterial = new THREE.MeshPhongMaterial({
 		color,
 		emissive: 0x072534,
-		side: THREE.DoubleSide,
-		flatShading: false //false = smooth, true = facets
+		side: THREE.FrontSide,
+		flatShading: false, //false = smooth, true = facets
+		transparent: false, //true,
+		opacity: 0.8
 	});
 
 	const sphere = new THREE.Group();
