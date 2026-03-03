@@ -145,11 +145,12 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		if (!socketUuid) {
 			socketUuid = m.data as string;
 			if (!connectionByUUID.has(socketUuid)) {
-				socket.close(1011, 'first message must be auth token')
-				console.log("WS - first message was not UUID", socketUuid)
+				socket.close(1011, 'first message must be a valid auth token')
+				console.log("WS - first message was not a valid UUID", socketUuid)
 				return
 			}
 			wsByUUID.set(socketUuid, socket)
+			console.log(`POSITION SOCKET opened`, socketUuid, wsByUUID.size, 'connections')
 			return
 		}
 
@@ -159,13 +160,13 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		const message = JSON.parse(m.data) as { position: Position, quaternion: QuaternionTuple }
 		con.position = message.position
 		con.quaternion = message.quaternion
-
+		
 		db.persistPosition({
 			uuid: socketUuid, 
 			position: JSON.stringify(message.position), 
 			quaternion: JSON.stringify(message.quaternion)
 		})
-
+		
 		const pm: PositionMessage = {
 			id: con.id,
 			position: con.position,
@@ -181,6 +182,7 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 	};
 	socket.onclose = () => {
 		wsByUUID.delete(socketUuid)
+		console.log(`POSITION SOCKET closed`, socketUuid)
 	}
 
 	ctx.response.status = 200
