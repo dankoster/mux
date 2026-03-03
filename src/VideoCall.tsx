@@ -41,7 +41,6 @@ export default function VideoCall() {
 	let localVideo: HTMLVideoElement
 	let screenShareStream: MediaStream
 	let config: RTCConfiguration
-	let connectParams: ConnectParams
 
 	const [peers, setPeers] = createSignal<PeerConnection[]>()
 	const [outlineColor, setOutlineColor] = createSignal('')
@@ -182,8 +181,12 @@ export default function VideoCall() {
 	onMount(async () => {
 
 		server.onWebRtcMessage((message) => {
+			// we got here because the other side is sending us RTC connection info
+
 			if (!peersById.has(message.senderId)) {
-				ConnectVideo(connectParams)
+				// ConnectVideo(connectParams)
+				console.log(`got WebRtc message but have no peer for`, message.senderId)
+				return
 			}
 
 			peersById.get(message.senderId)?.handleMessage(JSON.parse(message.message))
