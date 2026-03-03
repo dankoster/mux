@@ -16,12 +16,6 @@ SELECT "placebear", 201, "Leroy Bearkins", "https://placebear.com/g/201/201";
 INSERT INTO identity (source, source_id, name, avatar_url)
 SELECT "placebear", 202, "Frank Bear", "https://placebear.com/g/202/202";
 
--- remove old rsa keys
-SELECT * FROM connection
---UPDATE connection set publicKey = NULL
-WHERE publicKey LIKE '{"alg":"RSA-OAEP-256"%'
-
-
 
 
 --get the 10 most recent messages before the specified timestamp

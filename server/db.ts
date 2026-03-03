@@ -51,15 +51,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS connection (
 		color TEXT,
 		status TEXT,
 		kind TEXT,
+		publicKey TEXT,
+		position TEXT,
+		quaternion TEXT,
 		FOREIGN KEY(identityId) REFERENCES identity(id)
 	);`
 )
 
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
-AddColumn_IfNotExists({ tableName: 'connection', columnName: 'quaternion', columnType: 'TEXT' }) //store quaternion as JSON [1,2,3,4]
-DropColumn({tableName: 'connection', columnName: 'text'})
-DropColumn({tableName: 'connection', columnName: 'roomId'})
+// AddColumn_IfNotExists({ tableName: 'connection', columnName: 'publicKey', columnType: 'TEXT' })
+// AddColumn_IfNotExists({ tableName: 'connection', columnName: 'position', columnType: 'TEXT' }) //store position as JSON {x:123,y:123,z:123}
+// AddColumn_IfNotExists({ tableName: 'connection', columnName: 'quaternion', columnType: 'TEXT' }) //store quaternion as JSON [1,2,3,4]
+// DropColumn({tableName: 'connection', columnName: 'text'})
+// DropColumn({tableName: 'connection', columnName: 'roomId'})
 
 db.exec(`CREATE TABLE IF NOT EXISTS directMessage (
 	id INTEGER PRIMARY KEY,
