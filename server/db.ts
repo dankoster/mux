@@ -1,20 +1,15 @@
 import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
-import type { Connection, DM, DMInsert, DMRequest, Friend, FriendRequest, Identity } from "./types.ts";
+import type { Connection, DM, DMInsert, DMRequest, Friend, FriendRequest } from "./types.ts";
+import { Identity, IdentityTable } from "./data/table/identity.ts";
 
 const db = new Database("data.db");
 
 db.exec(`PRAGMA journal_mode=WAL;`)
 db.exec(`PRAGMA foreign_keys = ON;`)
 
-db.exec(`CREATE TABLE IF NOT EXISTS identity (
-		id INTEGER PRIMARY KEY,
-		source TEXT,
-		source_id TEXT,
-		name TEXT,
-		avatar_url TEXT
-	);`
-)
+const identity = new IdentityTable(db)
+
 
 db.exec(`CREATE TABLE IF NOT EXISTS friend (
 		id INTEGER PRIMARY KEY,
@@ -241,24 +236,9 @@ const upsertConnection = db.prepare(`INSERT INTO connection
 	RETURNING *;`
 )
 
-const upsertIdentity = db.prepare(`INSERT INTO identity 
-	(id, source, source_id, name, avatar_url) 
-	VALUES (:id, :source, :source_id, :name, :avatar_url)
-	ON CONFLICT(id)
-	DO UPDATE SET 
-		name = excluded.name,
-		source = excluded.source,
-		source_id = excluded.source_id,
-		avatar_url = excluded.avatar_url
-	RETURNING *;`
-)
+
 
 const selectConnections = db.prepare(`SELECT * FROM connection;`)
-const selectIdentityById = db.prepare(`SELECT * FROM identity WHERE id = :id;`)
-const selectIdentityBySource = db.prepare(`SELECT * FROM identity 
-	WHERE source = :source 
-	AND source_id = :source_id;`
-)
 
 const selectFriends = db.prepare(`SELECT * FROM friend
 	WHERE myId = :myId`
@@ -343,12 +323,12 @@ export function persistConnection(uuid: string, con: Connection) {
 		const cid = con.identity
 		if (!cid.id && cid.source && cid.source_id) {
 			//try to reclaim a previously saved identity
-			idResult = selectIdentityBySource.get(cid.source, cid.source_id)
+			idResult = identity.selectBySource.get(cid.source, cid.source_id)
 			// console.log('selected', idResult)
 		}
 
 		if (!idResult) {
-			idResult = upsertIdentity.get(cid)
+			idResult = identity.upsert.get(cid)
 			// console.log('upserted', idResult)
 		}
 	}
@@ -378,7 +358,7 @@ export function getConnectionsByUUID() {
 		delete con.uuid
 		delete con.identityId
 		if (c.identityId) {
-			const ident = selectIdentityById.get({ id: c.identityId })
+			const ident = identity.selectById.get({ id: c.identityId })
 			con.identity = ident as Identity
 		}
 		removeNullFields(con)

@@ -1,8 +1,9 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, Identity, DM, DMRequest, PositionMessage, Position, initiateCallResult, QuaternionTuple } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, DM, DMRequest, PositionMessage, Position, initiateCallResult, QuaternionTuple } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
+import { Identity } from "./data/table/identity.ts";
 
 export { api }
 
@@ -70,12 +71,15 @@ export function validateConnectionByUUID(uuid: string) {
 }
 export async function addConnectionIdentity(uuid: string, identity: Identity) {
 	const con = connectionByUUID.get(uuid)
+
 	if (!con) throw new Error(`connection not found for uuid ${uuid}`)
+	if (!identity) throw new Error(`identity can not be ${identity}`)
+
 	con.identity = identity
 
 	const result = db.persistConnection(uuid, con)
 
-	con.identity.id = result?.identity?.id
+	con.identity!.id = result?.identity?.id
 	console.log("addConnectionIdentity", con)
 
 	notifyAllConnections(sseEvent.update, {

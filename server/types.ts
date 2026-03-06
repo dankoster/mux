@@ -1,10 +1,16 @@
 // @ts-types="npm:@types/webrtc"
 import type * as webrtc from "npm:/@types/webrtc"
+import { Identity } from "./data/table/identity.ts";
 
 export type initiateCallResult = {
 	["polite"]:boolean|undefined,
 	peerConfig: RTCConfiguration
 }
+
+export type Table<T> = {
+	create: (db: Database)=>number
+}
+
 
 export type AuthTokenName = "Authorization";
 export type ApiRoute = 
@@ -42,13 +48,6 @@ export type SSEvent =
 	"broadcastJson" |
 	"dm";
 
-export type Identity = {
-	id?: string;
-	source?: string;
-	source_id?: string;
-	name?: string;
-	avatar_url?: string;
-};
 
 export type ConnectionStatus = ""|"online"
 export type Connection = {
