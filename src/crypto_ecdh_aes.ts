@@ -128,15 +128,18 @@ async function demo(iterations: number = 100000) {
 	//var exported = await crypto.subtle.exportKey('raw', sharedKey);
 
 	const message = 'this is a test!'
-	const json = await encryptMessage(message, sharedKey)
-
-	console.log('encrypted', json)
+	const encryptedJson = await encryptMessage(message, sharedKey)
 
 	//send message
 
-	const decrypted = await decryptMessage(json, sharedKey)
+	const decrypted = await decryptMessage(encryptedJson, sharedKey)
 
-	console.log('decrypted', decrypted)
+	console.log({
+		message,
+		encrypted: `${encryptedJson.iv}'${encryptedJson.data}`,
+		decrypted,
+		match: message == decrypted
+	})
 }
 
 //https://stackoverflow.com/a/66046176
@@ -158,4 +161,5 @@ function base64ToUint8Array(base64: string) {
 // Deno.bench("100,000", async () => await demo(100000))
 // Deno.bench("250,000", async () => await demo(250000))
 // Deno.bench("500,000", async () => await demo(500000))
+//deno run --sloppy-imports crypto_ecdh_aes.ts
 //demo()
