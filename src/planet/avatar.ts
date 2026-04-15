@@ -25,6 +25,8 @@ export class Avatar extends EventTarget {
 	label: Labeled
 	chatBubble: Labeled
 
+	event = { moved: 'moved' }
+
 	private _distanceFromSelf: number = 0
 
 	constructor(size: number = 1, color?: number, x: number = 0) {
@@ -32,14 +34,14 @@ export class Avatar extends EventTarget {
 		this.mesh = new THREE.Mesh()
 		this.mesh.position.x = x
 
-		const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial()
+		// const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial()
 		// const boxGeometry = new THREE.BoxGeometry(size, size, size)
 		// this.box = new THREE.Mesh(boxGeometry, material)
 		// this.mesh.add(this.box)
 
-		const coneGeometry = new THREE.ConeGeometry(3, 3, 3);
-		const cone = new THREE.Mesh(coneGeometry, material);
-		this.mesh.add(cone);
+		// const coneGeometry = new THREE.ConeGeometry(3, 3, 3);
+		// const cone = new THREE.Mesh(coneGeometry, material);
+		// this.mesh.add(cone);
 
 		this.interactable = new Interactable(this.mesh, size, false)
 		this.label = new Labeled(this.mesh)
@@ -48,18 +50,22 @@ export class Avatar extends EventTarget {
 		// const boxGeometry = new THREE.BoxGeometry(size, size, size)
 		// this.mesh.add(new THREE.Mesh(boxGeometry, material))
 
-		// const loader = new GLTFLoader();
-		// loader.loadAsync('glb/shiba.glb')
-		// 	.then(gltf => {
-		// 		this.model = gltf
-		// 		this.model.scene.position.y -= 0.5
-		// 		var modelMesh = new THREE.Mesh()
-		// 		modelMesh.add(this.model.scene)
-		// 		this.mesh.add(modelMesh)
-		// 	})
-		// 	.catch(error => uiLog(error))
-
+		const loader = new GLTFLoader();
+		loader.loadAsync('glb/paper-airplane.glb')
+			.then(gltf => {
+				this.model = gltf
+				this.model.scene.position.y += 1.25
+				this.model.scene.rotateOnAxis(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(180))
+				this.model.scene.scale.setScalar(0.02)
+				var modelMesh = new THREE.Mesh()
+				modelMesh.add(this.model.scene)
+				modelMesh
+				this.mesh.add(modelMesh)
+			})
+			.catch(error => uiLog(error))
+			
 		this.addSpotlight()
+		this.mesh.castShadow = true
 		// this.addGui()
 
 		// const axesHelper = new THREE.AxesHelper(5);
@@ -100,16 +106,16 @@ export class Avatar extends EventTarget {
 		spotLight.penumbra = 0.35;
 		spotLight.decay = 1;
 		spotLight.distance = 15; //0 = unlimited
-		spotLight.intensity = 40;
+		spotLight.intensity = 10;
 
-		spotLight.castShadow = true;
-		spotLight.shadow.mapSize.width = 1024;
-		spotLight.shadow.mapSize.height = 1024;
-		spotLight.shadow.camera.near = 2;
-		spotLight.shadow.camera.far = 15;
-		spotLight.shadow.focus = 1;
-		spotLight.shadow.bias = - .003;
-		spotLight.shadow.intensity = 1;
+		// spotLight.castShadow = true;
+		// spotLight.shadow.mapSize.width = 1024;
+		// spotLight.shadow.mapSize.height = 1024;
+		// spotLight.shadow.camera.near = 1;
+		// spotLight.shadow.camera.far = 15;
+		// spotLight.shadow.focus = 1;
+		// spotLight.shadow.bias = 0.003;
+		// spotLight.shadow.intensity = 1;
 		this.mesh.add(spotLight);
 
 		// const lightHelper = new THREE.SpotLightHelper(spotLight);
@@ -155,7 +161,9 @@ export class Avatar extends EventTarget {
 	
 		if (!this.mesh?.position?.equals(position)) {
 			this.mesh.position.copy(position)
-			this.addMarker(position)
+			// this.addMarker(position)
+
+			this.dispatchEvent(new Event(this.event.moved))
 		}
 		
 		if (Array.isArray(quaternion)) {
@@ -198,6 +206,7 @@ export class Avatar extends EventTarget {
 	}
 
 
+	//TODO: move this out of Avatar
 	//https://garden.bradwoods.io/notes/javascript/three-js/animate-a-mesh-on-a-spheres-surface
 	calcMeshQuaterionAlongPath() {
 
