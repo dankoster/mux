@@ -1,17 +1,23 @@
 import * as THREE from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 
+type LabeledParams = {
+	text?: string, 
+	className?: string,
+	labelClick?: (this: GlobalEventHandlers, ev: PointerEvent) => any
+}
 export class Labeled {
 	labelDiv: HTMLDivElement
 
-	constructor(mesh: THREE.Mesh, text?: string) {
+	constructor(mesh: THREE.Mesh, params?: LabeledParams) {
 		this.labelDiv = document.createElement('div')
-		this.labelDiv.className = 'label'
-		this.labelDiv.textContent = text ?? ''
-		this.labelDiv.style.backgroundColor = 'transparent'
-		this.labelDiv.style.pointerEvents = 'none'
+		this.labelDiv.className = params?.className ?? 'label'
+		this.labelDiv.textContent = params?.text ?? ''
+		this.labelDiv.onclick = params?.labelClick
+		this.labelDiv.style.pointerEvents = params?.labelClick ? 'auto' : 'none';
+
 		const label = new CSS2DObject(this.labelDiv)
-		label.center.set(0.5, 1.5)
+		label.center.set(0.5, 2.5)
 		label.layers.set(0)
 		mesh.add(label)
 	}

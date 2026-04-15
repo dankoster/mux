@@ -1,13 +1,13 @@
 .keybind {
 	position: absolute;
-	bottom: 0.4rem;
+	transform: translateY(1.5rem);
 	justify-self: center;
 
 	&.outlined {
-        font-size: x-small;
-        outline: 1px solid #ffffff45;
-        border-radius: 3px;
-        padding-inline: 0.25rem;
-		backdrop-filter: contrast(0.5);
+		font-size: x-small;
+		outline: 1px solid #ffffff45;
+		border-radius: 3px;
+		padding-inline: 0.25rem;
+		backdrop-filter: contrast(0.5) blur(2px);
 	}
 }

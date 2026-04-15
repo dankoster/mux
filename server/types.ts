@@ -1,21 +1,17 @@
 // @ts-types="npm:@types/webrtc"
+import { Database } from "jsr:@db/sqlite";
 import type * as webrtc from "npm:/@types/webrtc"
 import { Identity } from "./data/table/identity.ts";
 
 export type initiateCallResult = {
-	["polite"]:boolean|undefined,
+	["polite"]: boolean | undefined,
 	peerConfig: RTCConfiguration
 }
 
-export type Table<T> = {
-	create: (db: Database)=>number
-}
-
-
 export type AuthTokenName = "Authorization";
-export type ApiRoute = 
+export type ApiRoute =
 	"auth" |
-	"connections" | 
+	"connections" |
 	"sse" |
 	"becomeAnonymous" |
 	"setColor" |
@@ -29,11 +25,11 @@ export type ApiRoute =
 	"dmHistory" |
 	"dmUnread" |
 	"publicKey" |
-	"broadcastJson" |
-	"position" | 
-	"initiateCall";
+	"position" |
+	"initiateCall" |
+	"area" | "grabArea" | "releaseArea";
 
-export type SSEvent = 
+export type SSEvent =
 	"initiateCall" |
 	"webRTC" |
 	"new_connection" |
@@ -45,11 +41,14 @@ export type SSEvent =
 	"friendRequests" |
 	"friendList" |
 	"friendRequestAccepted" |
-	"broadcastJson" |
-	"dm";
+	"dm" |
+	"addArea" |
+	"removeArea" |
+	"grabArea" |
+	"releaseArea";
 
 
-export type ConnectionStatus = ""|"online"
+export type ConnectionStatus = "" | "online"
 export type Connection = {
 	id: string
 	color?: string
@@ -62,9 +61,9 @@ export type Connection = {
 };
 
 export type Position = {
-    readonly x: number
-    readonly y: number
-    readonly z: number
+	readonly x: number
+	readonly y: number
+	readonly z: number
 }
 export type QuaternionTuple = [x: number, y: number, z: number, w: number]
 
@@ -118,4 +117,10 @@ export type DMRequest = {
 export type JwkPair = {
 	privateJwk: JsonWebKey,
 	publicJwk: JsonWebKey
+}
+
+export type AreaNotification = {
+	conId: string,
+	areaId: string,
+	position?: Position
 }

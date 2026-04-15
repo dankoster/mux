@@ -1,13 +1,15 @@
 import { API_URI } from "../API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult } from "../../server/types";
-import { apiRoute, GET, POST } from "./http";
+import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult, AreaNotification, Position } from "../../server/types";
+import { apiRoute, DELETE, GET, POST } from "./http";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
 import { uiLog } from "../uiLog";
 import { sharePrivateKey } from "./directMessages";
 import * as PositionSocket from "./positionSocket";
+import { AddPalm } from "../planet/palm";
+import { shortId } from "../helpers";
 
 const sse: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",
@@ -21,8 +23,11 @@ const sse: { [Property in SSEvent]: Property } = {
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
 	dm: "dm",
-	broadcastJson: "broadcastJson",
-	initiateCall: "initiateCall"
+	initiateCall: "initiateCall",
+	addArea: "addArea",
+	removeArea: "removeArea",
+	grabArea: "grabArea",
+	releaseArea: "releaseArea"
 }
 
 export const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
@@ -67,7 +72,7 @@ type AuthData = {
 function parseJsonDeep(obj) {
 	switch (typeof (obj)) {
 		case 'object':
-			for(const prop in obj) {
+			for (const prop in obj) {
 				const result = parseJsonDeep(obj[prop])
 				obj[prop] = result
 			}
@@ -85,13 +90,13 @@ function parseJsonDeep(obj) {
 startup()
 async function startup() {
 	console.log(`data pipeline startup`)
-	
+
 	const authResult = await POST(apiRoute.auth)
 	const authJson = await authResult.json() as AuthData
 	console.log(`auth`, authJson.uuid, authJson.self?.id, authJson.self.identity?.name)
-	
-	if(!authJson.uuid) throw new Error(`auth failed to get uuid`)
-	if(!authJson.self) throw new Error(`auth failed to get self`)
+
+	if (!authJson.uuid) throw new Error(`auth failed to get uuid`)
+	if (!authJson.self) throw new Error(`auth failed to get self`)
 
 	setPk(authJson.uuid)
 
@@ -101,7 +106,7 @@ async function startup() {
 		console.log(apiRoute.discardKey, { newKey: authJson.uuid, oldKey });
 		POST(apiRoute.discardKey, { subRoute: oldKey })
 	}
-	
+
 	const connectionsResult = await GET(apiRoute.connections)
 	const connectionsData = await connectionsResult.json() as Connection[]
 	console.log(`got ${connectionsData?.length} connections`)
@@ -113,7 +118,7 @@ async function startup() {
 	onConnectionsChanged()
 
 	const con = connections.find(c => c.id == authJson.self.id)
-	if(!con) throw new Error(`failed to find self connection ${authJson.self.id}`)
+	if (!con) throw new Error(`failed to find self connection ${authJson.self.id}`)
 
 	con.position = parseJsonDeep(con.position)
 	con.quaternion = parseJsonDeep(con.quaternion)
@@ -122,11 +127,19 @@ async function startup() {
 	resolvePromiseToGetSelfConnection(con)
 
 	initSSE(`${API_URI}/${apiRoute.sse}`).then(res => {
-		if(res.status == 401) //not authorized
+		if (res.status == 401) //not authorized
 			location.reload()
 	})
 
 	PositionSocket.connectSocket()
+
+
+}
+
+export async function loadAreas() {
+	const areas = await (await GET(apiRoute.area))?.json()
+	areas.forEach((a: { position: string; }) => a.position = JSON.parse(a.position))
+	return areas
 }
 
 
@@ -143,7 +156,7 @@ async function initSSE(route: string): Promise<Response> {
 			if (uuid) headers.set(AUTH_TOKEN_HEADER_NAME, uuid)
 			const response = await fetch(route, { method: 'GET', headers })
 
-			if(!response.ok){ 
+			if (!response.ok) {
 				console.log(`SSE not ok!`, response)
 				return response
 			}
@@ -221,17 +234,10 @@ export function githubAuthUrl() {
 	return url
 }
 
-type JsonMessage = {
-	command: "addArea" | "removeArea",
-	payload: any,
-	sender?: string //set by the server
-}
-
-export async function broadcastJson(message: JsonMessage) {
-	const json = JSON.stringify(message);
-	console.log("broadcastJson", json)
-	return await POST(apiRoute.broadcastJson, { body: json })
-}
+export const addArea = (area: AreaParams) => POST(apiRoute.area, { body: JSON.stringify(area) })
+export const removeArea = (uuid: string) => DELETE(apiRoute.area, uuid)
+export const grabArea = (uuid: string) => POST(apiRoute.grabArea, { body: uuid })
+export const releaseArea = (message: AreaNotification) => POST(apiRoute.releaseArea, { body: JSON.stringify(message) })
 
 export async function initiateCall(conId: string): Promise<initiateCallResult> {
 	var result = (await POST(apiRoute.initiateCall, { body: conId }))
@@ -262,7 +268,7 @@ export async function becomeAnonymous() {
 		setConnections({ from: index, to: index }, "identity", undefined)
 		setFriends([])
 		setFriendRequests([])
-		
+
 		//TODO: remove local storage
 	}
 }
@@ -357,21 +363,33 @@ async function handleSseEvent(event: SSEventPayload) {
 			uiLog(`SSE ${event.event}: ${dm}`)
 			break;
 
-		case sse.broadcastJson:
-			const json = JSON.parse(event.data) as JsonMessage
-			console.log(`SSE`, sse.broadcastJson, json)
+		case sse.addArea:
+			const ap = JSON.parse(event.data) as AreaParams
+			ap.fromServer = true
+			AddPalm(ap);
+			break;
+		case sse.removeArea:
+			Planet.removeArea(JSON.parse(event.data))
+			break;
 
-			switch(json.command) {
-				case "addArea":
-					Planet.addArea(json.payload as AreaParams);
-					break;
-				case "removeArea":
-					const ap = json.payload as AreaParams
-					Planet.removeArea(ap.id)
-					break;
-				default: 
-					throw `${json.command} not supported!`
-			}
+		case sse.grabArea:
+			const grabAreaMessage = JSON.parse(event.data) as AreaNotification
+			console.log(`GRAB AREA`, grabAreaMessage)
+			uiLog(`${grabAreaMessage.conId} GRAB ${shortId(grabAreaMessage.areaId)}`)
+			
+			const grab_avatar = Planet.getAvatarById(grabAreaMessage.conId)
+			const grab_area = Planet.getAreaById(grabAreaMessage.areaId)
+			grab_area?.grab(grab_avatar)
+			break;
+
+		case sse.releaseArea:
+			const releaseAreaMessage = JSON.parse(event.data) as AreaNotification
+			console.log(`RELEASE AREA`, releaseAreaMessage)
+			uiLog(`${releaseAreaMessage.conId} RELEASE ${shortId(releaseAreaMessage.areaId)}`)
+
+			const release_avatar = Planet.getAvatarById(releaseAreaMessage.conId)
+			const release_area = Planet.getAreaById(releaseAreaMessage.areaId)
+			release_area?.release(release_avatar)
 			break;
 
 		case sse.initiateCall:
@@ -400,7 +418,7 @@ export function sendWebRtcMessage(userId: string, message: string) {
 function onConnectionsChanged() {
 	//do we have another connection with the same identity as myself?
 	const me = self()
-	if(!me) return
+	if (!me) return
 
 	connections.forEach(con => {
 		if (me.identity &&

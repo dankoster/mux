@@ -18,9 +18,11 @@ export const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmHistory: "dmHistory",
 	dmUnread: "dmUnread",
 	position: "position",
-	broadcastJson: "broadcastJson",
 	initiateCall: "initiateCall",
 	connections: "connections",
+	area: "area",
+	grabArea: "grabArea",
+	releaseArea: "releaseArea"
 };
 
 export async function GET(route: ApiRoute, subRoute?: string) {
@@ -39,11 +41,13 @@ export async function POST(route: ApiRoute, options?: PostOptions) {
 	headers[AUTH_TOKEN_HEADER_NAME] = options?.authToken ?? pk();
 	if (!route) throw new Error(`invalid route: ${route}`)
 	const url = [API_URI, route, options?.subRoute].filter(s => s).join('/')
-	return await fetch(url, {
+	const result = await fetch(url, {
 		method: "POST",
 		body: options?.body,
 		headers
 	});
+
+	return result
 }
 
 export async function DELETE(route: ApiRoute, subRoute: string) {

@@ -1,9 +1,10 @@
 import { Request } from "jsr:@oak/oak@17/request";
 import { Router } from "jsr:@oak/oak@17/router";
 import * as db from "./db.ts";
-import type { SSEvent, AuthTokenName, ApiRoute, Connection, DM, DMRequest, PositionMessage, Position, initiateCallResult, QuaternionTuple } from "./types.ts";
+import type { SSEvent, AuthTokenName, ApiRoute, Connection, DM, DMRequest, PositionMessage, Position, initiateCallResult, QuaternionTuple, AreaNotification } from "./types.ts";
 import { onLocalBuild } from "./localHelper.ts";
 import { Identity } from "./data/table/identity.ts";
+import { AreaRecord } from "./data/table/area.ts";
 
 export { api }
 
@@ -19,14 +20,17 @@ const sseEvent: { [Property in SSEvent]: Property } = {
 	friendRequests: "friendRequests",
 	friendRequestAccepted: "friendRequestAccepted",
 	dm: "dm",
-	broadcastJson: "broadcastJson",
-	initiateCall: "initiateCall"
+	initiateCall: "initiateCall",
+	addArea: "addArea",
+	removeArea: "removeArea",
+	grabArea: "grabArea",
+	releaseArea: "releaseArea"
 }
 
 const AUTH_TOKEN_HEADER_NAME: AuthTokenName = "Authorization"
 
 const apiRoute: { [Property in ApiRoute]: Property } = {
-	auth: "auth", 
+	auth: "auth",
 	connections: "connections",
 	sse: "sse",
 	setColor: "setColor",
@@ -42,8 +46,10 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 	dmUnread: "dmUnread",
 	publicKey: "publicKey",
 	position: "position",
-	broadcastJson: "broadcastJson",
-	initiateCall: "initiateCall"
+	initiateCall: "initiateCall",
+	area: "area",
+	grabArea: "grabArea",
+	releaseArea: "releaseArea"
 }
 
 
@@ -164,13 +170,13 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		const message = JSON.parse(m.data) as { position: Position, quaternion: QuaternionTuple }
 		con.position = message.position
 		con.quaternion = message.quaternion
-		
+
 		db.persistPosition({
-			uuid: socketUuid, 
-			position: JSON.stringify(message.position), 
+			uuid: socketUuid,
+			position: JSON.stringify(message.position),
 			quaternion: JSON.stringify(message.quaternion)
 		})
-		
+
 		const pm: PositionMessage = {
 			id: con.id,
 			position: con.position,
@@ -301,7 +307,7 @@ api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	}
 })
 
-const calls: {from:string,to:string}[] = []
+const calls: { from: string, to: string }[] = []
 
 //TODO: get this from cloudflare
 const peerConfig: RTCConfiguration = {
@@ -343,55 +349,199 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 		const caller = con.id
 		const callee = await ctx.request.body.json()
 
-		const result: initiateCallResult = { 
+		const result: initiateCallResult = {
 			polite: undefined,
 			peerConfig
 		}
 
 		const pendingCall = calls.find(c => c.to == caller)
 
-		if(pendingCall){
-			calls.splice(calls.indexOf(pendingCall),1)
+		if (pendingCall) {
+			calls.splice(calls.indexOf(pendingCall), 1)
 			result.polite = true
 		}
 		else {
-			calls.push({from: caller, to: callee})
+			calls.push({ from: caller, to: callee })
 			result.polite = false
 		}
 
 		console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
-		console.log(typeof(callee), `${callee}`)
+		console.log(typeof (callee), `${callee}`)
 
 		const toUuid = getUUID(`${callee}`)
 		console.log('initiate call to UUID', toUuid)
-		if(toUuid){
+		if (toUuid) {
 			const updateFn = updateFunctionByUUID.get(toUuid)
 			updateFn?.update(sseEvent.initiateCall, caller)
 		}
 
 		ctx.response.body = JSON.stringify(result)
 		ctx.response.status = 200
-	} catch(err) {
+	} catch (err) {
 		console.error(err, ctx.request)
 		ctx.response.status = 400
 	}
 })
 
-api.post(`/${apiRoute.broadcastJson}`, async (ctx) => {
+api.post(`/${apiRoute.area}`, async ctx => {
 	try {
 		const { uuid, con } = getConnection(ctx.request)
-		const json = await ctx.request.body.json()
-		console.log(apiRoute.broadcastJson, uuid, json)
-		json.sender = uuid
 
-		notifyAllConnections(sseEvent.broadcastJson, json, {
+		const area = await ctx.request.body.json() as AreaRecord
+		console.log(ctx.request.url.pathname, uuid, area)
+
+		if (!con.identity?.id) {
+			ctx.response.status = 401 //unauthorized
+			return
+		}
+
+		area.ownerIdentityId = con.identity?.id!
+
+		db.area.add(area)
+
+		notifyAllConnections(sseEvent.addArea, area, {
 			excludeUUID: uuid
 		})
+
 		ctx.response.status = 200
-	} catch(err) {
+	} catch (err) {
 		console.error(err, ctx.request)
 		ctx.response.status = 500
 	}
+})
+
+api.post(`/${apiRoute.grabArea}`, async ctx => {
+	try {
+		const { uuid, con } = getConnection(ctx.request)
+
+		const areaId = await ctx.request.body.text() as string
+		console.log(ctx.request.url.pathname, uuid, areaId)
+
+		if (!areaId) {
+			ctx.response.status = 400
+			ctx.response.body = "missing areaId"
+			return
+		}
+		if (!con.identity?.id) {
+			ctx.response.status = 401 //unauthorized
+			return
+		}
+
+		const dbArea = db.area.getById(areaId, con.identity?.id)
+
+		if (!dbArea) {
+			ctx.response.status = 404
+			return
+		}
+		
+		//todo: retain grabbed areas in db
+		
+		const notification: AreaNotification = {
+			conId: con.id, 
+			areaId
+		}
+
+		notifyAllConnections(sseEvent.grabArea, notification, {
+			excludeUUID: uuid
+		})
+
+		ctx.response.status = 200
+	} catch (err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 500
+	}
+})
+
+api.post(`/${apiRoute.releaseArea}`, async ctx => {
+	try {
+		const { uuid, con } = getConnection(ctx.request)
+
+		const an = await ctx.request.body.json() as AreaNotification
+		console.log(ctx.request.url.pathname, uuid, an.areaId)
+
+		if (!an.areaId) {
+			ctx.response.status = 400
+			ctx.response.body = "missing areaId"
+			return
+		}
+		if (!con.identity?.id) {
+			ctx.response.status = 401 //unauthorized
+			return
+		}
+
+		const dbArea = db.area.getById(an.areaId, con.identity?.id)
+		
+		if (!dbArea) {
+			ctx.response.status = 404
+			return
+		}
+		
+		//TODO: retain grabbed areas in db
+
+		//update area position
+		dbArea.position = an.position
+		const result = db.area.update(dbArea)
+
+		notifyAllConnections(sseEvent.releaseArea, an, {
+			excludeUUID: uuid
+		})
+
+		ctx.response.status = 200
+	} catch (err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 500
+	}
+})
+
+api.delete(`/${apiRoute.area}/:id`, async ctx => {
+	try {
+		const { uuid, con } = getConnection(ctx.request)
+
+		if (!con.identity?.id) {
+			ctx.response.status = 401
+			ctx.response.body = 'invalid owner identity id from request'
+			return
+		}
+
+		if (ctx.params?.id?.length !== 36) {
+			ctx.response.status = 400
+			ctx.response.body = 'invalid area id'
+			return
+		}
+
+		const areaId = ctx.params.id
+		console.log(ctx.request.url.pathname, uuid, { areaId: areaId })
+
+		const area = db.area.getById(areaId, con.identity.id)
+
+		if (area.ownerIdentityId != con.identity?.id) {
+			ctx.response.status = 403 //forbidden
+			return
+		}
+
+		ctx.response.body = db.area.remove(areaId, con.identity.id)
+
+		notifyAllConnections(sseEvent.removeArea, areaId, {
+			excludeUUID: uuid
+		})
+
+		ctx.response.status = 200
+	} catch (err) {
+		console.error(err, ctx.request)
+		ctx.response.status = 500
+	}
+})
+
+api.get(`/${apiRoute.area}`, async (ctx) => {
+	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME)
+	if (!uuid) {
+		ctx.response.status = 401
+		return
+	}
+
+	const areas = db.area.getAll()
+
+	ctx.response.body = JSON.stringify(Array.from(areas.values()))
 })
 
 api.post(`/${apiRoute.setColor}`, async (ctx) => {
@@ -560,7 +710,7 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 
 api.get(`/${apiRoute.connections}`, async (ctx) => {
 	const uuid = ctx.request.headers.get(AUTH_TOKEN_HEADER_NAME)
-	if(!uuid) {
+	if (!uuid) {
 		ctx.response.status = 401
 		return
 	}
@@ -573,7 +723,7 @@ api.post(`/${apiRoute.auth}`, async context => {
 	const oldKey = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
 	let uuid = oldKey ?? crypto.randomUUID()
 
-	if(!uuid || uuid.length !== 36) {
+	if (!uuid || uuid.length !== 36) {
 		console.warn(`uuid cannot be ${typeof uuid} ${uuid}`)
 		uuid = crypto.randomUUID()
 	}
@@ -590,25 +740,25 @@ api.post(`/${apiRoute.auth}`, async context => {
 		notifyAllConnections(sseEvent.new_connection, connection, { excludeUUID: uuid })
 	}
 
-	context.response.body = JSON.stringify({uuid, self: connection})
+	context.response.body = JSON.stringify({ uuid, self: connection })
 })
 
 api.get(`/${apiRoute.sse}`, async (context) => {
 	const uuid = context.request.headers.get(AUTH_TOKEN_HEADER_NAME)
-	if(!uuid) {
+	if (!uuid) {
 		context.response.status = 400 //bad request
 		context.response.body = `missing ${AUTH_TOKEN_HEADER_NAME} header`
 		return
 	}
-		
-	if(!connectionByUUID.has(uuid)) {
+
+	if (!connectionByUUID.has(uuid)) {
 		context.response.status = 401 //unauthorized
 		return
 	}
 
 	console.log("SSE", `Connect`, uuid, context.request.ip, context.request.userAgent.os.name)
 	const connection = connectionByUUID.get(uuid)
-	if(!connection) {
+	if (!connection) {
 		console.error(`connection not found for ${uuid}`)
 		context.response.status = 500
 		return
@@ -655,7 +805,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 
 			//console.log("SSE Disconnect   ", uuid, connection)
 			connection.status = ""
-			
+
 			//cleanup
 			if (!connection.position) {
 				console.log(`cleanup`, uuid, connection)

@@ -1,38 +1,36 @@
 import * as THREE from 'three';
-import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { Connection } from '../../server/types';
+import { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { AreaRecord } from '../../server/data/table/area';
+import { shortId } from '../helpers';
+import { uiLog } from '../uiLog';
 import { Labeled } from './Labeled';
-import { Interactable } from './Interactable';
+import { Avatar } from './avatar';
 
-export type AreaParams = { 
-	id?: string,
-	size: number, 
-	position?: THREE.Vector3Like,
-	lookTarget?: THREE.Vector3,
-	color?: number, 
-	labelText?: string,
-	labelClick?: (this: GlobalEventHandlers, ev: PointerEvent) => any,
+export type AreaParams = AreaRecord & {
+	lookTarget?: THREE.Vector3
+	fromServer?: boolean
+}
+
+export interface Complication {
+	parent: Area
 }
 
 export class Area {
-	mesh: THREE.Mesh;
-	connection?: Connection;
-	id: string
-	label: Labeled
-	interactable: Interactable
+	mesh: THREE.Mesh
+	model: GLTF
+	uuid: string
+	complications: any[] = []
+	lookTarget?: THREE.Vector3
+	params: AreaParams
 
-	constructor(params : AreaParams) {	
-		this.id = params.id ?? crypto.randomUUID()
-
-		const material = params.color ? new THREE.MeshPhongMaterial({ color:params.color }) : new THREE.MeshNormalMaterial();
-		const boxGeometry = new THREE.BoxGeometry(params.size, params.size, params.size);
-		this.mesh = new THREE.Mesh(boxGeometry, material);
-
-		this.label = new Labeled(this.mesh, params.labelText)
-		this.label.labelDiv.onclick = params.labelClick
-		this.label.labelDiv.style.pointerEvents = params.labelClick ? 'auto' : 'none';
-
-		this.interactable = new Interactable(this.mesh, params.size)
+	constructor(params: AreaParams) {
+		this.uuid = params.uuid ?? crypto.randomUUID()
+		this.params = params
+		
+		// const material = params.color ? new THREE.MeshPhongMaterial({ color:params.color }) : new THREE.MeshNormalMaterial();
+		// const boxGeometry = new THREE.BoxGeometry(params.size, params.size, params.size);
+		// this.mesh = new THREE.Mesh(boxGeometry, material);
+		this.mesh = new THREE.Mesh();
 	}
 
 	setPositionAndLook({ position, lookTarget }: { position: THREE.Vector3Like, lookTarget?: THREE.Vector3 }) {
@@ -45,17 +43,50 @@ export class Area {
 			this.mesh.position.copy(position)
 		}
 
-		if (lookTarget)
+		if (lookTarget) {
 			this.mesh.lookAt(lookTarget)
+			this.lookTarget = lookTarget
+		}
 	}
 
 	set distanceFromSelf(value: number) {
-		this.label.labelDiv.style.opacity = `${100 - (value * 3)}%`;
+		this.complications
+			.filter(c => c instanceof Labeled)
+			.forEach(c => c.labelDiv.style.opacity = `${100 - (value * 3)}%`)
 	}
 
 	delete() {
-		console.log('area delete!', this.connection?.identity?.name);
 		this.mesh.removeFromParent();
-		this.label.labelDiv.remove();
+		this.complications.filter(c => c instanceof Labeled).forEach(l => l.labelDiv.remove())
+	}
+
+	private onAvatarMoved = () => {
+		this.setPositionAndLook({
+			position: this.holder.mesh.position,
+			lookTarget: this.lookTarget
+		})
+
+		//tell the server we moved it!
+	}
+
+	holder: Avatar;
+
+	//TODO: make grabbing a complication
+	grab = (avatar: Avatar) => {
+		if (this.holder) throw new Error(`already grabbed by ${this.holder.label.text}!`)
+		
+		this.holder = avatar
+		this.holder.addEventListener(this.holder.event.moved, this.onAvatarMoved)
+		uiLog(`${this.holder.label.text} grabbed ${shortId(this.uuid)}`)
+	}
+	
+	release = (avatar?: Avatar) => {
+		if (!this.holder) throw new Error(`${shortId(this.uuid)} is not held by anyone!`)
+		if (avatar && avatar.connection?.id !== this.holder.connection?.id)
+			throw new Error(`${avatar.connection.id} cannot release area ${shortId(this.uuid)}`)
+			
+		uiLog(`${this.holder.label.text} released ${shortId(this.uuid)}`)
+		this.holder.removeEventListener(this.holder.event.moved, this.onAvatarMoved)
+		this.holder = null
 	}
 }

@@ -16,15 +16,21 @@ import './planet.css'
 import { resizeRendererToDisplaySize } from './resizeRenderer'
 import { Area, AreaParams } from './area'
 import { Intersections } from './Intersections'
-import { uiLog } from '../uiLog'
+import { Interactable } from './Interactable'
+import { AddPalm } from './palm'
+import { AreaRecord } from '../../server/data/table/area'
 
-function NotReady():any { throw new Error('<Planet /> not ready!') }
+function NotReady(): any { throw new Error('<Planet /> not ready!') }
 
-export let addArea: (ap: AreaParams) => Area = () => NotReady()
+export let addArea: (area: Area) => Area = () => NotReady()
 export let removeArea: (id: string) => Area | undefined = () => NotReady()
 export let becomeAnynomous: () => void = () => NotReady()
-export let getSelfAvatarPosition: () => THREE.Vector3Like = () => NotReady()
- 
+export let getSelfAvatar: () => Avatar = () => NotReady()
+export let zoom: (area: Area) => void = () => NotReady()
+export let position: () => THREE.Vector3 = () => NotReady()
+export let getAreaById: (id:string) => Area = () => NotReady()
+export let getAvatarById: (id:string) => Avatar = () => NotReady()
+
 export const intersections = new Intersections()
 
 export function Planet() {
@@ -42,19 +48,36 @@ export function Planet() {
 	let sceneIsReady: (scene: THREE.Scene) => void
 	const sceneReady = new Promise<THREE.Scene>(resolve => sceneIsReady = resolve)
 
+	let targetZoom = 1
+	let trargetRotateSpeed = 0.85
+
+	position = (): THREE.Vector3 => sphere?.position
+	getAreaById = (areaId: string) => areas.find(a => a.uuid == areaId)
+	getAvatarById = (id: string) => avatarsById.get(id)
+
+	zoom = (area: Area): void => {
+		if (!camera) throw new Error("Camera not ready to zoom")
+
+		targetZoom = area ? 2 : 1
+		trargetRotateSpeed = area ? 0.35 : 0.85
+
+		console.log('planet.zoom', camera.zoom)
+	}
+
 	async function getAvatar(con: Connection): Promise<Avatar | undefined> {
-		if(!con) console.warn(`cannot getAvatar for ${con}`) 
-		
+		if (!con) console.warn(`cannot getAvatar for ${con}`)
+
 		await sceneReady
 
-		if(!scene){
+		if (!scene) {
 			console.warn('scene not ready!')
 			return
 		}
 
 		let avatar = avatarsById.get(con.id)
-		
+
 		if (!avatar) {
+			console.log('avatar create!', con.identity?.name ?? con.id);
 			avatar = new Avatar()
 			avatar.connection = con
 			avatar.label.text = displayName(con) || shortId(con.id)
@@ -64,11 +87,10 @@ export function Planet() {
 			}
 			avatarsById.set(con.id, avatar)
 		}
-		
-		if(scene && !scene.children.includes(avatar.mesh)){
+
+		if (scene && !scene.children.includes(avatar.mesh)) {
 			scene.add(avatar.mesh)
 		}
-		
 		return avatar
 	}
 
@@ -77,37 +99,43 @@ export function Planet() {
 		selfAvatar.label.text = shortId(selfAvatar.connection?.id)
 	}
 
-	getSelfAvatarPosition = () => selfAvatar.mesh.position
-	
-	addArea = (params: AreaParams) => {
-		const area = new Area(params)		
-		area.setPositionAndLook({ position: params.position, lookTarget: sphere?.position })
-		
-		console.log('addArea', area)
-		if(scene && !scene.children.includes(area.mesh)){
+	getSelfAvatar = () => selfAvatar
+
+
+	addArea = (area: Area) => {
+		if (!scene) console.warn('scene not ready!')
+		if (!(area instanceof Area)) throw new Error('area must be instance of Area')
+
+		if (!scene.children.includes(area.mesh)) {
+			// console.log('addArea', area)
 			scene.add(area.mesh)
 			areas.push(area)
 		}
-		if(!scene)
-			console.trace('scene not ready!', area)
 
 		return area
 	}
 
 	removeArea = (id: string) => {
-		const index = areas.findIndex(a => a.id === id)
-		if(index >= 0) {
-			const area = areas.splice(index,1)[0]
-			area.delete()
-			return area
-		}
+		const index = areas.findIndex(a => a.uuid === id)
+		
+		if (index < 0) 
+			throw new Error(`area id not found! ${id}`)
+			
+		const area = areas.splice(index, 1)[0]
+		
+		if(intersections.intersecting.has(area))
+			intersections.update(area, false)
+		
+		area.delete()
+		return area
 	}
 
 	//add/remove avatars when connection status changes
 	createEffect(async () => {
 		for (const con of Data.connections) {
+			//console.log(con.id, con.status ?? "offline")
 			if (con.status === 'online' && con.position && !avatarsById.has(con.id)) {
-				await getAvatar(con)
+				getAvatar(con)
 			}
 
 			//solid-js wierdness: if the following two conditionals are swapped
@@ -124,9 +152,9 @@ export function Planet() {
 		const con = Data.connections.find(con => con.id === message.id)
 
 		if (con?.status !== 'online') console.warn(`got position for ${con?.id} with status ${con?.status}`)
-		
+
 		//get the avatar for this position (add, if necessary)
-		let avatar = await getAvatar(con)		
+		let avatar = await getAvatar(con)
 		const position = new THREE.Vector3(message.position.x, message.position.y, message.position.z)
 		const quaternion = message.quaternion;
 		avatar.setPositionAndLook(position, quaternion)
@@ -134,25 +162,29 @@ export function Planet() {
 	})
 
 	function updateDistanceFromSelf(avatar: Avatar, minDistanceMoved: number = 0.25) {
-		if(avatar == selfAvatar) return
-		
+		if (avatar == selfAvatar) return
+
 		avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 
-		if(avatar.distanceFromSelf > avatar.lastBroadcastDistanceFromSelf + minDistanceMoved
+		if (avatar.distanceFromSelf > avatar.lastBroadcastDistanceFromSelf + minDistanceMoved
 			|| avatar.distanceFromSelf < avatar.lastBroadcastDistanceFromSelf - minDistanceMoved
 		) {
 			avatar.lastBroadcastDistanceFromSelf = avatar.distanceFromSelf
 		}
 	}
 
+	// let lastBroadcastPositionID
 	function broadcastPosition(avatar: Avatar, minDistanceMoved: number = 0.25) {
 		if (!selfAvatar) return
-		
+
 		if (avatar?.mesh?.position.distanceTo(selfAvatar.lastBroadcastPosition) > minDistanceMoved) {
 			const broadcasted = positionSocket.broadcastPosition(selfAvatar?.mesh?.position, selfAvatar?.mesh?.quaternion.toArray())
 			if (broadcasted) {
 				if (selfAvatar.lastBroadcastPosition) selfAvatar.lastBroadcastPosition.copy(selfAvatar?.mesh?.position)
 				else selfAvatar.lastBroadcastPosition = selfAvatar.mesh.position
+
+				// const latlon = LatLonFromVector3(selfAvatar.lastBroadcastPosition)
+				// lastBroadcastPositionID = uiLog(`${latlon.lat.toPrecision(6)}, ${latlon.lon.toPrecision(6)}`, { logId: lastBroadcastPositionID })
 			}
 		}
 	}
@@ -161,7 +193,17 @@ export function Planet() {
 		broadcastPosition(selfAvatar)
 	}, 25)
 
+	setInterval(() => {
+		//update distances
+		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
+		areas.filter(a => a.mesh).forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh?.position))
+
+		//check for collisions (but don't wait for the async to finish)
+		checkForCollisions()
+	}, 25)
+
 	async function BuildSceneAndStartRendering() {
+		console.log('BuildSceneAndStartRendering')
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
 		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
 		scene = new THREE.Scene()
@@ -172,10 +214,12 @@ export function Planet() {
 		scene.add(sphere)
 
 		const orbit = new OrbitControls(camera, renderer.domElement)
-		orbit.enableZoom = false
 		orbit.enablePan = false
 		orbit.enableDamping = true
 		orbit.dampingFactor = 0.04
+		orbit.enableZoom = true
+		orbit.minZoom = 30
+		orbit.rotateSpeed = 0.75
 
 		const lights: THREE.DirectionalLight[] = []
 		lights[0] = new THREE.DirectionalLight(0xffffff, 3)
@@ -189,7 +233,7 @@ export function Planet() {
 		}
 
 		sceneIsReady(scene)
-	
+
 		let prevTime: number
 		function render(time: number) {
 			if (stopRendering) return
@@ -200,20 +244,35 @@ export function Planet() {
 			if (selfAvatar) {
 				//move our avatar to be under the camera
 				const c = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				if(c?.currentPosition.distanceTo(c.idealPosition) > 0.01) {
-					if (!selfAvatar?.mesh?.position) return
+				if (c?.currentPosition.distanceTo(c.idealPosition) > 0.01) {
+
+					if (!selfAvatar?.mesh?.position) {
+						debugger
+						return
+					}
 
 					selfAvatar.setPositionAndLook(c.currentPosition)
-
-					//TODO: don't do this in then render thread!
-					//our distance to all other avatars has now changed, so update them!
-					avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
-					areas.forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh.position))
 				}
 			}
 
 			//move the camera around the scene origin
 			orbit.update()
+
+			//handle zoom
+			if (camera.zoom != targetZoom) {
+				const diff = targetZoom - camera.zoom
+				const isReallyClose = () =>
+					(targetZoom > camera.zoom && diff < 0.01)
+					|| (targetZoom < camera.zoom && diff > -0.01)
+
+				camera.zoom = isReallyClose() ? targetZoom : (camera.zoom + diff / 15)
+				camera.updateProjectionMatrix()
+				// console.log(diff, camera.zoom)
+			}
+
+			if (orbit.rotateSpeed != trargetRotateSpeed) {
+				orbit.rotateSpeed = trargetRotateSpeed
+			}
 
 			//handle resize
 			const resized = resizeRendererToDisplaySize({ renderer, labelRenderer })
@@ -226,30 +285,56 @@ export function Planet() {
 			renderer.render(scene, camera)
 			labelRenderer.render(scene, camera)
 
-			//check for collisions (but don't wait for the async to finish)
-			checkForCollisions()
-
 			requestAnimationFrame(render)
 		}
 		requestAnimationFrame(render)
 	}
 
 	async function checkForCollisions() {
-		areas.forEach(area => intersections.update(area, selfAvatar.interactable.intersects(area.interactable)))
-		avatarsById.forEach((avatar) => {
-			if(avatar != selfAvatar)
+		areas.forEach(async area => {
+			area.complications?.forEach((c: any) => {
+				if (c instanceof Interactable)
+					intersections.update(area, selfAvatar.interactable.intersects(c))
+			})
+		})
+
+		avatarsById.forEach(async avatar => {
+			if (avatar != selfAvatar)
 				intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
 		})
 	}
 
 	onMount(async () => {
-		BuildSceneAndStartRendering()
+		console.log(`Planet.onMount`)
 
-		const con = await Data.selfConnection
-		selfAvatar = await getAvatar(con)		
-		placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
+		BuildSceneAndStartRendering()
+		Data.loadAreas().then(areas => {
+			areas.forEach((a: AreaRecord) => {
+				const ap: AreaParams = {
+					label: a.label,
+					uuid: a.uuid,
+					ownerIdentityId: a.ownerIdentityId,
+					position: a.position,
+					ownerName: a.ownerName,
+					ownerAvatarUrl: a.ownerAvatarUrl,
+					fromServer: true
+				}
+
+				AddPalm(ap)
+			})
+			console.log(`loaded areas`, areas)
+		})
+
+		Data.selfConnection.then(async con => {
+			console.log(`got self connection`)
+			selfAvatar = await getAvatar(con)
+			console.log(`got self avatar`)
+			placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
+		})
+		
+		console.log(`Planet.onMount - Done!`)
 	})
-	
+
 	onCleanup(() => {
 		console.log(`planet cleanup`)
 		stopRendering = true
