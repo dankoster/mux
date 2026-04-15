@@ -2,6 +2,7 @@ import { Database } from "jsr:@db/sqlite";
 import { assertEquals } from "jsr:@std/assert";
 import type { Connection, DM, DMInsert, DMRequest, Friend, FriendRequest } from "./types.ts";
 import { Identity, IdentityTable } from "./data/table/identity.ts";
+import { AreaTable } from "./data/table/area.ts";
 
 const db = new Database("data.db");
 
@@ -9,7 +10,7 @@ db.exec(`PRAGMA journal_mode=WAL;`)
 db.exec(`PRAGMA foreign_keys = ON;`)
 
 const identity = new IdentityTable(db)
-
+export const area = new AreaTable(db)
 
 db.exec(`CREATE TABLE IF NOT EXISTS friend (
 		id INTEGER PRIMARY KEY,
