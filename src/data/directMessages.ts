@@ -230,6 +230,11 @@ async function getSharedKey(privateKey: CryptoKey, sharedKeyId: string, publicJw
 export async function sharePrivateKey(myId: string, con: Connection) {
 	console.warn(`sharePrivateKey from ${myId} to ${con.id}`)
 
+	if (!myKeys) {
+		console.warn(`No keys to share... Run InitKeys first!`)
+		return
+	}
+
 	//TODO: create a two step process: 
 	// send a pin number to the other connection then
 	// require that number to be confirmed on this side
