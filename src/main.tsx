@@ -9,7 +9,7 @@ import * as server from "./data/data";
 import "./main.css"
 import Welcome, { welcomeVisible } from "./Welcome";
 import { UserToolbar } from "./UserToolbar";
-import ProximityWatcher from "./ProximityWatcher";
+import AvatarProximityCall from "./AvatarProximityCall";
 
 render(() => <App />, document.body)
 
@@ -23,7 +23,7 @@ function App() {
 			<Welcome />
 			<VideoCall />
 			<Planet />
-			<ProximityWatcher />
+			<AvatarProximityCall />
 			<Show when={!welcomeVisible() && !settingsVisible()}>
 				<UserToolbar />
 			</Show>

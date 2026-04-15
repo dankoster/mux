@@ -4,17 +4,13 @@ import { uiLog } from "./uiLog"
 import * as videoCall from "./VideoCall";
 import * as planet from "./planet/planet";
 import { IntersectionTarget } from "./planet/Intersections";
-import { Area } from "./planet/area";
 import { initiateCall } from "./data/data";
 
-export default function ProximityWatcher() {
-	uiLog(`Watching for intersections...`)
+export default function AvatarProximityCall() {
 	
 	const onStartIntersection = async (e: CustomEvent<IntersectionTarget>) => {
-		
 		if (e.detail instanceof Avatar) {
-			var avatar = e.detail as Avatar
-
+			const avatar = e.detail as Avatar
 			const callResult = await initiateCall(avatar.connection.id)
 			uiLog(`Start Call: ${avatar.label.text}`)
 			await videoCall.ConnectVideo({
@@ -24,19 +20,10 @@ export default function ProximityWatcher() {
 			})
 			uiLog(`Started Call: ${avatar.label.text}`)
 		}
-		else if (e.detail instanceof Area) {
-			var area = e.detail as Area
-			uiLog(`Entered Area: ${area.label.text}`)
-		}
 	}
 
 	const onEndIntersection = (e: CustomEvent<Avatar>) => {
-		
-		if (e.detail instanceof Area) {
-			var area = e.detail as Area
-			uiLog(`Exited Area: ${area.label.text}`)
-		}
-		else if (e.detail instanceof Avatar) {
+		if (e.detail instanceof Avatar) {
 			var avatar = e.detail as Avatar
 			videoCall.DisconnectVideo(avatar.connection?.id)
 			uiLog(`End Call: ${avatar.label.text}`)
@@ -46,10 +33,12 @@ export default function ProximityWatcher() {
 	onMount(() => {
 		planet.intersections.addEventListener(planet.intersections.event.enter, onStartIntersection)
 		planet.intersections.addEventListener(planet.intersections.event.exit, onEndIntersection)
+		uiLog(`Started watching avatar intersections...`)
 	})
 	onCleanup(() => {
 		planet.intersections.removeEventListener(planet.intersections.event.enter, onStartIntersection)
 		planet.intersections.removeEventListener(planet.intersections.event.exit, onEndIntersection)
+		uiLog(`Stopped watching avatar intersections...`)
 	})
 
 	return <></>
