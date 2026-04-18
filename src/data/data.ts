@@ -9,7 +9,6 @@ import { uiLog } from "../uiLog";
 import { sharePrivateKey } from "./directMessages";
 import * as PositionSocket from "./positionSocket";
 import { AddPalm } from "../planet/palm";
-import { shortId } from "../helpers";
 
 const sse: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",
@@ -368,7 +367,7 @@ async function handleSseEvent(event: SSEventPayload) {
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			// handleNewDirectMessage(dm);
+			//TODO: handleNewDirectMessage(dm);
 			uiLog(`SSE ${event.event}: ${dm}`)
 			break;
 
@@ -382,10 +381,7 @@ async function handleSseEvent(event: SSEventPayload) {
 			break;
 
 		case sse.grabArea:
-			const grabAreaMessage = JSON.parse(event.data) as AreaNotification
-			console.log(`GRAB AREA`, grabAreaMessage)
-			uiLog(`${grabAreaMessage.conId} GRAB ${shortId(grabAreaMessage.areaId)}`)
-			
+			const grabAreaMessage = JSON.parse(event.data) as AreaNotification			
 			const grab_avatar = Planet.getAvatarById(grabAreaMessage.conId)
 			const grab_area = Planet.getAreaById(grabAreaMessage.areaId)
 			grab_area?.grab(grab_avatar)
@@ -393,9 +389,6 @@ async function handleSseEvent(event: SSEventPayload) {
 
 		case sse.releaseArea:
 			const releaseAreaMessage = JSON.parse(event.data) as AreaNotification
-			console.log(`RELEASE AREA`, releaseAreaMessage)
-			uiLog(`${releaseAreaMessage.conId} RELEASE ${shortId(releaseAreaMessage.areaId)}`)
-
 			const release_avatar = Planet.getAvatarById(releaseAreaMessage.conId)
 			const release_area = Planet.getAreaById(releaseAreaMessage.areaId)
 			release_area?.release(release_avatar)

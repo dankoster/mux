@@ -36,13 +36,12 @@ function Card(props: { area: Area }) {
 		}
 	}
 
-	return <div class="card">
-		{shortId(props.area.uuid)}
+	return <div class="card" style={{outline: holder() ? '2px solid yellow' : null}} onclick={action}>
 		<div>{props.area.params.ownerName}</div>
-
-		<div style="display:flex;">
-			<IconButton icon="hand_pointer" action={action} />
-			<span>{holder() && 'carrying'}</span>
+		<div style="display:flex; gap:0.5rem;">
+			{holder() && <span>drop</span>}
+			{!holder() && <span>grab</span>}
+			<span>{shortId(props.area.uuid)}</span>
 		</div>
 	</div>
 }
@@ -53,14 +52,14 @@ export function AreaProximityCards() {
 	const onStartIntersection = async (e: CustomEvent<IntersectionTarget>) => {
 		if (!(e.detail instanceof Area)) return
 
-		console.log(`start intersection`, shortId(e.detail.uuid))
+		// console.log(`start intersection`, shortId(e.detail.uuid))
 		setIntersectedAreas([e.detail, ...intersectedAreas()])
 	}
 
 	const onEndIntersection = (e: CustomEvent<IntersectionTarget>) => {
 		if (!(e.detail instanceof Area)) return
 
-		console.log(`end intersection`, shortId(e.detail.uuid))
+		// console.log(`end intersection`, shortId(e.detail.uuid))
 		const index = intersectedAreas().indexOf(e.detail)
 		if (index < 0) {
 			console.warn(`index not found`, index)
