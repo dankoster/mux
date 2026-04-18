@@ -8,6 +8,14 @@ export type initiateCallResult = {
 	peerConfig: RTCConfiguration
 }
 
+export type SSEventPayload = {
+	event: SSEvent;
+	data?: string;
+	id?: string;
+	retry?: string;
+}
+
+
 export type AuthTokenName = "Authorization";
 export type ApiRoute =
 	"auth" |

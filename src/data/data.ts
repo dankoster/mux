@@ -1,7 +1,7 @@
 import { API_URI } from "../API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult, AreaNotification, Position } from "../../server/types";
+import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult, AreaNotification, Position, SSEventPayload } from "../../server/types";
 import { apiRoute, DELETE, GET, POST } from "./http";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
@@ -37,12 +37,6 @@ type Stats = {
 	offline: number;
 }
 
-type SSEventPayload = {
-	event: SSEvent;
-	data?: string;
-	id?: string;
-	retry?: string;
-}
 
 
 const [connections, setConnections] = createStore<Connection[]>([])
@@ -202,6 +196,7 @@ async function initSSE(route: string): Promise<Response> {
 				}
 
 				events.forEach(event => handleSseEvent(event as SSEventPayload))
+				events.forEach((event: SSEventPayload) => sseHandlers[event.event]?.forEach(handler => handler(event)))
 			}
 		} catch (error) {
 			setServerOnline(false)
@@ -288,6 +283,20 @@ export function onWebRtcMessage(callback: (message: { senderId: string, message:
 	return ac
 }
 
+const sseHandlers: {[key:string]:[(payload: SSEventPayload)=>void]} = {}
+export function addServerSentEventHandler(event: SSEvent, handler: (payload: SSEventPayload) => void) {
+	if(!Array.isArray(sseHandlers[event])) 
+		sseHandlers[event] = [handler]
+	else
+		sseHandlers[event].push(handler) 
+	//console.trace(`Added handler for`, event)
+}
+export function removeServerSentEventHandler(event: SSEvent, handler: (payload: SSEventPayload) => void) {
+	sseHandlers[event]?.splice(sseHandlers[event]?.indexOf(handler), 1)
+	//console.trace(`Removed handler for`, event)
+}
+
+//TODO: convert this to a consumer driven strategy pattern (see above)
 async function handleSseEvent(event: SSEventPayload) {
 	switch (event.event) {
 		case sse.reconnect:
@@ -393,8 +402,7 @@ async function handleSseEvent(event: SSEventPayload) {
 			break;
 
 		case sse.initiateCall:
-			uiLog(`SSE: ${event.event} ${JSON.parse(event.data)}`)
-			console.log(`SSE`, event.event, JSON.parse(event.data))
+			console.log("SSE", event)
 			break;
 
 		default:
