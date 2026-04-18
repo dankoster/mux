@@ -307,8 +307,6 @@ api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	}
 })
 
-const calls: { from: string, to: string }[] = []
-
 //TODO: get this from cloudflare
 const peerConfig: RTCConfiguration = {
 	iceServers: [
@@ -343,6 +341,8 @@ const peerConfig: RTCConfiguration = {
 	iceCandidatePoolSize: 10,
 };
 
+const calls: { id: string, from: string, to: string }[] = []
+
 api.post(`/${apiRoute.initiateCall}`, async ctx => {
 	try {
 		const { con } = getConnection(ctx.request)
@@ -355,24 +355,24 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 		}
 
 		const pendingCall = calls.find(c => c.to == caller)
-
 		if (pendingCall) {
+			//we're answering a call
 			calls.splice(calls.indexOf(pendingCall), 1)
 			result.polite = true
+			console.log('answer call from', callee, 'to', caller, `polite: ${result.polite}`)
 		}
 		else {
-			calls.push({ from: caller, to: callee })
+			//we're starting a new call
+			calls.push({ id: crypto.randomUUID(), from: caller, to: callee })
 			result.polite = false
-		}
-
-		console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
-		console.log(typeof (callee), `${callee}`)
-
-		const toUuid = getUUID(`${callee}`)
-		console.log('initiate call to UUID', toUuid)
-		if (toUuid) {
-			const updateFn = updateFunctionByUUID.get(toUuid)
-			updateFn?.update(sseEvent.initiateCall, caller)
+			console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
+			
+			//Send SSE message to the callee who will also POST to initiateCall
+			const toUuid = getUUID(`${callee}`)
+			if (toUuid) {
+				const updateFn = updateFunctionByUUID.get(toUuid)
+				updateFn?.update(sseEvent.initiateCall, caller)
+			}
 		}
 
 		ctx.response.body = JSON.stringify(result)

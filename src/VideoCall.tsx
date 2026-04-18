@@ -164,7 +164,7 @@ export default function VideoCall() {
 		const start = Date.now()
 		localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
 		const duration = Date.now() - start;
-		uiLog(`getUserMedia in ${duration}ms`)
+		console.log(`getUserMedia in ${duration}ms`)
 
 		localVideo.srcObject = localStream;
 		localVideo.muted = true;
