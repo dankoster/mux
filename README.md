@@ -8,15 +8,12 @@ Software is art. What do you think of AI art?
 ---
 
 ### The goal is...
-A virtual space with all the serious communication features of [Slack](https://slack.com/)...\
-But **way** less convenient! \
-And a **lot** more fun!
+People shouldn't just be items in a list! Explore a tiny 3D world where people are avatars and you need to get close to communicate. 
 
-Instead of a boring flat UI where people are just items in a list, explore a 3D world where people have avatars and you need to get close to communicate. Move your avatar around a tiny 3d planet and interact with anyone nearby via video call.
+This is a virtual space with all the serious communication features of [Slack](https://slack.com/)\
+...but more fun and **waaay** less convenient!
 
-There's so much potential for building fun features... Own your own planet, travel to other planets, share files, encrypted chat, build persistent objects in the world, push notifications, voice only calls, funny sounds, avatar customization, file transfer, passkey integration, shared whiteboards.
-
-Inspired by [Gather](https://www.gather.town/virtual-office)
+Inspired by [Gather](https://www.gather.town/features)
 
 ---
 
@@ -33,6 +30,46 @@ Inspired by [Gather](https://www.gather.town/virtual-office)
 - screen sharing - start a video call then hit the screen button
 - github auth - click the login button
 - domain name, linux server, database, etc.
+
+---
+### Up next
+There's so much potential for building fun features! Own your own planet and build it out however you want. Travel to other planets, share files as 3d objects, e2e encrypted chat, push notifications, voice only calls, shared whiteboards, funny sounds, avatar customization, passkey integration. 
+
+---
+### Experimental stuff
+
+Remember, I'm just tinkering here.
+
+Sharing state in React between non-adjacent components is... annoying, at best. Props and contexts and reducers all make great sense from a unit testing perspective but fail to provide a good developer experience in all other cases. I still like the idea of JSX but the browser and plain JavaScript offer interesting and perhaps excellent solutions to the things that annoy me about React, and even SolidJS.
+
+I am interested in answering the following questions in a way that is easy to use, easy to understand later, and easy to debug: 
+- Can I just directly share state between different parts of a UI?
+- Can I make an action like a button click in one part of the UI call a function waaaay over there on the other side of the UI in a totally different component? 
+
+I just want stack traces that don't dissappear into the guts of some library. That's all.
+
+JavaScript Module exports seem to solve a lot of the state sharing issues that libraries want to solve in over engineered ways. You may trade a little convenience but you get back a lot of simplicity. I like simplicity.
+
+One thing I'm trying is module level `export let` functions. A singleton component can basically publish an API by exporting functions that are hooked up once the component is rendered. In the pseudocode example below, any other module can `import { addItem } from myComponent` and use that function to talk to the rendered component directly. Obviously you have to use state primitives within the component (signals in SolidJS, useState in React, etc) but the `export let` functions work great just because of how javascript modules work in the browser. You get actual stack traces and there's no unnecessary infrastructure.
+
+Will this lead to a horriffic spaghetti mess? Maybe. But so can React's "clean code" approach. I'm going to shoot at my feet with this and see what happens. At least I'll get stack traces that are actually useful.
+
+```javascript
+//myComponent.js
+function NotReady() { throw new Error('MyComponent not ready!') }
+export let addItem = (item) => NotReady()
+
+export MyComponent() {
+
+	const items = []
+
+	//replaces the exported module level function with this definition for all importers
+	addItem = (item) => items.push(item)
+
+	return <>use {items} here</>
+}
+
+```
 
 ---
 ### New-to-me learning for this project:
