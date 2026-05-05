@@ -368,7 +368,7 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 			calls.push({ id: crypto.randomUUID(), from: caller, to: callee })
 			result.polite = false
 			console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
-			
+
 			//Send SSE message to the callee who will also POST to initiateCall
 			const toUuid = getUUID(`${callee}`)
 			if (toUuid) {
@@ -435,11 +435,11 @@ api.post(`/${apiRoute.grabArea}`, async ctx => {
 			ctx.response.status = 404
 			return
 		}
-		
+
 		//todo: retain grabbed areas in db
-		
+
 		const notification: AreaNotification = {
-			conId: con.id, 
+			conId: con.id,
 			areaId
 		}
 
@@ -472,12 +472,12 @@ api.post(`/${apiRoute.releaseArea}`, async ctx => {
 		}
 
 		const dbArea = db.area.getById(an.areaId, con.identity?.id)
-		
+
 		if (!dbArea) {
 			ctx.response.status = 404
 			return
 		}
-		
+
 		//TODO: retain grabbed areas in db
 
 		//update area position
@@ -691,16 +691,17 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		//TODO: send push notification (perhaps have an updater that does this?)
 
 		//update all connections owned by the sender or the receiver, except the intitial sender.
+
+		const updateFn = updateFunctionByUUID.get(toUuid)
+		if (updateFn) {
+			updateFn.update(sseEvent.dm, JSON.stringify(message))
+		}
+
 		const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
 		connectionByUUID.forEach((con, uuid) => {
 			if (uuid !== fromUuid
 				&& con.identity?.id
 				&& identitiesToUpdate.includes(con.identity.id)) {
-
-				const updateFn = updateFunctionByUUID.get(uuid)
-				if (updateFn) {
-					updateFn.update(sseEvent.dm, JSON.stringify(message))
-				}
 			}
 		})
 
