@@ -66,9 +66,11 @@ const updateFunctionByUUID = new Map<string, {
 if (Deno.env.get('ENVIRONMENT') === 'local') {
 	console.log('LOCAL BUILD watching for frontend changes...')
 	onLocalBuild('./dist', 1000, () => {
-		console.log('LOCAL BUILD! Tell all connections to refresh...')
-		//tell all connections to reload the page
-		updateFunctionByUUID.forEach(updater => updater.update(sseEvent.refresh))
+		setTimeout(() => {
+			console.log('LOCAL BUILD! Tell all connections to refresh...')
+			//tell all connections to reload the page
+			updateFunctionByUUID.forEach(updater => updater.update(sseEvent.refresh))
+		}, 1000);
 	})
 }
 
