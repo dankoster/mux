@@ -18,85 +18,107 @@ import { SSEventPayload } from "../server/types";
 // the video streams. If one of the avatars is only making chat available then 
 // pop up the chat. There should be levels of interaction. If one of the avatars is hiding then
 // prompt to open a chat or call.
+//
+// turn on local video stream when enabling video calling
+// show local video in a small viewer on or near the user button
+// 
+// use view transitions to move always on video from user button to call view
+
+
+//start WebRTC connecton on proximity and only provide available tracks
+// - add and remove tracks on demand
+
 
 export default function AvatarProximityCall() {
-
-	const onInitiateCall = async (event: SSEventPayload) => {
+	
+	//const [intersected, setIntersected] = solid.createSignal<Avatar[]>([])
+	
+	const onInitiateCallFromServer = async (event: SSEventPayload) => {
 		const callingConId = event.data
 		const callingAvatar = planet.getAvatarById(callingConId)
 
-		//TODO: ask the user if they want to answer!
-		uiLog(`Answering call from ${callingAvatar.label?.text}`)
+		//TODO: check to see if we've already connected to this caller
 
+		if(videoCall.HasPeer(callingConId)) {
+			//uiLog(`Got call from ${callingAvatar.label?.text} but already connected`)
+			console.log(`Got call from ${callingAvatar.label?.text} but already connected`)
+			return
+		}
+
+		uiLog(`Answering connection from ${callingAvatar.label?.text}`)
+		console.log(`Answering connection from `, callingAvatar.label?.text)
+		
+		
 		const callResult = await server.initiateCall(callingConId)
-		await videoCall.ConnectVideo({
+		await videoCall.Connect({
 			conId: callingConId,
 			rtcConfig: callResult.peerConfig,
 			polite: callResult.polite
 		})
 	}
-
-	const [intersected, setIntersected] = solid.createSignal<{avatar: Avatar,connected:boolean}[]>([])
-
-	const startVideoCall = async (avatar: Avatar) => {
-		uiLog(`Initiate Call: ${avatar.label.text}`)
-		const callResult = await server.initiateCall(avatar.connection.id)
-		uiLog(`Start Call: ${avatar.label.text}`)
-		await videoCall.ConnectVideo({
-			conId: avatar.connection?.id,
-			rtcConfig: callResult.peerConfig,
-			polite: callResult.polite
-		})
-		const index = intersected().findIndex(i=> i.avatar == avatar)
-		setIntersected(intersected().toSpliced(index, 1, {avatar, connected:true}))
-
-		uiLog(`Started Call: ${avatar.label.text}`)
-	}
-
-	const endVideoCall = async (avatar: Avatar) => {
-		videoCall.DisconnectVideo(avatar.connection?.id)
-		uiLog(`End Call: ${avatar.label.text}`)
-	}
-
+	
 	const onStartIntersection = async (e: CustomEvent<IntersectionTarget>) => {
 		if (e.detail instanceof Avatar) {
 			const avatar = e.detail as Avatar
-			setIntersected([...intersected(), {avatar, connected:false}])
+			//setIntersected([...intersected(), avatar])
+
+			if (videoCall.HasPeer(avatar.connection?.id)) {
+				//uiLog(`Intersected ${avatar.label?.text} but already connected`)
+				console.log(`Intersected ${avatar.label?.text} but already connected`)
+				return
+			}
+			
+			uiLog(`Connecting to ${avatar.label?.text}`)
+			console.log(`Connecting to`, avatar.label?.text)
+			
+			const callResult = await server.initiateCall(avatar.connection.id)
+			await videoCall.Connect({
+				conId: avatar.connection?.id,
+				rtcConfig: callResult.peerConfig,
+				polite: callResult.polite
+			})
 		}
 	}
-
+	
 	const onEndIntersection = (e: CustomEvent<Avatar>) => {
 		if (e.detail instanceof Avatar) {
 			var avatar = e.detail as Avatar
-			const index = intersected().findIndex(i=> i.avatar == avatar)
-			if (index < 0) {
-				uiLog(`ERROR! onEndIntersection cannot find avatar`)
-				return
-			}
-			setIntersected(intersected().toSpliced(index, 1))
+			// const index = intersected().findIndex(i=> i == avatar)
+			// if (index < 0) {
+			// 	uiLog(`ERROR! onEndIntersection cannot find avatar`)
+			// 	return
+			// }
+			// setIntersected(intersected().toSpliced(index, 1))
+			console.log(`onEndIntersection`, avatar.label?.text)
+			videoCall.Disconnect(avatar?.connection?.id)
 		}
 	}
-
+	
 	onMount(() => {
-		planet.intersections.addEventListener(planet.intersections.event.enter, onStartIntersection)
-		planet.intersections.addEventListener(planet.intersections.event.exit, onEndIntersection)
-		server.addServerSentEventHandler("initiateCall", onInitiateCall)
-		uiLog(`Started watching avatar intersections...`)
+		const intersections = planet.getIntersections()
+		intersections.addEventListener(intersections.event.enter, onStartIntersection)
+		intersections.addEventListener(intersections.event.exit, onEndIntersection)
+		server.addServerSentEventHandler("initiateCall", onInitiateCallFromServer)
+		uiLog(`Started watching avatars`)
+		console.log(`onMount`)
 	})
 	onCleanup(() => {
-		planet.intersections.removeEventListener(planet.intersections.event.enter, onStartIntersection)
-		planet.intersections.removeEventListener(planet.intersections.event.exit, onEndIntersection)
-		server.removeServerSentEventHandler("initiateCall", onInitiateCall)
-		uiLog(`Stopped watching avatar intersections...`)
+		const intersections = planet.getIntersections()
+		intersections.removeEventListener(intersections.event.enter, onStartIntersection)
+		intersections.removeEventListener(intersections.event.exit, onEndIntersection)
+		server.removeServerSentEventHandler("initiateCall", onInitiateCallFromServer)
+		uiLog(`Stopped watching avatars`)
+		console.log(`onCleanup`)
 	})
 
-	return <div>
-		<solid.For each={intersected()} fallback={<div>no avatar intersections</div>}>
-			{({avatar, connected}) => <div>
-				<div>{avatar.label.text}</div>
-				{connected && <button onclick={() => endVideoCall(avatar)}>Stop Video</button>}
-				{!connected && <button onclick={() => startVideoCall(avatar)}>Start Video</button>}
-			</div>}
-		</solid.For>
-	</div>
+	return <></>
+	
+	// <div class="cards">
+	// 	<solid.For each={intersected()} fallback={<div id="AvatarProximityCall">no avatar intersections</div>}>
+	// 		{(avatar) => <div id="AvatarProximityCall" class="card">
+	// 			<div>{avatar.label.text}</div>
+	// 			{/* TODO: show chat? */}
+	// 		</div>}
+	// 	</solid.For>
+	// </div>
 }

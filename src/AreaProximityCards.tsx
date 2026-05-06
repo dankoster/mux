@@ -2,10 +2,11 @@ import * as solid from "solid-js"
 import * as planet from "./planet/planet";
 import * as server from "./data/data";
 import { IntersectionTarget } from "./planet/Intersections";
-import { IconButton } from "./component/MediaButton";
 import { shortId } from "./helpers";
 import { Area } from "./planet/area";
 import { uiLog } from "./uiLog";
+import { AreaNotification, SSEventPayload } from "../server/types";
+import { Avatar } from "./planet/avatar";
 
 function Card(props: { area: Area }) {
 
@@ -36,7 +37,7 @@ function Card(props: { area: Area }) {
 		}
 	}
 
-	return <div class="card" style={{outline: holder() ? '2px solid yellow' : null}} onclick={action}>
+	return <div class="card" style={{ outline: holder() ? '2px solid yellow' : null }} onclick={action}>
 		<div>{props.area.params.ownerName}</div>
 		<div style="display:flex; gap:0.5rem;">
 			{holder() && <span>drop</span>}
@@ -49,17 +50,28 @@ function Card(props: { area: Area }) {
 export function AreaProximityCards() {
 	const [intersectedAreas, setIntersectedAreas] = solid.createSignal<Area[]>([])
 
+	const onGrabArea = (payload: SSEventPayload) => {
+		const an = JSON.parse(payload.data) as AreaNotification
+		const avatar = planet.getAvatarById(an.conId)
+		const area = planet.getAreaById(an.areaId)
+		area?.grab(avatar)
+	}
+	const onReleaseArea = (payload: SSEventPayload) => {
+		const an = JSON.parse(payload.data) as AreaNotification
+		const avatar = planet.getAvatarById(an.conId)
+		const area = planet.getAreaById(an.areaId)
+		area?.release(avatar)
+	}
+
 	const onStartIntersection = async (e: CustomEvent<IntersectionTarget>) => {
 		if (!(e.detail instanceof Area)) return
 
-		// console.log(`start intersection`, shortId(e.detail.uuid))
 		setIntersectedAreas([e.detail, ...intersectedAreas()])
 	}
 
 	const onEndIntersection = (e: CustomEvent<IntersectionTarget>) => {
 		if (!(e.detail instanceof Area)) return
 
-		// console.log(`end intersection`, shortId(e.detail.uuid))
 		const index = intersectedAreas().indexOf(e.detail)
 		if (index < 0) {
 			console.warn(`index not found`, index)
@@ -68,17 +80,49 @@ export function AreaProximityCards() {
 		setIntersectedAreas(intersectedAreas().toSpliced(index, 1))
 	}
 
+	let selfAvatar:Avatar = null
+	let spaceDown = false
+
+	const onKeyDown = (e: KeyboardEvent) => {
+		if(e.key === ' ' && !spaceDown && e.target === document.body) {
+			spaceDown = true
+			if(!selfAvatar) selfAvatar = planet.getSelfAvatar()
+				console.log('keyDown', selfAvatar, intersectedAreas()) 
+			//TODO: only grab ungrabbed areas
+			intersectedAreas()?.forEach(area => area.grab(selfAvatar))
+		}
+	}
+	
+	const onKeyUp = (e: KeyboardEvent) => {
+		if(e.key === ' ' && e.target === document.body) {
+			spaceDown = false
+			console.log('keyUp') 
+			//TODO: only release grabbed areas
+			intersectedAreas()?.forEach(area => area.release(selfAvatar))
+		}
+	}
+	
+	
+		
 	solid.onMount(() => {
-		planet.intersections.addEventListener(planet.intersections.event.enter, onStartIntersection)
-		planet.intersections.addEventListener(planet.intersections.event.exit, onEndIntersection)
-		console.log(`Cards - mounted`)
-		uiLog(`Started watching area intersections...`)
+		document.addEventListener('keydown', onKeyDown)
+		document.addEventListener('keyup', onKeyUp)
+		const intersections = planet.getIntersections()
+		intersections.addEventListener(intersections.event.enter, onStartIntersection)
+		intersections.addEventListener(intersections.event.exit, onEndIntersection)
+		server.addServerSentEventHandler('grabArea', onGrabArea)
+		server.addServerSentEventHandler('releaseArea', onReleaseArea)
+		uiLog(`Started watching areas`)
 	})
 	solid.onCleanup(() => {
-		planet.intersections.removeEventListener(planet.intersections.event.enter, onStartIntersection)
-		planet.intersections.removeEventListener(planet.intersections.event.exit, onEndIntersection)
-		console.log(`Cards - cleanup`)
-		uiLog(`Stopped watching area intersections...`)
+		document.removeEventListener('keydown', onKeyDown)
+		document.removeEventListener('keyup', onKeyUp)
+		const intersections = planet.getIntersections()
+		intersections.removeEventListener(intersections.event.enter, onStartIntersection)
+		intersections.removeEventListener(intersections.event.exit, onEndIntersection)
+		server.removeServerSentEventHandler('grabArea', onGrabArea)
+		server.removeServerSentEventHandler('releaseArea', onReleaseArea)
+		uiLog(`Stopped watching areas`)
 	})
 
 	return <div class="cards">

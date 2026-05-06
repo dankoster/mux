@@ -8,7 +8,7 @@ type pcInit = {
 	onDisconnect: () => Promise<void>;
 };
 export class PeerConnection extends EventTarget {
-	abortControllers: AbortController[] = [];
+	abortControllers: {[key:string]:AbortController} = {};
 	conId: string;
 
 	pc: RTCPeerConnection
@@ -17,6 +17,8 @@ export class PeerConnection extends EventTarget {
 	polite = false;
 	makingOffer = false;
 	ignoreOffer = false;
+
+	static STREAMS_CHANGED = "PeerConnection:StreamsChanged";
 
 	onDisconnect: () => Promise<void>;
 
@@ -31,11 +33,21 @@ export class PeerConnection extends EventTarget {
 		this.pc.ontrack = (e) => {
 			console.log(`PeerConnection: got ${e.track.kind} ${e.type} from peer connection. Saving MediaStreams`, e.streams)
 			this.logTrackEvents(e.track, 'remote')
-
+			
 			const streamCount = this.streams.size
 			e.streams?.forEach(stream => this.streams.add(stream))
 			if(streamCount != this.streams.size){
-				this.dispatchEvent(new Event('PeerConnection:StreamsChanged'))}
+				console.log(`pc.ontrack -----------> added ${this.streams.size} streams`)
+				this.dispatchEvent(new Event(PeerConnection.STREAMS_CHANGED))
+			}
+			
+			//when any stream tracks are muted, remove the stream
+			e.track.addEventListener('mute', () => {
+				
+				console.log(`pc.ontrack -----------> removing stream: remote ${e.track.kind}: ${e.track.label}`)
+				e.streams?.forEach(stream => this.streams.delete(stream))
+				this.dispatchEvent(new Event(PeerConnection.STREAMS_CHANGED))
+			})
 		}
 
 		this.pc.onnegotiationneeded = async () => {
@@ -69,15 +81,11 @@ export class PeerConnection extends EventTarget {
 		}
 	}
 
-	addAbortController(ac: AbortController) {
-		this.abortControllers.push(ac);
-	}
-
 	//https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 	//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/addTrack#adding_tracks_to_multiple_streams
 	addTracks(stream: MediaStream) {
 		// Push tracks from local stream to peer connection
-		stream.getTracks().forEach((track) => {
+		stream?.getTracks().forEach((track) => {
 			console.log(`adding ${track.enabled ? "enabled" : "disabled"} local ${track.kind} track to peer connection:`, track.label);
 			// this.logTrackEvents(track, 'local');
 			if(this.pc.signalingState != 'closed')
@@ -108,9 +116,12 @@ export class PeerConnection extends EventTarget {
 	endCall() {
 		console.log('PeerConnection.endCall', this.conId);
 
-		this.abortControllers.forEach(ac => {
-			ac.abort();
-		});
+		for(var ac in this.abortControllers)
+		{
+			console.log('endCall - aborting:', ac)
+			this.abortControllers[ac].abort();
+			delete this.abortControllers[ac]
+		}
 
 		try {
 			//https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/close
@@ -122,7 +133,7 @@ export class PeerConnection extends EventTarget {
 
 	logTrackEvents(track: MediaStreamTrack, label: 'local' | 'remote') {
 		const ac = new AbortController();
-		this.abortControllers.push(ac);
+		this.abortControllers[`${label}_${track.kind}_${track.label}`] = ac;
 		track.addEventListener('ended', () => console.log(`ENDED: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal });
 		track.addEventListener('mute', () => console.log(`MUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal });
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal });

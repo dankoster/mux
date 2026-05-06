@@ -6,7 +6,7 @@ import { apiRoute, DELETE, GET, POST } from "./http";
 import { AreaParams, } from "../planet/area";
 import * as Planet from "../planet/planet";
 import { uiLog } from "../uiLog";
-import { sharePrivateKey } from "./directMessages";
+import * as DirectMessages from "./directMessages";
 import * as PositionSocket from "./positionSocket";
 import { AddPalm } from "../planet/palm";
 
@@ -267,21 +267,6 @@ export async function becomeAnonymous() {
 	}
 }
 
-class SSEventEmitter extends EventTarget {
-	onSseEvent(event: SSEvent, value: string | {}) {
-		this.dispatchEvent(new CustomEvent(event, { detail: value }))
-	}
-}
-const SSEvents = new SSEventEmitter()
-
-export function onWebRtcMessage(callback: (message: { senderId: string, message: string }) => void) {
-	const ac = new AbortController()
-	SSEvents.addEventListener(sse.webRTC, async (e: CustomEvent) => {
-		callback(e.detail)
-	}, { signal: ac.signal })
-	return ac
-}
-
 const sseHandlers: {[key:string]:[(payload: SSEventPayload)=>void]} = {}
 export function addServerSentEventHandler(event: SSEvent, handler: (payload: SSEventPayload) => void) {
 	if(!Array.isArray(sseHandlers[event])) 
@@ -316,15 +301,6 @@ async function handleSseEvent(event: SSEventPayload) {
 			//https://docs.solidjs.com/concepts/stores#range-specification
 			setConnections({ from: index, to: index }, update.field, update.value)
 			onConnectionsChanged()
-			break;
-		case sse.webRTC:
-			// console.log('SSE', event.event, event.data)
-			try {
-				const data = JSON.parse(event.data)
-				SSEvents.onSseEvent(event.event, data)
-			} catch (error) {
-				console.error("Failed to parse webRTC event", event)
-			}
 			break;
 		case sse.new_connection:
 			const newCon = JSON.parse(event.data) as Connection
@@ -367,8 +343,7 @@ async function handleSseEvent(event: SSEventPayload) {
 
 		case sse.dm:
 			const dm = JSON.parse(event.data) as DM
-			//TODO: handleNewDirectMessage(dm);
-			uiLog(`SSE ${event.event}: ${dm}`)
+			DirectMessages.handleNewDirectMessage(dm);
 			break;
 
 		case sse.addArea:
@@ -380,20 +355,10 @@ async function handleSseEvent(event: SSEventPayload) {
 			Planet.removeArea(JSON.parse(event.data))
 			break;
 
+		case sse.webRTC:
+			break;
 		case sse.grabArea:
-			const grabAreaMessage = JSON.parse(event.data) as AreaNotification			
-			const grab_avatar = Planet.getAvatarById(grabAreaMessage.conId)
-			const grab_area = Planet.getAreaById(grabAreaMessage.areaId)
-			grab_area?.grab(grab_avatar)
-			break;
-
 		case sse.releaseArea:
-			const releaseAreaMessage = JSON.parse(event.data) as AreaNotification
-			const release_avatar = Planet.getAvatarById(releaseAreaMessage.conId)
-			const release_area = Planet.getAreaById(releaseAreaMessage.areaId)
-			release_area?.release(release_avatar)
-			break;
-
 		case sse.initiateCall:
 			console.log("SSE", event)
 			break;
@@ -432,7 +397,7 @@ function onConnectionsChanged() {
 			const dateCreated = new Date(Number.parseInt(con.id))
 			const kind = con.id === me.id ? "myself" : con.kind
 			console.log(`Same identity: ${con.id} (${kind}) ${con.status} ${dateCreated.toLocaleString()}`)
-			sharePrivateKey(me.id, con)
+			DirectMessages.sharePrivateKey(me.id, con)
 		}
 	})
 

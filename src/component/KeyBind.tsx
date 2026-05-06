@@ -42,7 +42,11 @@ export function KeyBind(props: { char: string, action: () => void }) {
 	if (!props.char) return;
 
 	const onKeyDown = (e: KeyboardEvent) => {
-		e.key === props.char && props.action()
+		//only handle presses that are not directed at a particular element
+		if(e.key !== props.char || e.target !== document.body)
+			return
+
+		props.action()
 	}
 
 	onMount(() => {

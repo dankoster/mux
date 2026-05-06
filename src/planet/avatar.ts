@@ -23,7 +23,6 @@ export class Avatar extends EventTarget {
 	model: GLTF
 	interactable: Interactable
 	label: Labeled
-	chatBubble: Labeled
 
 	event = { moved: 'moved' }
 

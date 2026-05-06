@@ -4,7 +4,7 @@ import "./Settings.css"
 export let ShowSettings: () => void = () => { throw new Error('NOT READY - <Settings /> element not mounted') }
 
 type SettingName = "Show welcome"
-	| 'Start video on load'
+	// | 'Start video on load'
 	| 'Start Call Muted (audio)'
 	| 'Start Call Muted (video)'
 	| 'Mute when focus is lost'
@@ -21,10 +21,10 @@ const SettingsData: Setting[] = [
 		name: "Show welcome",
 		value: false
 	},
-	{
-		name: "Start video on load",
-		value: false
-	},
+	// {
+	// 	name: "Start video on load",
+	// 	value: false
+	// },
 	{
 		name: 'Start Call Muted (audio)',
 		value: true

@@ -27,6 +27,8 @@ async function InitKeys() {
 	})
 }
 
+InitKeys() // call this as soon as this module is imported
+
 async function broadcastPublicKey(publicKey: CryptoKey) {
 	console.trace(`broadcastPublicKey`)
 	const jwk = await exportJWK(publicKey)
@@ -104,6 +106,25 @@ export async function getRecentHistory(conId: string, publicKey, minCount = 20) 
 	return Array.from(messagesByMessageId.values()).sort((a, b) => a.timestamp - b.timestamp)
 }
 
+export async function getLatestHistory(conId: string, minCount = 20) {
+	if (!messagesByConId.has(conId))
+		messagesByConId.set(conId, new Map<number, DM>())
+
+	const messagesByMessageId = messagesByConId.get(conId)
+
+	const messages = await getHistory({
+		timestamp: Date.now(), //get messages before this timestamp
+		conId: conId,
+		qty: minCount
+	})
+	for (const dm of messages) {
+		await decryptAndSaveMessage(dm)
+	}
+
+	//sort the result from oldest to newest
+	return Array.from(messagesByMessageId.values()).sort((a, b) => a.timestamp - b.timestamp)
+}
+
 function incrementUnreadCount(conId: string) {
 	const counts = unreadCountByConId();
 	counts[conId] = (counts[conId] ?? 0) + 1
@@ -154,7 +175,7 @@ export function onNewMessage(callback: (dm: DM) => void) {
 //we're starting up... query the server for unread messages
 export async function getAllUnread(friends: Friend[], connections: Connection[]) {
 	if (!friends?.length || !connections?.length) {
-		// console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
+		console.log(`can't get unread messages yet...`, friends?.length, connections?.length)
 		return
 	}
 	const friendConId = connections
@@ -273,8 +294,11 @@ async function decryptAndSaveMessage(dm: DM) {
 	try {
 		dm.message = await decryptMessage(dm.message as EncryptedMessage, sharedKey);
 	} catch (error) {
+		dm.message = `⨳ could not decrypt ⨳`
 		console.warn(error)
 		console.log('could not decrypt', dm)
+
+//		return
 	}
 
 	const conId = sentByMe ? dm.toId : dm.fromId;

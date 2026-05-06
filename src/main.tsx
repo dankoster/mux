@@ -23,7 +23,6 @@ function App() {
 			<Welcome />
 			<VideoCall />
 			<Planet />
-			<AvatarProximityCall />
 			<Show when={!welcomeVisible() && !settingsVisible()}>
 				<UserToolbar />
 			</Show>

@@ -10,6 +10,7 @@ import { ServerStats } from "./ServerStats";
 import { GitHubSvg } from "./GitHubSvg";
 import { AddPalm } from "./planet/palm";
 import { AreaProximityCards } from "./AreaProximityCards";
+import AvatarProximityCall from "./AvatarProximityCall";
 
 
 export function UserToolbar() {
@@ -43,6 +44,7 @@ export function UserToolbar() {
 
 	return <div class="footer">
 		<AreaProximityCards />
+		<AvatarProximityCall />
 
 		<div class="toolbar">
 			<ServerStats />
@@ -58,10 +60,16 @@ export function UserToolbar() {
 						<img alt={server.self()?.identity?.name} src={server.self()?.identity.avatar_url} onclick={showMenu} />
 						<div class="name" onclick={showMenu}>{server.self()?.identity.name}</div>
 					</Show>
+					<IconButton icon="gear" action={() => ShowSettings()} keyChar="s" />
 
-					<IconButton icon="gear" action={() => ShowSettings()} ctrlKeyChar="s" />
-					<IconButton icon="hammer" action={() => AddPalm()} keyChar="b" />
-					<Show when={VideoCall.isConnected()}>
+					<MediaButton
+						keyChar="v"
+						className="video"
+						enabled={VideoCall.camEnabled}
+						action={() => VideoCall.toggleVideo()}
+						enabledIcon="camera"
+						disabledIcon="camera_muted" />
+					<Show when={VideoCall.camEnabled()}>
 						<MediaButton
 							keyChar="m"
 							className="audio"
@@ -69,12 +77,10 @@ export function UserToolbar() {
 							action={() => VideoCall.toggleMic()}
 							enabledIcon="microphone"
 							disabledIcon="microphone_muted" />
-						<MediaButton
-							className="video"
-							enabled={VideoCall.camEnabled}
-							action={() => VideoCall.toggleVideo()}
-							enabledIcon="camera"
-							disabledIcon="camera_muted" />
+					</Show>
+
+					<IconButton icon="hammer" action={() => AddPalm()} keyChar="b" />
+					<Show when={VideoCall.isConnected()}>
 						<MediaButton
 							className="screen"
 							enabled={VideoCall.screenEnabled}

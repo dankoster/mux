@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { Connection } from "../server/types"
-import Chat from "./Chat";
+import Chat from "./chat/Chat";
 
 import * as server from "./data/data";
 import * as directMessages from "./data/directMessages";

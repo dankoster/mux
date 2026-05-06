@@ -1,36 +1,38 @@
-import { createEffect, createSignal, For, Show } from "solid-js"
-import { Connection, DM } from "../server/types";
-import { ageTimestamp, diffTime, shortTime } from "./time";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { Connection, DM } from "../../server/types";
+import { ageTimestamp, diffTime, shortTime } from "../time";
 
-import * as directMessages from "./data/directMessages";
-import * as server from "./data/data";
+import * as directMessages from "../data/directMessages";
+import * as server from "../data/data";
 
 import "./Chat.css"
 
-let inputRef: HTMLInputElement
 
-export const scrollLatestMessageIntoView = () => {
+// export const scrollLatestMessageIntoView = () => {
 
-	//scroll last message into view
-	const dmElements = Array.from(document.getElementsByClassName('dm'));
-	dmElements[dmElements.length - 1]?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+// 	//scroll last message into view
+// 	const dmElements = Array.from(document.getElementsByClassName('dm'));
+// 	dmElements[dmElements.length - 1]?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
 
-	//scroll input into view
-	inputRef?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
-	inputRef?.focus()
-}
-
-const [dmList, setDmList] = createSignal<directMessages.groupedDM[][]>([], { equals: false })
-const [dmError, setDmError] = createSignal("")
-const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
-
+// 	//scroll input into view
+// 	inputRef?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
+// 	inputRef?.focus()
+// }
 
 export default function Chat(props: { connection: Connection, onClose: () => void }) {
+	let inputRef: HTMLInputElement
+
+	const [dmList, setDmList] = createSignal<directMessages.groupedDM[][]>([], { equals: false })
+	const [dmError, setDmError] = createSignal("")
+	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
 
 	directMessages.onNewMessage((dm: DM) => {
 		updateDmDisplay(dm)
 	})
 
+	onMount(() => {
+		console.log(`onMount`)
+	})
 
 	createEffect(() => {
 		console.log('CHAT - connection changed to', props.connection)
@@ -56,7 +58,7 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 
 			const groupedBySender = directMessages.groupBySender(history)
 			setDmList(groupedBySender)
-			scrollLatestMessageIntoView()
+			// scrollLatestMessageIntoView()
 			directMessages.setLastReadNow(con.id)
 
 			console.log('lastReadDmByConId', lastRead)
@@ -81,7 +83,7 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 			const latestMessage = messages[messages.length - 1]
 			const groupedBySender = directMessages.groupBySender(messages)
 			setDmList(groupedBySender)
-			scrollLatestMessageIntoView()
+			// scrollLatestMessageIntoView()
 			directMessages.setLastReadTimestamp(con.id, latestMessage.timestamp)
 		}
 	}
@@ -128,10 +130,10 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 
 	return <div class="chat">
 		<div class="dm-chat">
-			<div class="dm-header">
+			{/* <div class="dm-header">
 				<span>Chat with {selectedDmTarget()?.identity?.name}</span>
 				<button onclick={props.onClose}>close</button>
-			</div>
+			</div> */}
 			<Show when={dmError()}>ERROR: {dmError()}</Show>
 			<Show when={!dmError()}>
 				<div class="dm-scrolling">

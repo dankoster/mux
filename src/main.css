@@ -121,31 +121,31 @@ body {
 
 
 .cards {
-    display: flex;
-    flex-wrap: wrap-reverse;
-    justify-content: center;
-    gap: 1rem;
+	display: flex;
+	flex-wrap: wrap-reverse;
+	justify-content: center;
+	gap: 1rem;
 	pointer-events: none;
-	
+
 	.card {
-        padding: 0.5rem;
-        border-radius: 10px;
-        outline: 1px solid #ffffff7a;
-        pointer-events: all;
-        cursor: default;
-        backdrop-filter: brightness(1.3) blur(5px) contrast(0.6);
+		padding: 0.5rem;
+		border-radius: 10px;
+		outline: 1px solid #ffffff7a;
+		pointer-events: all;
+		cursor: default;
+		backdrop-filter: brightness(1.3) blur(5px) contrast(0.6);
 	}
 }
 
 .footer {
 	container-type: inline-size;
 	container-name: footer;
-	
-	/* border-top: 1px solid var(--separator-color); */
 	bottom: 0;
 	width: 100%;
 	position: absolute;
 	pointer-events: none;
+	display: grid;
+	row-gap: 0.7rem;
 }
 
 .toolbar {
@@ -235,7 +235,9 @@ body {
 		}
 
 		img {
-			max-width: 2.5rem;
+			width: 2.5rem;
+			height: 2.5rem;
+			object-fit: cover;
 		}
 	}
 

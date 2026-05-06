@@ -12,9 +12,60 @@
 
 }
 
+.small-chat {
+
+	overflow: auto;
+	padding: 0.3rem;
+	border-radius: 10px;
+	backdrop-filter: blur(2px) brightness(0.5);
+
+	input {
+		padding: 0.3rem;
+		padding-inline: 0.5rem;
+		border-radius: 8px;
+		border: none;
+		background-color: #00000038;
+		width: 100%;
+		outline: 1px solid #0088ff;
+	}
+
+	.messages {
+		max-height: 25vh;
+		overflow: auto;
+	}
+
+	.message {
+		border-radius: 10px;
+		padding-inline: 0.5rem;
+		padding-block: 0.1rem;
+		margin-block-end: 0.35rem;
+		backdrop-filter: brightness(0.5) blur(10px);
+	}
+
+	.message.outgoing {
+		justify-self: left;
+		margin-inline-end: 20%;
+		border-bottom-left-radius: 0;
+		background-color: #0088ff4f;
+	}
+
+	.message.incoming {
+		justify-self: right;
+		margin-inline-start: 20%;
+		border-bottom-right-radius: 0;
+		background-color: #00ff444f;
+	}
+}
+
 .chat {
 	display: grid;
 	overflow: auto;
+	max-height: 200px;
+	background-color: #222222cc;
+	backdrop-filter: blur(1px) brightness(0.2);
+	border-radius: 12px;
+	container-type: inline-size;
+	container-name: chat;
 
 	@media (max-width: 700px) {
 		border-top: 1px solid var(--separator-color);
@@ -22,6 +73,9 @@
 	}
 
 }
+
+/* If the container is larger than 700px */
+@container chat (width < 200px) {}
 
 
 .dm-chat {
