@@ -30,11 +30,11 @@ export let zoom: (area: Area) => void = () => NotReady()
 export let position: () => THREE.Vector3 = () => NotReady()
 export let getAreaById: (id:string) => Area = () => NotReady()
 export let getAvatarById: (id:string) => Avatar = () => NotReady()
+export let getIntersections: () => Intersections = () => NotReady()
 
-export const intersections = new Intersections()
 
 export function Planet() {
-
+	
 	let stopRendering = false
 	let planetCanvas: HTMLCanvasElement
 	let planetLabels: HTMLDivElement
@@ -44,6 +44,9 @@ export function Planet() {
 	let selfAvatar: Avatar
 	const avatarsById = new Map<string, Avatar>()
 	const areas: Area[] = []
+	const intersections = new Intersections()
+
+	getIntersections = () => intersections
 
 	let sceneIsReady: (scene: THREE.Scene) => void
 	const sceneReady = new Promise<THREE.Scene>(resolve => sceneIsReady = resolve)
@@ -53,7 +56,7 @@ export function Planet() {
 
 	position = (): THREE.Vector3 => sphere?.position
 	getAreaById = (areaId: string) => areas.find(a => a.uuid == areaId)
-	getAvatarById = (id: string) => avatarsById.get(id)
+	getAvatarById = (id: string) => avatarsById.get(`${id}`)
 
 	zoom = (area: Area): void => {
 		if (!camera) throw new Error("Camera not ready to zoom")
@@ -200,7 +203,22 @@ export function Planet() {
 
 		//check for collisions (but don't wait for the async to finish)
 		checkForCollisions()
-	}, 25)
+	}, 50)
+
+	async function checkForCollisions() {
+		areas.forEach(async area => {
+			area.complications?.forEach((c: any) => {
+				if (c instanceof Interactable)
+					intersections.update(area, selfAvatar.interactable.intersects(c))
+			})
+		})
+
+		avatarsById.forEach(async avatar => {
+			if (avatar != selfAvatar)
+				intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
+		})
+	}
+
 
 	async function BuildSceneAndStartRendering() {
 		console.log('BuildSceneAndStartRendering')
@@ -290,20 +308,6 @@ export function Planet() {
 		requestAnimationFrame(render)
 	}
 
-	async function checkForCollisions() {
-		areas.forEach(async area => {
-			area.complications?.forEach((c: any) => {
-				if (c instanceof Interactable)
-					intersections.update(area, selfAvatar.interactable.intersects(c))
-			})
-		})
-
-		avatarsById.forEach(async avatar => {
-			if (avatar != selfAvatar)
-				intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
-		})
-	}
-
 	onMount(async () => {
 		console.log(`Planet.onMount`)
 
@@ -320,6 +324,7 @@ export function Planet() {
 					fromServer: true
 				}
 
+				//TODO area types
 				AddPalm(ap)
 			})
 			console.log(`loaded areas`, areas)
