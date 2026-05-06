@@ -124,7 +124,7 @@ async function demo(iterations: number = 100000) {
 	const sharedKey = await computeSharedKey(myKeys.privateKey, theirKeys.publicKey, iterations)
 
 	// The raw bits of the actual encryption key can be exported and saved.
-	// These bits should be stored encrypted and should reference the specfic party are communicating with.
+	// These bits should be stored encrypted and should reference the specfic party we are communicating with.
 	//var exported = await crypto.subtle.exportKey('raw', sharedKey);
 
 	const message = 'this is a test!'
@@ -135,6 +135,7 @@ async function demo(iterations: number = 100000) {
 	const decrypted = await decryptMessage(encryptedJson, sharedKey)
 
 	console.log({
+		sharedKey: await crypto.subtle.exportKey("raw", sharedKey),
 		message,
 		encrypted: `${encryptedJson.iv}'${encryptedJson.data}`,
 		decrypted,
