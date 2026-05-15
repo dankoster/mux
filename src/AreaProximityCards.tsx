@@ -7,11 +7,15 @@ import { Area } from "./planet/area";
 import { uiLog } from "./uiLog";
 import { AreaNotification, SSEventPayload } from "../server/types";
 import { Avatar } from "./planet/avatar";
+import { RenderSnapshot64 } from "./planet/snapshot";
 
 function Card(props: { area: Area }) {
 
 	const [holder, setHolder] = solid.createSignal<string>()
+	let imgSnapshot: HTMLImageElement
 
+
+	//TODO: make this action come from the thing the card is representing
 	const action = async () => {
 		if (props.area.holder) {
 			const response = await server.releaseArea({
@@ -24,7 +28,7 @@ function Card(props: { area: Area }) {
 				setHolder()
 			}
 			else
-				uiLog(`failed to release ${shortId(props.area.uuid)} on the server!`)
+				uiLog(`Failed to release ${shortId(props.area.uuid)}!`)
 		}
 		else {
 			const response = await server.grabArea(props.area.uuid)
@@ -33,15 +37,23 @@ function Card(props: { area: Area }) {
 				setHolder(props.area.holder?.label.text)
 			}
 			else
-				uiLog(`failed to grab ${shortId(props.area.uuid)} on the server!`)
+				uiLog(`Access denied, cannot grab ${shortId(props.area.uuid)}!`)
 		}
 	}
 
+	solid.onMount(async () => {
+		imgSnapshot.src = await RenderSnapshot64(props.area?.model?.scene);
+	})
+
 	return <div class="card" style={{ outline: holder() ? '2px solid yellow' : null }} onclick={action}>
-		<div>{props.area.params.ownerName}</div>
-		<div style="display:flex; gap:0.5rem;">
-			{holder() && <span>drop</span>}
-			{!holder() && <span>grab</span>}
+		<img class="snapshot" ref={imgSnapshot}></img>
+		<div class="details">
+			<div>{props.area.params.ownerName}</div>
+			<div class="action">
+				<span>click to</span>
+				{holder() && <span>drop</span>}
+				{!holder() && <span>grab</span>}
+			</div>
 			<span>{shortId(props.area.uuid)}</span>
 		</div>
 	</div>
@@ -80,30 +92,28 @@ export function AreaProximityCards() {
 		setIntersectedAreas(intersectedAreas().toSpliced(index, 1))
 	}
 
-	let selfAvatar:Avatar = null
+	let selfAvatar: Avatar = null
 	let spaceDown = false
 
 	const onKeyDown = (e: KeyboardEvent) => {
-		if(e.key === ' ' && !spaceDown && e.target === document.body) {
+		if (e.key === ' ' && !spaceDown && e.target === document.body) {
 			spaceDown = true
-			if(!selfAvatar) selfAvatar = planet.getSelfAvatar()
-				console.log('keyDown', selfAvatar, intersectedAreas()) 
+			if (!selfAvatar) selfAvatar = planet.getSelfAvatar()
+			console.log('keyDown', selfAvatar, intersectedAreas())
 			//TODO: only grab ungrabbed areas
 			intersectedAreas()?.forEach(area => area.grab(selfAvatar))
 		}
 	}
-	
+
 	const onKeyUp = (e: KeyboardEvent) => {
-		if(e.key === ' ' && e.target === document.body) {
+		if (e.key === ' ' && e.target === document.body) {
 			spaceDown = false
-			console.log('keyUp') 
+			console.log('keyUp')
 			//TODO: only release grabbed areas
 			intersectedAreas()?.forEach(area => area.release(selfAvatar))
 		}
 	}
-	
-	
-		
+
 	solid.onMount(() => {
 		document.addEventListener('keydown', onKeyDown)
 		document.addEventListener('keyup', onKeyUp)

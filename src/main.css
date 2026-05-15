@@ -126,6 +126,7 @@ body {
 	justify-content: center;
 	gap: 1rem;
 	pointer-events: none;
+	margin-inline: 1rem;
 
 	.card {
 		padding: 0.5rem;
@@ -133,7 +134,21 @@ body {
 		outline: 1px solid #ffffff7a;
 		pointer-events: all;
 		cursor: default;
-		backdrop-filter: brightness(1.3) blur(5px) contrast(0.6);
+		backdrop-filter: brightness(2) blur(10px) contrast(0.3);
+		display: flex;
+		gap: 0.5rem;
+
+		.snapshot {
+			aspect-ratio: 1;
+			max-width: 60px;
+		}
+
+		.details {
+			.action {
+				display: flex;
+				gap: 0.5rem;
+			}
+		}
 	}
 }
 

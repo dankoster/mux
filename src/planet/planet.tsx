@@ -19,6 +19,7 @@ import { Intersections } from './Intersections'
 import { Interactable } from './Interactable'
 import { AddPalm } from './palm'
 import { AreaRecord } from '../../server/data/table/area'
+import { addLights } from './lighting'
 
 function NotReady(): any { throw new Error('<Planet /> not ready!') }
 
@@ -28,8 +29,8 @@ export let becomeAnynomous: () => void = () => NotReady()
 export let getSelfAvatar: () => Avatar = () => NotReady()
 export let zoom: (area: Area) => void = () => NotReady()
 export let position: () => THREE.Vector3 = () => NotReady()
-export let getAreaById: (id:string) => Area = () => NotReady()
-export let getAvatarById: (id:string) => Avatar = () => NotReady()
+export let getAreaById: (id: string) => Area = () => NotReady()
+export let getAvatarById: (id: string) => Avatar = () => NotReady()
 export let getIntersections: () => Intersections = () => NotReady()
 
 
@@ -120,15 +121,15 @@ export function Planet() {
 
 	removeArea = (id: string) => {
 		const index = areas.findIndex(a => a.uuid === id)
-		
-		if (index < 0) 
+
+		if (index < 0)
 			throw new Error(`area id not found! ${id}`)
-			
+
 		const area = areas.splice(index, 1)[0]
-		
-		if(intersections.intersecting.has(area))
+
+		if (intersections.intersecting.has(area))
 			intersections.update(area, false)
-		
+
 		area.delete()
 		return area
 	}
@@ -219,7 +220,6 @@ export function Planet() {
 		})
 	}
 
-
 	async function BuildSceneAndStartRendering() {
 		console.log('BuildSceneAndStartRendering')
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
@@ -239,16 +239,7 @@ export function Planet() {
 		orbit.minZoom = 30
 		orbit.rotateSpeed = 0.75
 
-		const lights: THREE.DirectionalLight[] = []
-		lights[0] = new THREE.DirectionalLight(0xffffff, 3)
-		lights[1] = new THREE.DirectionalLight(0xffffff, 3)
-		lights[2] = new THREE.DirectionalLight(0xffffff, 3)
-		lights[0].position.set(0, 200, 0)
-		lights[1].position.set(100, 200, 100)
-		lights[2].position.set(-100, -200, -100)
-		for (const light of lights) {
-			scene.add(light)
-		}
+		addLights(scene)
 
 		sceneIsReady(scene)
 
@@ -336,7 +327,7 @@ export function Planet() {
 			console.log(`got self avatar`)
 			placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
 		})
-		
+
 		console.log(`Planet.onMount - Done!`)
 	})
 
