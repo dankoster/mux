@@ -12,6 +12,7 @@ import "./VideoCall.css"
 import { uiLog } from "./uiLog";
 import { Connection, SSEventPayload } from "../server/types";
 import SmallChat from "./chat/SmallChat";
+import { SvgIcon } from "./SvgIcon";
 
 const peersById = new Map<string, PeerConnection>()
 
@@ -258,7 +259,10 @@ function PeerConnectionMedia(props: { peer: PeerConnection }) {
 			{stream => <PeerVideo name={name()} peer={props.peer} stream={stream} />}
 		</For>
 		<Show when={!mediaStreams() || mediaStreams()?.length == 0}>
-			<div>No stream! Show avatar!</div>
+			<div class="video-ui anon">
+				<span class="name">{name()}</span>
+				<SvgIcon icon="user" />
+			</div>
 		</Show>
 		
 		<SmallChat connection={connection()} />

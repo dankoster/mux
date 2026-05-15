@@ -7,13 +7,22 @@
 	justify-content: center;
 	gap: 1rem;
 	overflow: hidden;
-	z-index: 1;
+	z-index: 3;
 	padding: 1rem;
 
 	&.max-video {
 		grid-template-columns: repeat(auto-fit, minmax(90px, max-content));
 	}
 
+	.anon {
+		display: grid;
+		align-content: center;
+		border-radius: 10px;
+		padding-inline: 4rem;
+		aspect-ratio: 1.5;
+		fill: rgb(255 255 255 / 67%);
+		backdrop-filter: brightness(0.3) blur(10px);
+	}
 	.video-ui {
 		justify-items: center;
 		white-space: nowrap;
