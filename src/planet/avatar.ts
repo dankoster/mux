@@ -24,7 +24,7 @@ export class Avatar extends EventTarget {
 	interactable: Interactable
 	label: Labeled
 
-	event = { moved: 'moved' }
+	static event = { moved: 'moved' }
 
 	private _distanceFromSelf: number = 0
 
@@ -163,7 +163,7 @@ export class Avatar extends EventTarget {
 			this.mesh.position.copy(position)
 			// this.addMarker(position)
 
-			this.dispatchEvent(new Event(this.event.moved))
+			this.dispatchEvent(new Event(Avatar.event.moved))
 		}
 		
 		if (Array.isArray(quaternion)) {
