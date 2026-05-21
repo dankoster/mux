@@ -1,4 +1,4 @@
-import { Accessor, Switch, Match, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { Accessor, Switch, Match, Show } from "solid-js";
 import { svgIcon, SvgIcon } from "../SvgIcon";
 import { CtrlKeyBind, KeyBind } from "./KeyBind";
 
