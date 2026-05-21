@@ -139,7 +139,7 @@ export class Avatar extends EventTarget {
 
 		this.markers.forEach(m => {
 			const geodata = m.geometry.toJSON()
-			const radius = geodata["radius"]
+			const radius = geodata.data?.boundingSphere?.radius
 			if(radius){
 				m.geometry.dispose()
 				m.geometry = new THREE.SphereGeometry(radius * 0.96)
