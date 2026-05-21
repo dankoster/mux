@@ -690,20 +690,21 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 
 		//TODO: send push notification (perhaps have an updater that does this?)
 
-		//update all connections owned by the sender or the receiver, except the intitial sender.
-
+		
 		const updateFn = updateFunctionByUUID.get(toUuid)
 		if (updateFn) {
 			updateFn.update(sseEvent.dm, JSON.stringify(message))
 		}
-
-		const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
-		connectionByUUID.forEach((con, uuid) => {
-			if (uuid !== fromUuid
-				&& con.identity?.id
-				&& identitiesToUpdate.includes(con.identity.id)) {
-			}
-		})
+		
+		//TODO: update all connections owned by the sender or the receiver, except the intitial sender.
+		// const identitiesToUpdate = [toCon.identity?.id, fromCon.identity?.id]
+		// connectionByUUID.forEach((con, uuid) => {
+		// 	if (uuid !== fromUuid
+		// 		&& con.identity?.id
+		// 		&& identitiesToUpdate.includes(con.identity.id)) {
+		// 			//this is doing nothing?
+		// 	}
+		// })
 
 	} catch (err) {
 		console.error(err, ctx.request)
