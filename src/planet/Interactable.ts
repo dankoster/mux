@@ -4,7 +4,7 @@ export class Interactable {
 	range: number = 3
 	sphere: THREE.Sphere
 
-	constructor(mesh: THREE.Mesh, size: number, showRing: boolean = true) {
+	constructor(mesh: THREE.Mesh, size: number = 1, showRing: boolean = false) {
 		var radius = size * this.range
 		this.sphere = new THREE.Sphere(mesh.position, radius)
 

@@ -13,10 +13,12 @@ export class Intersections extends EventTarget {
 	};
 
 	public intersecting = new Set<IntersectionTarget>();
-	labelFor = (target: IntersectionTarget) => (target instanceof Area && target.complications.find(c => c instanceof Labeled).text) 
-	|| (target instanceof Avatar && target.label.text)
+	labelFor = (target: IntersectionTarget) => (target instanceof Area && target.labeled?.text)
+		|| (target instanceof Avatar && target.label.text)
 
-	update(target: IntersectionTarget, isIntersecting: boolean) {
+	update(target: IntersectionTarget, isIntersecting: boolean | undefined) {
+		if (!target) return
+		
 		if (this.intersecting.has(target)) {
 			if (!isIntersecting) {
 				this.intersecting.delete(target);

@@ -138,9 +138,20 @@ body {
 		display: flex;
 		gap: 0.5rem;
 
+		.info {
+			margin-top: 0.5rem;
+			position: relative;
+
+			label {
+				position: absolute;
+				top: -0.5rem;
+				left: -0.25rem;
+				font-size: x-small;
+			}
+		}
+
 		.snapshot {
-			aspect-ratio: 1;
-			max-width: 60px;
+			max-height: 4.5rem;
 		}
 
 		.details {

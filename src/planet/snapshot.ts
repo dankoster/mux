@@ -5,23 +5,23 @@ import { addLights } from './lighting';
 //so use a shared module level renderer here
 const snapRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
 
-export async function RenderSnapshot64(object: THREE.Group | THREE.Object3D) {
-	
-	if(!object) {
+export async function RenderSnapshotToUrl(object: THREE.Group | THREE.Object3D) {
+
+	if (!object) {
 		console.warn(`cannot render snapshot for ${object}`)
 		return
 	}
 	
 	//build the scene
-	const snapScene: THREE.Scene = new THREE.Scene;
+	const snapScene: THREE.Scene = new THREE.Scene
 	snapScene.add(object)
 	addLights(snapScene)
 	
-	const snapCamera = new THREE.PerspectiveCamera()
-	//TODO set the camera z so the entire object is in the frustum
+	const snapCamera = new THREE.PerspectiveCamera(50, 1)
+	//TODO calculate the camera z so the entire object is in the frustum
 	snapCamera.position.z = 4
-
-
+	snapCamera.updateProjectionMatrix();	
+	
 	//look at the center of the object
 	const centerOfMesh = new THREE.Vector3();
 	var boundingBox = new THREE.Box3()
@@ -29,6 +29,20 @@ export async function RenderSnapshot64(object: THREE.Group | THREE.Object3D) {
 	boundingBox.getCenter(centerOfMesh)
 	snapCamera.lookAt(centerOfMesh)
 	
+	snapRenderer.setSize(300,300)
 	snapRenderer.render(snapScene, snapCamera)
-	return snapRenderer.domElement.toDataURL("image/jpg")
+
+	return new Promise<string>((resolve, reject) => {
+		try {
+			//https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toBlob
+			snapRenderer.domElement.toBlob((blob) => {
+				if(!blob) throw new Error(`blob is ${blob}`)
+				const url = URL.createObjectURL(blob);
+				console.log(url)
+				resolve(url)
+			})
+		} catch (ex) {
+			reject(ex)
+		}
+	});
 }
