@@ -12,9 +12,9 @@ AND m.name ='connection'
 
 -- insert test users
 INSERT INTO identity (source, source_id, name, avatar_url)
-SELECT "placebear", 201, "Leroy Bearkins", "https://placebear.com/g/201/201";
+SELECT "wikipedia", 201, "Leroy Jenkins", "https://static.wikia.nocookie.net/wowpedia/images/5/5e/Leeroy_Follower.jpg";
 INSERT INTO identity (source, source_id, name, avatar_url)
-SELECT "placebear", 202, "Frank Bear", "https://placebear.com/g/202/202";
+SELECT "placebear", 202, "Bear", "https://placebear.com/g/202/202";
 
 
 
