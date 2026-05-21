@@ -26,23 +26,23 @@ function NotReady(): any { throw new Error('<Planet /> not ready!') }
 export let addArea: (area: Area) => Area = () => NotReady()
 export let removeArea: (id: string) => Area | undefined = () => NotReady()
 export let becomeAnynomous: () => void = () => NotReady()
-export let getSelfAvatar: () => Avatar = () => NotReady()
+export let getSelfAvatar: () => Avatar | undefined = () => NotReady()
 export let zoom: (area: Area) => void = () => NotReady()
 export let position: () => THREE.Vector3 = () => NotReady()
-export let getAreaById: (id: string) => Area = () => NotReady()
-export let getAvatarById: (id: string) => Avatar = () => NotReady()
+export let getAreaById: (id: string) => Area | undefined = () => NotReady()
+export let getAvatarById: (id: string) => Avatar | undefined = () => NotReady()
 export let getIntersections: () => Intersections = () => NotReady()
 
 
 export function Planet() {
-	
+
 	let stopRendering = false
-	let planetCanvas: HTMLCanvasElement
-	let planetLabels: HTMLDivElement
+	let planetCanvas: HTMLCanvasElement | undefined
+	let planetLabels: HTMLDivElement | undefined
 	let scene: THREE.Scene
 	let camera: THREE.PerspectiveCamera
 	let sphere: THREE.Group<THREE.Object3DEventMap>
-	let selfAvatar: Avatar
+	let selfAvatar: Avatar | undefined
 	const avatarsById = new Map<string, Avatar>()
 	const areas: Area[] = []
 	const intersections = new Intersections()
@@ -68,8 +68,8 @@ export function Planet() {
 		console.log('planet.zoom', camera.zoom)
 	}
 
-	async function getAvatar(con: Connection): Promise<Avatar | undefined> {
-		if (!con) console.warn(`cannot getAvatar for ${con}`)
+	async function getAvatar(con: Connection | undefined): Promise<Avatar | undefined> {
+		if (!con) throw new Error(`cannot getAvatar for ${con}`)
 
 		await sceneReady
 
@@ -84,7 +84,7 @@ export function Planet() {
 			console.log('avatar create!', con.identity?.name ?? con.id);
 			avatar = new Avatar()
 			avatar.connection = con
-			avatar.label.text = displayName(con) || shortId(con.id)
+			avatar.label.text = displayName(con) || shortId(con.id) || 'unknown'
 			if (con.position) {
 				const position = new THREE.Vector3(con.position.x, con.position.y, con.position.z)
 				avatar.setPositionAndLook(position, con.quaternion)
@@ -99,8 +99,9 @@ export function Planet() {
 	}
 
 	becomeAnynomous = () => {
+		if (!selfAvatar) throw new Error(`selfAvatar is ${selfAvatar}}`)
 		console.log(`planet.becomeAnonymous()`)
-		selfAvatar.label.text = shortId(selfAvatar.connection?.id)
+		selfAvatar.label.text = shortId(selfAvatar.connection?.id) ?? 'unknown'
 	}
 
 	getSelfAvatar = () => selfAvatar
@@ -161,12 +162,13 @@ export function Planet() {
 		let avatar = await getAvatar(con)
 		const position = new THREE.Vector3(message.position.x, message.position.y, message.position.z)
 		const quaternion = message.quaternion;
-		avatar.setPositionAndLook(position, quaternion)
-		updateDistanceFromSelf(avatar)
+		avatar?.setPositionAndLook(position, quaternion)
+		if (avatar) updateDistanceFromSelf(avatar)
 	})
 
 	function updateDistanceFromSelf(avatar: Avatar, minDistanceMoved: number = 0.25) {
 		if (avatar == selfAvatar) return
+		if (!selfAvatar) return
 
 		avatar.distanceFromSelf = avatar.mesh.position.distanceTo(selfAvatar.mesh.position)
 
@@ -194,29 +196,30 @@ export function Planet() {
 	}
 
 	setInterval(() => {
-		broadcastPosition(selfAvatar)
+		if (selfAvatar)
+			broadcastPosition(selfAvatar)
 	}, 25)
 
 	setInterval(() => {
 		//update distances
 		avatarsById.forEach(avatar => updateDistanceFromSelf(avatar))
-		areas.filter(a => a.mesh).forEach(area => area.distanceFromSelf = selfAvatar.mesh.position.distanceTo(area.mesh?.position))
+		areas.filter(a => a.mesh).forEach(area => area.distanceFromSelf = selfAvatar?.mesh.position.distanceTo(area.mesh?.position))
 
 		//check for collisions (but don't wait for the async to finish)
 		checkForCollisions()
 	}, 50)
 
 	async function checkForCollisions() {
-		areas.forEach(async area => {
-			area.complications?.forEach((c: any) => {
-				if (c instanceof Interactable)
-					intersections.update(area, selfAvatar.interactable.intersects(c))
+		if (!selfAvatar) return
+
+		areas.filter(a => a.interactable)
+			.forEach(async area => {
+				intersections.update(area, selfAvatar?.interactable?.intersects(area.interactable))
 			})
-		})
 
 		avatarsById.forEach(async avatar => {
-			if (avatar != selfAvatar)
-				intersections.update(avatar, selfAvatar?.interactable?.intersects(avatar.interactable))
+			if (selfAvatar && avatar != selfAvatar)
+				intersections.update(avatar, selfAvatar.interactable?.intersects(avatar.interactable))
 		})
 	}
 
@@ -225,7 +228,7 @@ export function Planet() {
 		const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, canvas: planetCanvas })
 		const labelRenderer = new CSS2DRenderer({ element: planetLabels })
 		scene = new THREE.Scene()
-		camera = new THREE.PerspectiveCamera(70, window.innerWidth / planetCanvas.offsetHeight, 0.01, 1000)
+		camera = new THREE.PerspectiveCamera(70, window.innerWidth / (planetCanvas?.offsetHeight ?? window.innerHeight), 0.01, 1000)
 		camera.position.z = 60
 
 		sphere = makeSphere(30, 0x156289)
@@ -325,6 +328,7 @@ export function Planet() {
 			console.log(`got self connection`)
 			selfAvatar = await getAvatar(con)
 			console.log(`got self avatar`)
+			if (!selfAvatar) throw new Error(`selfAvatar is ${selfAvatar}`)
 			placeCameraPastTargetFromPosition({ camera, target: selfAvatar?.mesh?.position, position: sphere.position })
 		})
 

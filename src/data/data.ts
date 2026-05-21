@@ -54,7 +54,7 @@ export {
 }
 
 export function isSelf(con: Connection) {
-	return con.identity && con.identity?.id === self().identity?.id
+	return con.identity && con.identity?.id === self()?.identity?.id
 }
 
 type AuthData = {
@@ -62,7 +62,7 @@ type AuthData = {
 	self: Connection
 }
 
-function parseJsonDeep(obj) {
+function parseJsonDeep(obj: any) {
 	switch (typeof (obj)) {
 		case 'object':
 			for (const prop in obj) {
@@ -154,7 +154,7 @@ async function initSSE(route: string): Promise<Response> {
 				return response
 			}
 
-			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+			const reader = response.body?.pipeThrough(new TextDecoderStream()).getReader()
 			setServerOnline(true)
 			retries = 0
 
@@ -163,15 +163,15 @@ async function initSSE(route: string): Promise<Response> {
 			// https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/read#example_2_-_handling_text_line_by_line
 			// ...but this is small data, and HULK SMASH is easier to reason about. 
 
-			let buffer = ""
-			while (true) {
+			let buffer: string | undefined = ""
+			while (reader) {
 				const { value: chunk, done } = await reader.read()
 				if (done) break
 
 				buffer += chunk
 
 				//split up the incoming message stream and account for partial reads
-				const messages = buffer.split('\r\n\r\n')
+				const messages: string[] = buffer?.split('\r\n\r\n') ?? []
 
 				//keep everything since the last terminator
 				//we expect the last item in messages to be '' if we got a final terminator
@@ -184,9 +184,9 @@ async function initSSE(route: string): Promise<Response> {
 				while (messages.length) {
 					const message = messages.shift()
 					const event = message
-						.split("\r\n") //split the lines apart
+						?.split("\r\n") //split the lines apart
 						.map(s => [s.slice(0, s.indexOf(': ')), s.slice(s.indexOf(': ') + 2)]) //split each line by the first ": "
-						.reduce((out, cur) => { //convert those sub-arrays into an object like {[key:string]:string}
+						.reduce((out:{[key:string]:string}, cur) => { //convert those sub-arrays into an object like {[key:string]:string}
 							out[cur[0]] = cur[1]
 							return out
 						}, {})
@@ -195,9 +195,9 @@ async function initSSE(route: string): Promise<Response> {
 				}
 
 				events.forEach(event => handleSseEvent(event as SSEventPayload))
-				events.forEach((event: SSEventPayload) => sseHandlers[event.event]?.forEach(handler => handler(event)))
+				events.forEach(event => sseHandlers[(event as SSEventPayload).event]?.forEach(handler => handler(event as SSEventPayload)))
 			}
-		} catch (error) {
+		} catch (error:any) {
 			setServerOnline(false)
 			if (retries * interval < maxInterval)
 				retries++
@@ -221,7 +221,7 @@ export function githubAuthUrl() {
 	url.searchParams.append('client_id', client_id)
 	url.searchParams.append('redirect_uri', redirect_uri)
 	url.searchParams.append('scope', 'read:user')
-	url.searchParams.append('state', pk())
+	url.searchParams.append('state', pk() ?? '')
 	url.searchParams.append('allow_signup', 'true')
 	// url.searchParams.append('prompt', 'select_account')
 
@@ -267,12 +267,12 @@ export async function becomeAnonymous() {
 	}
 }
 
-const sseHandlers: {[key:string]:[(payload: SSEventPayload)=>void]} = {}
+const sseHandlers: { [key: string]: [(payload: SSEventPayload) => void] } = {}
 export function addServerSentEventHandler(event: SSEvent, handler: (payload: SSEventPayload) => void) {
-	if(!Array.isArray(sseHandlers[event])) 
+	if (!Array.isArray(sseHandlers[event]))
 		sseHandlers[event] = [handler]
 	else
-		sseHandlers[event].push(handler) 
+		sseHandlers[event].push(handler)
 	//console.trace(`Added handler for`, event)
 }
 export function removeServerSentEventHandler(event: SSEvent, handler: (payload: SSEventPayload) => void) {
@@ -290,7 +290,7 @@ async function handleSseEvent(event: SSEventPayload) {
 			location.reload()
 			break;
 		case sse.update:
-			const update = JSON.parse(event.data) as Update
+			const update = JSON.parse(event.data ?? '') as Update
 			//console.log('SSE', event.event, update)
 			if (update.field === 'identity') {
 				update.value = update.value && JSON.parse(update.value)
@@ -303,38 +303,38 @@ async function handleSseEvent(event: SSEventPayload) {
 			onConnectionsChanged()
 			break;
 		case sse.new_connection:
-			const newCon = JSON.parse(event.data) as Connection
+			const newCon = JSON.parse(event.data ?? '') as Connection
 			console.log('SSE', event.event, newCon)
 			setConnections(connections.length, newCon)
 			onConnectionsChanged()
 			console.log(connections)
 			break;
 		case sse.delete_connection:
-			const conId = JSON.parse(event.data)
+			const conId = JSON.parse(event.data ?? '')
 			console.log('SSE', event.event, conId)
 			setConnections(connections.filter(con => con.id !== conId))
 			onConnectionsChanged()
 			break;
 		case sse.friendRequest:
-			const frenReq = JSON.parse(event.data)
+			const frenReq = JSON.parse(event.data ?? '')
 			setFriendRequests(friendRequests.length, frenReq)
 			console.log('SSE', event.event, frenReq)
 			break;
 		case sse.friendRequests:
-			const frenReqList = JSON.parse(event.data)
+			const frenReqList = JSON.parse(event.data ?? '')
 			setFriendRequests(frenReqList)
 			//console.log('SSE', event.event, frenReqList)
 			break;
 		case sse.friendRequestAccepted:
-			const newFriend = JSON.parse(event.data) as Friend
+			const newFriend = JSON.parse(event.data ?? '') as Friend
 			const acceptedFrenReq = friendRequests.find(
 				fr => fr.fromId === newFriend.friendId || fr.toId === newFriend.friendId)
-			setFriendRequests(friendRequests.filter(fr => fr.id !== acceptedFrenReq.id))
+			setFriendRequests(friendRequests.filter(fr => fr.id !== acceptedFrenReq?.id))
 			setFriends(friends.length, newFriend)
 			//console.log('SSE', event.event, { newFriend, acceptedFrenReq })
 			break;
 		case sse.friendList:
-			const friendsList = JSON.parse(event.data) as Friend[]
+			const friendsList = JSON.parse(event.data ?? '') as Friend[]
 			setFriends(friendsList)
 			// getAllUnread(friends, connections)
 			uiLog(`SSE ${event.event}: ${friendsList}`)
@@ -342,24 +342,26 @@ async function handleSseEvent(event: SSEventPayload) {
 			break;
 
 		case sse.dm:
-			const dm = JSON.parse(event.data) as DM
+			const dm = JSON.parse(event.data ?? '') as DM
 			DirectMessages.handleNewDirectMessage(dm);
 			break;
 
 		case sse.addArea:
-			const ap = JSON.parse(event.data) as AreaParams
+			const ap = JSON.parse(event.data ?? '') as AreaParams
 			ap.fromServer = true
 			AddPalm(ap);
 			break;
 		case sse.removeArea:
-			Planet.removeArea(JSON.parse(event.data))
+			Planet.removeArea(JSON.parse(event.data ?? ''))
 			break;
 
 		case sse.webRTC:
+			//migrated to use addServerSentEventHandler
 			break;
 		case sse.grabArea:
 		case sse.releaseArea:
 		case sse.initiateCall:
+			//migrated to use addServerSentEventHandler
 			console.log("SSE", event)
 			break;
 

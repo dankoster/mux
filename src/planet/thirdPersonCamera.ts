@@ -36,7 +36,7 @@ export type cameraInfo = {
 }
 
 export function calculateThirdPersonCamera({ deltaTime, target, camera }: 
-	{ deltaTime: number; target: THREE.Group; camera: THREE.PerspectiveCamera; }): cameraInfo {
+	{ deltaTime: number; target: THREE.Group | THREE.Object3D; camera: THREE.PerspectiveCamera; }): cameraInfo | undefined {
 	const _elapsedSec = deltaTime * 0.001 // convert time to seconds
 
 	//direction vector from camera to sphere
@@ -66,7 +66,7 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }:
 		const dist = _currentPosition?.distanceTo(sphere.position)
 		const radius = sphere?.geometry?.boundingSphere?.radius
 		const diff = (dist && radius) ? radius - dist : 0
-		if(diff > 0)
+		if(diff > 0 && firstIntersectedSphereGeometry.normal instanceof THREE.Vector3)
 		{
 			_currentPosition.addScaledVector(firstIntersectedSphereGeometry.normal, diff)
 		}

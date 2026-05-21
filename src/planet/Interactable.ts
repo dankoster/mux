@@ -16,5 +16,5 @@ export class Interactable {
 		}
 	}
 
-	intersects = (interactable: Interactable) => interactable && this.sphere.intersectsSphere(interactable?.sphere)
+	intersects = (interactable: Interactable | undefined) => interactable && this.sphere.intersectsSphere(interactable?.sphere)
 }

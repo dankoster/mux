@@ -11,16 +11,16 @@ import { selfConnection } from '../data/data'
 export class Avatar extends EventTarget {
 	mesh: THREE.Mesh
 	connection?: Connection
-	prevDistanceFromSelf: number = undefined
-	prevDistanceLocation: THREE.Vector3 = undefined
+	prevDistanceFromSelf: number | undefined = undefined
+	prevDistanceLocation: THREE.Vector3 | undefined = undefined
 	lastBroadcastPosition: THREE.Vector3 = new THREE.Vector3
 	lastBroadcastDistanceFromSelf: number = 0
 
 	prevPositions: THREE.Vector3[] = []
 	markers: THREE.Mesh[] = []
 
-	box: THREE.Mesh
-	model: GLTF
+	// box: THREE.Mesh
+	model: GLTF | undefined = undefined
 	interactable: Interactable
 	label: Labeled
 
@@ -147,7 +147,8 @@ export class Avatar extends EventTarget {
 		})
 
 		while (this.markers.length > maxMarkers) {
-			this.mesh.parent.remove(this.markers.shift())
+			const marker = this.markers.shift()
+			if(marker) this.mesh.parent.remove(marker)
 		}
 	}
 
@@ -199,7 +200,7 @@ export class Avatar extends EventTarget {
 		if(this.connection?.id === (await selfConnection).id)
 			console.warn('deleting self avatar!')
 
-		console.log('avatar delete!', this.connection.identity?.name ?? this.connection.id);
+		console.log('avatar delete!', this.connection?.identity?.name ?? this.connection?.id);
 		this.mesh.removeFromParent();
 		this.label.remove();
 	}

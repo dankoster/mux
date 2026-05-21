@@ -4,10 +4,10 @@ import { Avatar } from './avatar';
 import { Labeled } from './Labeled';
 
 export type IntersectionEvent = 'enter' | 'exit'
-export type IntersectionTarget = Avatar | Area
+export type IntersectionTarget = Avatar | Area | undefined
 
 export class Intersections extends EventTarget {
-	public event: {[Property in IntersectionEvent]: Property} = {
+	public event: { [Property in IntersectionEvent]: Property } = {
 		enter: 'enter',
 		exit: 'exit'
 	};
