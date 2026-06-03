@@ -139,7 +139,7 @@ export class PeerConnection extends EventTarget {
 		track.addEventListener('unmute', () => console.log(`UNMUTE: ${label} ${track.kind}: ${track.label}`), { signal: ac.signal });
 	}
 
-	async handleMessage({ description, candidate }) {
+	async handleMessage({ description, candidate }: { description: RTCSessionDescription, candidate: RTCIceCandidate}) {
 		try {
 			if (this.pc.signalingState === "closed") {
 				console.warn(`RTCPeerConnection's signalingState is 'closed'... retrying...`);
@@ -175,6 +175,7 @@ export class PeerConnection extends EventTarget {
 					await this.pc.addIceCandidate(candidate);
 				} catch (err) {
 					if (!this.ignoreOffer) {
+						console.log('signalingState', this.pc.signalingState)
 						console.warn(err)
 					}
 				}
