@@ -15,12 +15,16 @@ import { Deletable } from "./Deletable";
 //load glb and snapshot once for the module and cache it in memory
 const loader = new GLTFLoader()
 const palmGltf = loader.loadAsync('glb/palm.glb')
-let palmImgUrl: string | undefined
-palmGltf.then(async gltf => palmImgUrl = await RenderSnapshotToUrl(gltf.scene))
+let palmImgUrl: Promise<string | undefined>
+palmGltf.then(async gltf => palmImgUrl = RenderSnapshotToUrl(gltf.scene))
 
 export async function AddPalm(ap: AreaParams = {}) {
 
-	if (!ap.ownerIdentityId) ap.ownerIdentityId = (await server.selfConnection).identity?.id
+	if (!ap.ownerIdentityId) {
+		const selfConnection = await server.selfConnection
+		ap.ownerIdentityId = selfConnection.identity?.id
+		ap.ownerName = selfConnection.identity?.name
+	}
 	if (!ap.uuid) ap.uuid = crypto.randomUUID()
 	if (!ap.label) ap.label = shortId(ap.uuid)
 	if (!ap.position) ap.position = planet.getSelfAvatar()?.mesh.position
@@ -40,7 +44,7 @@ export async function AddPalm(ap: AreaParams = {}) {
 	modelMesh.add((await palmGltf).scene.clone())
 	area.mesh.add(modelMesh)
 
-	area.ImageUrl = palmImgUrl
+	area.ImageUrl = await palmImgUrl
 
 	//optimistically add area locally before sending to server
 	planet.addArea(area)
@@ -49,10 +53,18 @@ export async function AddPalm(ap: AreaParams = {}) {
 	if (ap.fromServer) return
 
 	//we're addig this palm, so we need to tell the server
+
+	//these properties are used by the frontend but
+	// don't exist on the area database table
+	// TODO: need a better solution for this
+	delete ap.ownerName
 	delete ap.lookTarget
+	
 	const result = await server.addArea(ap)
 	if (!result.ok) {
 		planet.removeArea(area.uuid)
 		uiLog(`${result.status} error sending area to server`)
+		const error = await result.text()
+		console.error(error)
 	}
 }
