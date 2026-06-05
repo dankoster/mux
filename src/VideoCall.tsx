@@ -246,7 +246,7 @@ function PeerConnectionMedia(props: { peer: PeerConnection }) {
 
 		const con = server.connections.find(con => con.id === props.peer.conId)
 		setConnection(con)
-		setName(displayName(con) || shortId(props.peer.conId))
+		setName((displayName(con) || shortId(props.peer?.conId)) ?? 'unknown')
 	})
 
 	onCleanup(() => {
