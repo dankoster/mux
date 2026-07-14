@@ -55,7 +55,7 @@ const apiRoute: { [Property in ApiRoute]: Property } = {
 
 //server is starting up... cleanup and then get persisted data
 db.serverInitAndCleanup()
-const connectionByUUID = db.getConnectionsByUUID() ?? new Map<string, Connection>()
+const connectionByUUID = db.connection.getConnectionsByUUID() ?? new Map<string, Connection>()
 const wsByUUID = new Map<string, WebSocket>()
 const updateFunctionByUUID = new Map<string, {
 	isLocal: boolean,
@@ -85,7 +85,7 @@ export async function addConnectionIdentity(uuid: string, identity: Identity) {
 
 	con.identity = identity
 
-	const result = db.persistConnection(uuid, con)
+	const result = db.connection.persistConnection(uuid, con)
 
 	con.identity!.id = result?.identity?.id
 	console.log("addConnectionIdentity", con)
@@ -173,7 +173,7 @@ api.get(`/${apiRoute.position}`, async (ctx) => {
 		con.position = message.position
 		con.quaternion = message.quaternion
 
-		db.persistPosition({
+		db.connection.persistPosition({
 			uuid: socketUuid,
 			position: JSON.stringify(message.position),
 			quaternion: JSON.stringify(message.quaternion)
@@ -255,7 +255,7 @@ api.post(`/${apiRoute.friendRequest}`, async (ctx) => {
 		return
 	}
 
-	const friendRequest = db.addFriendRequest(requestor.identity?.id, requestee.identity?.id)
+	const friendRequest = db.friendRequest.addFriendRequest(requestor.identity?.id, requestee.identity?.id)
 	if (!friendRequest) {
 		ctx.response.status = 500
 		return
@@ -272,7 +272,7 @@ api.post(`/${apiRoute.acceptFriendRequest}`, async (ctx) => {
 
 	if (!friendRequestId) throw new Error(`friend request id ${friendRequestId} not found`)
 
-	const result = db.acceptFriendRequest(friendRequestId)
+	const result = db.friendRequest.acceptFriendRequest(friendRequestId)
 
 	//get the uuid of the requestor
 	let requestorUuid
@@ -296,7 +296,7 @@ api.post(`/${apiRoute.becomeAnonymous}`, async (ctx) => {
 	try {
 		const { uuid, con } = getConnection(ctx.request);
 		delete con.identity
-		db.persistConnection(uuid, con)
+		db.connection.persistConnection(uuid, con)
 		notifyAllConnections(sseEvent.update, {
 			connectionId: con.id,
 			field: "identity",
@@ -554,7 +554,7 @@ api.post(`/${apiRoute.setColor}`, async (ctx) => {
 
 		const { uuid, con } = getConnection(ctx.request)
 		con.color = color
-		db.persistConnection(uuid, con)
+		db.connection.persistConnection(uuid, con)
 		notifyAllConnections(sseEvent.update, {
 			connectionId: con.id,
 			field: 'color',
@@ -576,7 +576,7 @@ api.post(`/${apiRoute.publicKey}`, async (ctx) => {
 	}
 
 	con.publicKey = publicKey
-	db.persistPublicKey({ uuid, publicKey })
+	db.connection.persistPublicKey({ uuid, publicKey })
 	console.log('PUBLIC KEY saved for', con.identity ? `${con.identity.source}:${con.identity.name}` : `conId:${con.id}`, uuid)
 	ctx.response.status = 200
 
@@ -611,7 +611,7 @@ api.post(`/${apiRoute.dmHistory}`, async (ctx) => {
 		return
 	}
 
-	const messages = db.getDirectMessagesBeforeTimestamp(uuid, otherUuid, dmRequest)
+	const messages = db.directMessage.getDirectMessagesBeforeTimestamp(uuid, otherUuid, dmRequest)
 	ctx.response.body = messages
 })
 
@@ -636,7 +636,7 @@ api.post(`/${apiRoute.dmUnread}`, async (ctx) => {
 		return
 	}
 
-	const messages = db.getDriectMessagesAfterTimestamp(uuid, otherUuid, timestamp)
+	const messages = db.directMessage.getDriectMessagesAfterTimestamp(uuid, otherUuid, timestamp)
 	ctx.response.body = messages
 })
 
@@ -673,7 +673,7 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
-		const persistedDm = db.persistDm({
+		const persistedDm = db.directMessage.persistDm({
 			toUuid,
 			fromUuid,
 			message: message.message
@@ -776,7 +776,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			connection.kind = context.request.userAgent.os.name
 
 			try {
-				db.persistConnection(uuid, connection)
+				db.connection.persistConnection(uuid, connection)
 			} catch (error) {
 				console.error(error)
 				return
@@ -813,7 +813,7 @@ api.get(`/${apiRoute.sse}`, async (context) => {
 			//cleanup
 			if (!connection.position) {
 				console.log(`cleanup`, uuid, connection)
-				db.deleteConnection(uuid)
+				db.connection.deleteConnection(uuid)
 				connectionByUUID.delete(uuid)
 				notifyAllConnections(sseEvent.delete_connection, connection.id)
 			}
