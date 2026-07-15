@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { AreaRecord } from '../../server/data/table/area';
-import { Labeled } from './Labeled';
+import { AreaRecord } from '../../../server/data/table/area';
+import { Labeled } from '../Labeled';
 import { Avatar } from './avatar';
-import { Movable } from './Movable';
-import { Interactable } from './Interactable';
-import { Deletable } from './Deletable';
+import { Movable } from '../Movable';
+import { Interactable } from '../Interactable';
+import { Deletable } from '../Deletable';
 
 export type AreaParams = AreaRecord & {
 	lookTarget?: THREE.Vector3

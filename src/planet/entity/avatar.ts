@@ -1,12 +1,12 @@
 import * as THREE from 'three'
-import { Connection } from '../../server/types'
-import { Labeled } from './Labeled'
-import { Interactable } from './Interactable'
-import { uiLog } from '../uiLog'
+import { Connection } from '../../../server/types'
+import { Labeled } from '../Labeled'
+import { Interactable } from '../Interactable'
+import { uiLog } from '../../uiLog'
 
 import { GLTF, GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-import { selfConnection } from '../data/data'
+import { selfConnection } from '../../data/data'
 
 export class Avatar extends EventTarget {
 	mesh: THREE.Mesh
@@ -64,7 +64,7 @@ export class Avatar extends EventTarget {
 			.catch(error => uiLog(error))
 			
 		this.addSpotlight()
-		this.mesh.castShadow = true
+		this.mesh.castShadow = false
 		// this.addGui()
 
 		// const axesHelper = new THREE.AxesHelper(5);

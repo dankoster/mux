@@ -1,7 +1,5 @@
-import { uiLog } from '../uiLog';
-import { Area } from './area';
-import { Avatar } from './avatar';
-import { Labeled } from './Labeled';
+import { Area } from './entity/area';
+import { Avatar } from './entity/avatar';
 
 export type IntersectionEvent = 'enter' | 'exit'
 export type IntersectionTarget = Avatar | Area | undefined

@@ -3,12 +3,12 @@ import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
 import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult, AreaNotification, Position, SSEventPayload } from "../../server/types";
 import { apiRoute, DELETE, GET, POST } from "./http";
-import { AreaParams, } from "../planet/area";
+import { AreaParams, } from "../planet/entity/area";
 import * as Planet from "../planet/planet";
 import { uiLog } from "../uiLog";
 import * as DirectMessages from "./directMessages";
 import * as PositionSocket from "./positionSocket";
-import { AddPalm } from "../planet/palm";
+import { AddPalm } from "../planet/entity/palm";
 
 const sse: { [Property in SSEvent]: Property } = {
 	webRTC: "webRTC",

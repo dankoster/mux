@@ -8,7 +8,7 @@ import * as planet from "./planet/planet";
 import * as VideoCall from "./VideoCall";
 import { ServerStats } from "./ServerStats";
 import { GitHubSvg } from "./GitHubSvg";
-import { AddPalm } from "./planet/palm";
+import { AddPalm } from "./planet/entity/palm";
 import { AreaProximityCards } from "./AreaProximityCards";
 import AvatarProximityCall from "./AvatarProximityCall";
 

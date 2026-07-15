@@ -1,6 +1,6 @@
 import * as solid from "solid-js"
 import { onCleanup, onMount } from "solid-js";
-import { Avatar } from "./planet/avatar"
+import { Avatar } from "./planet/entity/avatar"
 import { uiLog } from "./uiLog"
 import * as videoCall from "./VideoCall";
 import * as planet from "./planet/planet";

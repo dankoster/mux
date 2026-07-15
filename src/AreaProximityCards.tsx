@@ -2,7 +2,7 @@ import * as solid from "solid-js"
 import * as planet from "./planet/planet";
 import { IntersectionTarget } from "./planet/Intersections";
 import { shortId } from "./helpers";
-import { Area } from "./planet/area";
+import { Area } from "./planet/entity/area";
 import { uiLog } from "./uiLog";
 
 export function AreaProximityCards() {

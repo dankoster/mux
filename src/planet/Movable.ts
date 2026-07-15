@@ -4,8 +4,8 @@ import * as planet from "../planet/planet";
 import { AreaNotification, SSEventPayload } from "../../server/types";
 import { shortId } from '../helpers';
 import { uiLog } from '../uiLog';
-import { Area } from "./area";
-import { Avatar } from "./avatar";
+import { Area } from "./entity/area";
+import { Avatar } from "./entity/avatar";
 
 export class Movable {
 	area: Area

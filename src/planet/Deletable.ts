@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import * as server from "../data/data";
 import * as planet from "./planet";
-import { Area } from './area';
+import { Area } from './entity/area';
 import { uiLog } from '../uiLog';
 
 export class Deletable {

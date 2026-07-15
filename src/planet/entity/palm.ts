@@ -1,16 +1,16 @@
 import { Area, AreaParams } from "./area";
-import { uiLog } from "../uiLog";
+import { uiLog } from "../../uiLog";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { Labeled } from "./Labeled";
-import { Interactable } from "./Interactable";
+import { Labeled } from "../Labeled";
+import { Interactable } from "../Interactable";
 
-import * as server from "../data/data";
+import * as server from "../../data/data";
 import * as THREE from 'three'
-import * as planet from "./planet";
-import { shortId } from "../helpers";
-import { RenderSnapshotToUrl } from "./snapshot";
-import { Deletable } from "./Deletable";
+import * as planet from "../planet";
+import { shortId } from "../../helpers";
+import { RenderSnapshotToUrl } from "../snapshot";
+import { Deletable } from "../Deletable";
 
 //load glb and snapshot once for the module and cache it in memory
 const loader = new GLTFLoader()
