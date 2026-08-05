@@ -63,7 +63,7 @@ if (certPath && keyPath) {
 	try {
 		const cert = Deno.readTextFileSync(certPath)
 		const key = Deno.readTextFileSync(keyPath)
-		console.log('starting server with certificate')
+		console.log('starting server with certificate', {certPath, keyPath})
 		await app.listen({ port: PORT, secure: true, cert, key });
 	} catch (error) {
 		console.log(error)
