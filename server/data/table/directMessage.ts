@@ -1,5 +1,6 @@
 import { Database, Statement } from "jsr:@db/sqlite";
 import { DM, DMInsert, DMRequest } from "../../types.ts";
+import { AddColumn_IfNotExists } from "../dbUtility.ts";
 
 export class DirectMessageTable {
 
@@ -13,15 +14,35 @@ export class DirectMessageTable {
 			id INTEGER PRIMARY KEY,
 			toUuid TEXT NOT NULL, 
 			fromUuid TEXT NOT NULL,
+			toIdentityId INTEGER NOT NULL,
+			fromIdentityId INTEGER NOT NULL,
 			message TEXT,
 			timestamp TEXT NOT NULL DEFAULT (unixepoch('subsec')),
 			FOREIGN KEY(toUuid) REFERENCES connection(uuid),
 			FOREIGN KEY(fromUuid) REFERENCES connection(uuid),
+			FOREIGN KEY(toIdentityId) REFERENCES identity(id),
+			FOREIGN KEY(fromIdentityId) REFERENCES identity(id),
 			CHECK(fromUuid != toUuid));`)
 
+		AddColumn_IfNotExists({
+			db,
+			tableName: 'directMessage', 
+			columnName: 'toIdentityId', 
+			columnType: 'INTEGER',
+			references: 'identity(id)'
+		})
+		AddColumn_IfNotExists({
+			db,
+			tableName: 'directMessage', 
+			columnName: 'fromIdentityId', 
+			columnType: 'INTEGER',
+			references: 'identity(id)'
+		})
+
+
 		this.insertDm = db.prepare(`INSERT INTO directMessage 
-			(toUuid, fromUuid, message)
-			VALUES (:toUuid, :fromUuid, :message)
+			(toUuid, fromUuid, toIdentityId, fromIdentityId, message)
+			VALUES (:toUuid, :fromUuid, :toIdentityId, :fromIdentityId, :message)
 			RETURNING *;`
 		)
 

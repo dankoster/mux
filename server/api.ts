@@ -674,6 +674,8 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 		}
 
 		const persistedDm = db.directMessage.persistDm({
+			toIdentityId: toCon.identity?.id,
+			fromIdentityId: fromCon.identity?.id,
 			toUuid,
 			fromUuid,
 			message: message.message

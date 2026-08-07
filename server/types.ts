@@ -92,8 +92,8 @@ export type Friend = {
 
 export type FriendRequest = {
 	id: string,
-	fromId: string,
-	toId: string,
+	fromId: number,
+	toId: number,
 	status: string
 }
 
@@ -113,6 +113,8 @@ export type EncryptedMessage = { iv: string, data: string }
 export type DMInsert = {
 	toUuid: string,
 	fromUuid: string,
+	toIdentityId?: number,
+	fromIdentityId?: number,
 	message: string | EncryptedMessage,
 }
 

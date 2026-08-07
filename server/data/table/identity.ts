@@ -1,7 +1,7 @@
 import { Database, Statement } from "jsr:@db/sqlite";
 
 export type Identity = {
-	id?: string;
+	id?: number;
 	source?: string;
 	source_id?: string;
 	name?: string;
