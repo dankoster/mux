@@ -7,10 +7,11 @@ import { uiLog } from '../../uiLog'
 import { GLTF, GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { selfConnection } from '../../data/data'
+import { displayName, shortId } from '../../helpers'
 
 export class Avatar extends EventTarget {
 	mesh: THREE.Mesh
-	connection?: Connection
+	connection: Connection
 	prevDistanceFromSelf: number | undefined = undefined
 	prevDistanceLocation: THREE.Vector3 | undefined = undefined
 	lastBroadcastPosition: THREE.Vector3 = new THREE.Vector3
@@ -28,22 +29,24 @@ export class Avatar extends EventTarget {
 
 	private _distanceFromSelf: number = 0
 
-	constructor(size: number = 1, color?: number, x: number = 0) {
+	constructor(connection: Connection, size: number = 1, color?: number, x: number = 0) {
 		super()
+		this.connection = connection
 		this.mesh = new THREE.Mesh()
 		this.mesh.position.x = x
-
+		
 		// const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial()
 		// const boxGeometry = new THREE.BoxGeometry(size, size, size)
 		// this.box = new THREE.Mesh(boxGeometry, material)
 		// this.mesh.add(this.box)
-
+		
 		// const coneGeometry = new THREE.ConeGeometry(3, 3, 3);
 		// const cone = new THREE.Mesh(coneGeometry, material);
 		// this.mesh.add(cone);
-
+		
 		this.interactable = new Interactable(this.mesh, size, false)
 		this.label = new Labeled(this.mesh)
+		this.label.text = displayName(connection) || shortId(connection.id) || 'unknown'
 
 		// const material = color ? new THREE.MeshPhongMaterial({ color }) : new THREE.MeshNormalMaterial()
 		// const boxGeometry = new THREE.BoxGeometry(size, size, size)

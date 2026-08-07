@@ -82,9 +82,8 @@ export function Planet() {
 
 		if (!avatar) {
 			console.log('avatar create!', con.identity?.name ?? con.id);
-			avatar = new Avatar()
-			avatar.connection = con
-			avatar.label.text = displayName(con) || shortId(con.id) || 'unknown'
+			avatar = new Avatar(con)
+			
 			if (con.position) {
 				const position = new THREE.Vector3(con.position.x, con.position.y, con.position.z)
 				avatar.setPositionAndLook(position, con.quaternion)
