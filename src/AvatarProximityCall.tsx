@@ -57,7 +57,7 @@ export default function AvatarProximityCall() {
 		})
 	}
 	
-	const onStartIntersection = async (e: CustomEvent<IntersectionTarget>) => {
+	const onStartIntersection = async (e: CustomEventInit<IntersectionTarget>) => {
 		if (e.detail instanceof Avatar) {
 			const avatar = e.detail as Avatar
 			//setIntersected([...intersected(), avatar])
@@ -80,7 +80,7 @@ export default function AvatarProximityCall() {
 		}
 	}
 	
-	const onEndIntersection = (e: CustomEvent<Avatar>) => {
+	const onEndIntersection = (e: CustomEventInit<Avatar>) => {
 		if (e.detail instanceof Avatar) {
 			var avatar = e.detail as Avatar
 			// const index = intersected().findIndex(i=> i == avatar)
