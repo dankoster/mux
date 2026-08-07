@@ -1,6 +1,7 @@
 import { Database } from "jsr:@db/sqlite";
 
-function AddColumn_IfNotExists({ db, tableName, columnName, columnType }: { db: Database, tableName: string, columnName: string, columnType: "TEXT" }) {
+export function AddColumn_IfNotExists({ db, tableName, columnName, columnType, references }: 
+	{ db: Database, tableName: string, columnName: string, columnType: "TEXT"|"INTEGER", references: string }) {
 	const transaction = db.transaction(() => {
 		const getColumns = db.prepare(
 			`SELECT ti.name AS 'column'
@@ -22,12 +23,14 @@ function AddColumn_IfNotExists({ db, tableName, columnName, columnType }: { db: 
 		}
 
 		console.log('ADD COLUMN', `Column ${columnName} NOT FOUND in ${tableName}. Adding...`)
-		db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}`)
+		const command = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnType}${references ? ` REFERENCES ${references}`:''}`
+		//console.log(command)
+		db.exec(command)
 	})
 	transaction()
 }
 
-function DropColumn({ db, tableName, columnName }: { db: Database, tableName: string, columnName: string }) {
+export function DropColumn({ db, tableName, columnName }: { db: Database, tableName: string, columnName: string }) {
 	const transaction = db.transaction(() => {
 		const getColumns = db.prepare(
 			`SELECT ti.name AS 'column'
