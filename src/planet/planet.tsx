@@ -149,6 +149,7 @@ export function Planet() {
 				const avatar = avatarsById.get(con.id)
 				avatar?.delete()
 				avatarsById.delete(con.id)
+				intersections.update(avatar, false)
 			}
 		}
 	})
