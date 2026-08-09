@@ -9,6 +9,7 @@ export function addLights(targetScene: THREE.Scene) {
 	lights[1].position.set(100, 200, 100)
 	lights[2].position.set(-100, -200, -100)
 	for (const light of lights) {
+		light.castShadow = false
 		targetScene.add(light)
 	}
 }
