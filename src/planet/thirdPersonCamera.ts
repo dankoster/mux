@@ -36,7 +36,7 @@ export type cameraInfo = {
 }
 
 export function calculateThirdPersonCamera({ deltaTime, target, camera }: 
-	{ deltaTime: number; target: THREE.Group | THREE.Object3D; camera: THREE.PerspectiveCamera; }): cameraInfo | undefined {
+	{ deltaTime: number; target: THREE.Group | THREE.Object3D; camera: THREE.PerspectiveCamera; }): cameraInfo {
 	const _elapsedSec = deltaTime * 0.001 // convert time to seconds
 
 	//direction vector from camera to sphere
@@ -76,4 +76,6 @@ export function calculateThirdPersonCamera({ deltaTime, target, camera }:
 			idealPosition,
 		}
 	}
+
+	throw new Error('Failed to calculate third person camera!')
 }
