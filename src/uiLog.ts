@@ -1,45 +1,45 @@
 
-var logs = new Map<number, HTMLElement>()
+var logs = new Map<number, UiLog>()
 
+type UiLog = {timeoutId: number, element: HTMLElement}
 export type uiLogOptions = {
 	logId?: number,
 	timeoutMs?: number,
 }
 
 export function uiLog(value: string, { logId, timeoutMs = 5000 }: uiLogOptions = {}) {
-	let logElement = getLogElement()
+	let logParent = getLogElement()
 
-	if(logs.has(logId)) {
-		clearTimeout(logId)
-		const logElement = logs.get(logId)
-		logs.delete(logId)
-		// logElement.textContent = `[${logId}]${value}`
-		logElement.textContent = value
-		logId = setTimeout(() => {
-			logElement.remove()
-			logs.delete(logId)
+	if(logId && logs.has(logId)) {
+		const logEntry = logs.get(logId)
+		clearTimeout(logEntry!.timeoutId)
+		if(!logEntry) throw new Error(`logElement is ${logEntry}`)
+		logEntry.element.textContent = value
+		logEntry.timeoutId = setTimeout(() => {
+			logEntry.element.remove()
+			if(logId && logs.has(logId)) logs.delete(logId)
 		}, timeoutMs);
-		logs.set(logId, logElement)
+		logs.set(logId, logEntry)
 		return logId
 	}
 
-	const logEntry = document.createElement('pre')
-	logEntry.style.margin = "0"
-	logEntry.textContent = value
-	logElement.appendChild(logEntry)
-	logEntry.scrollIntoView() //{behavior: "smooth"})
+	const logElement = document.createElement('pre')
+	logElement.style.margin = "0"
+	logElement.textContent = value
+	logParent.appendChild(logElement)
+	logElement.scrollIntoView() //{behavior: "smooth"})
 
-	const id = setTimeout(() => {
-		logEntry.remove()
-		logs.delete(id)
+	const timeoutId = setTimeout(() => {
+		logElement.remove()
+		logs.delete(timeoutId)
 	}, timeoutMs);
 
-	if(logs.has(id as number)) 
-		throw new Error(`${id} already exists in logs`)
+	if(logs.has(logId || timeoutId as number)) 
+		throw new Error(`${timeoutId} already exists in logs`)
 
-	logs.set(id, logEntry);
+	logs.set(logId || timeoutId, {timeoutId: timeoutId, element: logElement});
 
-	return id
+	return timeoutId
 }
 
 function getLogElement() {
