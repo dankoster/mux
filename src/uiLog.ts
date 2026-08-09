@@ -39,7 +39,7 @@ export function uiLog(value: string, { logId, timeoutMs = 5000 }: uiLogOptions =
 
 	logs.set(logId || timeoutId, {timeoutId: timeoutId, element: logElement});
 
-	return timeoutId
+	return logId || timeoutId
 }
 
 function getLogElement() {
