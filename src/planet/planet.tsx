@@ -20,6 +20,8 @@ import { Interactable } from './Interactable'
 import { AddPalm } from './entity/palm'
 import { AreaRecord } from '../../server/data/table/area'
 import { addLights } from './lighting'
+import { onVisibilityChange } from '../onVisibilityChange'
+import { uiLog } from '../uiLog'
 
 function NotReady(): any { throw new Error('<Planet /> not ready!') }
 
@@ -246,17 +248,31 @@ export function Planet() {
 
 		sceneIsReady(scene)
 
-		let prevTime: number
-		function render(time: number) {
+		let targetFps = 5
+		onVisibilityChange(visible => {
+			uiLog(visible ? 'focused' : 'unfocused')
+			targetFps = visible ? 60 : 5
+		})
+
+		let prevTime = 0
+		async function render(time: number) {
 			if (stopRendering) return
 
+			const start = performance.now()
+
+			//elapsed miliseconds since last render
 			const deltaTime = time - prevTime
 			prevTime = time
+
+			//actual fps
+			const fps = 1000 / deltaTime 
+			uiLog(`${Math.round(fps)} fps`, { logId: 999, timeoutMs: 1200 })
+
 
 			if (selfAvatar) {
 				//move our avatar to be under the camera
 				const c = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				if (c?.currentPosition.distanceTo(c.idealPosition) > 0.01) {
+				if (c.currentPosition.distanceTo(c.idealPosition) > 0.01) {
 
 					if (!selfAvatar?.mesh?.position) {
 						debugger
@@ -268,7 +284,7 @@ export function Planet() {
 			}
 
 			//move the camera around the scene origin
-			orbit.update()
+			orbit.update(deltaTime)
 
 			//handle zoom
 			if (camera.zoom != targetZoom) {
@@ -296,6 +312,15 @@ export function Planet() {
 
 			renderer.render(scene, camera)
 			labelRenderer.render(scene, camera)
+
+			//limit fps if we have excess time
+			//60fps is 16.666ms per frame so we can say anything more than that should be awaited
+			const frameLength = performance.now() - start
+			const targetFrameLength = 1000 / targetFps
+			const timeRemainingInFrame = targetFrameLength - frameLength
+			if (timeRemainingInFrame > 20) { 
+				await new Promise<void>(resolve => setTimeout(() => resolve(), timeRemainingInFrame))
+			}
 
 			requestAnimationFrame(render)
 		}
