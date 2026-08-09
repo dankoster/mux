@@ -66,17 +66,28 @@ export function AreaProximityCards() {
 
 	return <div class="cards">
 		<solid.For each={intersectedAreas()} fallback={<div>nothing nearby</div>}>
-			{(item) => <Card area={item} />}
+			{(area) => <Card area={area} />}
 		</solid.For>
 	</div>
 }
 
 function Card(props: { area: Area }) {
 
-	return <div class="card" style={{ outline: props.area.movable?.holder() ? '2px solid yellow' : undefined }}>
+	const onMouseEnter = (e: MouseEvent) => {
+		props.area.interactable?.addRing(3, 0xffff00)
+	}
+
+	const onMouseLeave = (e: MouseEvent) => {
+		props.area.interactable?.removeRing()
+	}
+
+	solid.onCleanup(() => props.area.interactable?.removeRing())
+
+	return <div class="card" style={{ outline: props.area.movable?.holder() ? '2px solid yellow' : undefined }}
+	onmouseenter={onMouseEnter} onmouseleave={onMouseLeave}>
 		<img class="snapshot" src={props.area.ImageUrl}></img>
 		<div class="details">
-			<div class="info"><label>uuid</label>{shortId(props.area.uuid)}</div>
+			{/* <div class="info"><label>uuid</label>{shortId(props.area.uuid)}</div> */}
 			<div class="info"><label>owner</label>{props.area.params.ownerName}</div>
 			<div>
 				<button onclick={props.area.movable?.defaultAction}>{props.area.movable?.holder() ? 'drop' : 'grab'}</button>
