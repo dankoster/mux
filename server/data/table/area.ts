@@ -4,7 +4,7 @@ import { Position, QuaternionTuple } from "../../types.ts";
 
 export type AreaRecord = {
 	uuid?: string
-	ownerIdentityId?: string
+	ownerIdentityId?: number
 	ownerName?: string
 	ownerAvatarUrl?: string
 	planetId?: string
@@ -22,7 +22,7 @@ export class AreaTable {
 		db.exec(
 			`CREATE TABLE IF NOT EXISTS area (
 			uuid TEXT PRIMARY KEY,
-			ownerIdentityId TEXT,
+			ownerIdentityId INTEGER,
 			planetId TEXT,
 			position TEXT,
 			quaternion TEXT,
@@ -53,7 +53,7 @@ export class AreaTable {
 
 	add = (area: AreaRecord) => this.upsert.run({...area})
 	update = (area: AreaRecord) => this.upsert.run({...area})
-	remove = (uuid: string, ownerIdentityId: string) => this.delete.run({uuid, ownerIdentityId})
+	remove = (uuid: string, ownerIdentityId: number) => this.delete.run({uuid, ownerIdentityId})
 	getAll = () => this.selectAll.all()
-	getById = (uuid: string, ownerIdentityId: string) => this.selectById.get({uuid, ownerIdentityId}) as AreaRecord
+	getById = (uuid: string, ownerIdentityId: number) => this.selectById.get({uuid, ownerIdentityId}) as AreaRecord
 }
