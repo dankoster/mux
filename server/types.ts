@@ -102,7 +102,7 @@ export type DM = {
 	toId: string,
 	fromId: string,
 	fromName?: string,
-	timestamp?: number,
+	timestamp: number,
 	message: string | EncryptedMessage,
 	kind: 'key-share' | 'text' | 'call'
 }
