@@ -1,9 +1,10 @@
-import { Connection, DM, DMRequest, EncryptedMessage, Friend, JwkPair } from "../../server/types"
+import { Connection, DM, DMRequest, Friend, JwkPair } from "../../server/types"
 import { apiRoute, POST } from "./http"
-import { computeSharedKey, decryptMessage, encryptMessage, exportJWK, getLocalKeyPair, jwkToCryptoKey, replaceLocaLKeyPair, sameAsPrivateKey } from "../crypto_ecdh_aes";
+import { computeSharedKey, decryptMessage, EncryptedMessage, encryptMessage, exportJWK, jwkToCryptoKey } from "../crypto/crypto_ecdh_aes";
 import { createSignal } from "solid-js";
 import { LAST_READ_DMS, localStorage_GetMap, SHARED_KEYS } from "./localStore";
 import { connections, isSelf, self } from "./data";
+import { getLocalKeyPair, replaceLocaLKeyPair, sameAsPrivateKey } from "../crypto/localCryptoStorage";
 
 type DMEventType = 'unreadMessges' | 'newMessage'
 type UnreadCountByConId = { [key: string]: number }

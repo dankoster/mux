@@ -2,6 +2,7 @@
 import { Database } from "jsr:@db/sqlite";
 import type * as webrtc from "npm:/@types/webrtc"
 import { Identity } from "./data/table/identity.ts";
+import { EncryptedMessage } from "../src/crypto/crypto_ecdh_aes.ts";
 
 export type initiateCallResult = {
 	["polite"]: boolean | undefined,
@@ -106,9 +107,6 @@ export type DM = {
 	message: string | EncryptedMessage,
 	kind: 'key-share' | 'text' | 'call'
 }
-
-export type EncryptedMessage = { iv: string, data: string }
-
 
 export type DMInsert = {
 	toUuid: string,

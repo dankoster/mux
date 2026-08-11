@@ -1,6 +1,7 @@
 {
 	"deno.enable": true,
 	"deno.enablePaths": [
-		"./server"
+		"./server",
+		"./test"
 	]
 }
