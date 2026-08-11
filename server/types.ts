@@ -85,9 +85,9 @@ export type Update = {
 };
 
 export type Friend = {
-	id: string,
-	myId: string,
-	friendId: string
+	id: number,
+	myId: number,
+	friendId: number
 }
 
 export type FriendRequest = {

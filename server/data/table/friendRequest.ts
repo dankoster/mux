@@ -54,7 +54,7 @@ export class FriendRequestTable {
 		return this.selectFriendRequests.all<FriendRequest>({ identityId })
 	}
 
-	addFriendRequest(fromId: string, toId: string) {
+	addFriendRequest(fromId: number, toId: number) {
 		const result = this.insertFriendRequest.get<FriendRequest>({
 			fromId: fromId,
 			toId: toId
