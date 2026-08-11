@@ -12,10 +12,10 @@ export async function replaceLocaLKeyPair(keypair: CryptoKeyPair) {
 	localStorage.setItem(ECDH_PRIVATE_KEY, JSON.stringify(await exportJWK(keypair.privateKey)))
 	localStorage.setItem(ECDH_PUBLIC_KEY, JSON.stringify(await exportJWK(keypair.publicKey)))
 }
-export async function sameAsPrivateKey(newKey: JsonWebKey) {
-	const curKey = JSON.parse(localStorage.getItem(ECDH_PRIVATE_KEY))
+export function sameAsPrivateKey(newKey: JsonWebKey) {
+	const curKey = JSON.parse(localStorage.getItem(ECDH_PRIVATE_KEY) ?? '{}')
 	for (const prop in newKey) {
-		if (JSON.stringify(curKey[prop]) !== JSON.stringify(newKey[prop]))
+		if (JSON.stringify(curKey[prop]) !== JSON.stringify(newKey[prop as keyof JsonWebKey]))
 			return false
 	}
 	return true
