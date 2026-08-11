@@ -42,18 +42,27 @@ async function broadcastPublicKey(publicKey: CryptoKey) {
 async function handleKeyShare(dm: DM) {
 	if (dm.kind !== 'key-share') throw new Error(`${dm.kind} is not valid in handleKeyShare`)
 
+	const selfId = self()?.id
+	if (!selfId) throw new Error(`selfId is ${selfId}`)
+
 	//does sender have an older key
-	if (dm.fromId < self().id) {
+	if (dm.fromId < selfId) {
 		const fromCon = connections.find(c => c.id === dm.fromId)
 
+		if (!fromCon) throw new Error(`fromCon is ${fromCon}`)
+		if (!fromCon.publicKey) throw new Error(`fromCon.publicKey is ${fromCon.publicKey}`)
+
 		const key = await getSharedKey(myKeys.privateKey, `${dm.fromId}-${dm.toId}`, fromCon.publicKey);
+
+		if (!key) throw new Error(`key is ${key}`)
+
 		dm.message = await decryptMessage(dm.message as EncryptedMessage, key);
 
 		const jwkPair = JSON.parse(dm.message) as JwkPair
 		console.log('KEY SHARE', `${dm.fromId}-${dm.toId}`, jwkPair);
 
 		if (sameAsPrivateKey(jwkPair.privateJwk)) {
-			//current primary key already matche incoming key
+			//current primary key already matches incoming key
 			return
 		}
 
@@ -84,18 +93,18 @@ export { unreadCountByConId }
 const messagesByConId = new Map<string, Map<number, DM>>()
 export const DirectMessageEvents = new DMEventEmitter()
 
-export async function getRecentHistory(conId: string, publicKey, minCount = 20) {
+export async function getRecentHistory(conId: string, minCount = 20) {
 	if (!messagesByConId.has(conId))
 		messagesByConId.set(conId, new Map<number, DM>())
 
 	const messagesByMessageId = messagesByConId.get(conId)
 	const lastRead = lastReadTimestamp(conId)
 
-	if (minCount > messagesByMessageId.size) {
+	if (minCount > (messagesByMessageId?.size ?? 0)) {
 		const messages = await getHistory({
 			timestamp: lastRead,
 			conId: conId,
-			qty: minCount - messagesByMessageId.size
+			qty: minCount - (messagesByMessageId?.size ?? 0)
 		})
 		for (const dm of messages) {
 			await decryptAndSaveMessage(dm)
@@ -103,7 +112,7 @@ export async function getRecentHistory(conId: string, publicKey, minCount = 20) 
 	}
 
 	//sort the result from oldest to newest
-	return Array.from(messagesByMessageId.values()).sort((a, b) => a.timestamp - b.timestamp)
+	return Array.from(messagesByMessageId?.values() ?? []).sort((a, b) => a.timestamp - b.timestamp)
 }
 
 export async function getLatestHistory(conId: string, minCount = 20) {
@@ -122,7 +131,7 @@ export async function getLatestHistory(conId: string, minCount = 20) {
 	}
 
 	//sort the result from oldest to newest
-	return Array.from(messagesByMessageId.values()).sort((a, b) => a.timestamp - b.timestamp)
+	return Array.from(messagesByMessageId?.values() ?? []).sort((a, b) => a.timestamp - b.timestamp)
 }
 
 function incrementUnreadCount(conId: string) {
@@ -140,12 +149,12 @@ function clearUnreadCount(conId: string) {
 }
 
 export function lastReadTimestamp(conId: string) {
-	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS)) ?? {}
+	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS) ?? '{}')
 	return lastReadDmByConId[conId]
 }
 
 export function setLastReadNow(conId: string) {
-	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS)) ?? {}
+	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS) ?? '{}')
 	lastReadDmByConId[conId] = Date.now()
 	localStorage.setItem(LAST_READ_DMS, JSON.stringify(lastReadDmByConId))
 
@@ -154,7 +163,7 @@ export function setLastReadNow(conId: string) {
 }
 
 export function setLastReadTimestamp(conId: string, timestamp: number) {
-	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS)) ?? {}
+	const lastReadDmByConId: LastReadTimestamp = JSON.parse(localStorage.getItem(LAST_READ_DMS) ?? '{}')
 	lastReadDmByConId[conId] = timestamp
 	localStorage.setItem(LAST_READ_DMS, JSON.stringify(lastReadDmByConId))
 
@@ -163,11 +172,13 @@ export function setLastReadTimestamp(conId: string, timestamp: number) {
 	clearUnreadCount(conId)
 }
 
-export function onNewMessage(callback: (dm: DM) => void) {
+export function onNewMessageForConnection(con: Connection, callback: (dm: DM) => void) {
 	const ac = new AbortController()
 	const event: DMEventType = 'newMessage'
-	DirectMessageEvents.addEventListener(event, async (e: CustomEvent) => {
-		callback(e.detail)
+	DirectMessageEvents.addEventListener(event, async (e: CustomEventInit) => {
+		const dm = e.detail as DM
+		if (dm.fromId == con.id)
+			callback(e.detail)
 	}, { signal: ac.signal })
 	return ac
 }
@@ -184,8 +195,8 @@ export async function getAllUnread(friends: Friend[], connections: Connection[])
 
 	for (const conId of friendConId) {
 		const con = connections.find(c => c.id === conId)
-		if (!con.publicKey) {
-			console.log('getUnreadDms', conId, con.identity?.name, 'has no public key')
+		if (!con?.publicKey) {
+			console.log('getUnreadDms', conId, con?.identity?.name, 'has no public key')
 			continue
 		}
 
@@ -214,13 +225,14 @@ export async function sendDm(dm: DM, publicKey: string) {
 	if (response.ok) {
 		const savedDm = await response.json() as DM
 		dm.timestamp = savedDm.timestamp
+		if (!savedDm.id) throw new Error(`missing dm id`)
 		dm.id = savedDm.id
 		setLastReadTimestamp(dm.toId, savedDm.timestamp)
 
 		if (!messagesByConId.has(dm.toId))
 			messagesByConId.set(dm.toId, new Map<number, DM>())
 
-		messagesByConId.get(dm.toId).set(dm.id, dm)
+		messagesByConId?.get(dm.toId)?.set(dm.id, dm)
 	}
 
 	return dm
@@ -245,7 +257,7 @@ async function getSharedKey(privateKey: CryptoKey, sharedKeyId: string, publicJw
 		sharedKeyByConnectionId.set(sharedKeyId, key)
 	}
 
-	return sharedKeyByConnectionId.get(sharedKeyId)
+	return sharedKeyByConnectionId.get(sharedKeyId)!
 }
 
 export async function sharePrivateKey(myId: string, con: Connection) {
@@ -256,6 +268,8 @@ export async function sharePrivateKey(myId: string, con: Connection) {
 		return
 	}
 
+	if (!con.publicKey) throw new Error(`target connection public key is ${con.publicKey}`)
+
 	//TODO: create a two step process: 
 	// send a pin number to the other connection then
 	// require that number to be confirmed on this side
@@ -265,6 +279,7 @@ export async function sharePrivateKey(myId: string, con: Connection) {
 	sendDm({
 		toId: con.id,
 		fromId: myId,
+		timestamp: Date.now(),
 		message: JSON.stringify({ privateJwk, publicJwk } as JwkPair),
 		kind: "key-share"
 	}, con.publicKey)
@@ -285,7 +300,8 @@ async function decryptAndSaveMessage(dm: DM) {
 	const toCon = connections.find(c => c.id === dm.toId)
 	const fromCon = connections.find(c => c.id === dm.fromId)
 	const sentByMe = isSelf(fromCon);
-	const publicKey = sentByMe ? toCon.publicKey : fromCon.publicKey
+	const publicKey = sentByMe ? toCon?.publicKey : fromCon?.publicKey
+	if (!publicKey) throw new Error(`publicKey is ${publicKey}`)
 	const sharedKey = await getSharedKey(myKeys.privateKey, `${dm.fromId}-${dm.toId}`, publicKey);
 
 	if (typeof dm.message === 'string')
@@ -298,14 +314,15 @@ async function decryptAndSaveMessage(dm: DM) {
 		console.warn(error)
 		console.log('could not decrypt', dm)
 
-//		return
+		//return
 	}
 
 	const conId = sentByMe ? dm.toId : dm.fromId;
 	if (!messagesByConId.has(conId))
 		messagesByConId.set(conId, new Map<number, DM>())
 
-	messagesByConId.get(conId).set(dm.id, dm)
+	if (!dm.id) throw new Error(`dm id is ${dm.id}`)
+	messagesByConId?.get(conId)?.set(dm.id, dm)
 
 	incrementUnreadCount(conId)
 }
