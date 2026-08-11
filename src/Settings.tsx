@@ -9,6 +9,8 @@ type SettingName = "Show welcome"
 	| 'Start Call Muted (video)'
 	| 'Mute when focus is lost'
 	| 'Restore mute state when refocused'
+	| 'Limit fps when focus is lost'
+	| 'Show fps'
 
 type Setting = {
 	name: SettingName,
@@ -21,10 +23,14 @@ const SettingsData: Setting[] = [
 		name: "Show welcome",
 		value: false
 	},
-	// {
-	// 	name: "Start video on load",
-	// 	value: false
-	// },
+	{
+		name: "Limit fps when focus is lost",
+		value: true
+	},
+	{
+		name: "Show fps",
+		value: true
+	},
 	{
 		name: 'Start Call Muted (audio)',
 		value: true
@@ -50,12 +56,22 @@ for (const setting of SettingsData) {
 		setting.value = JSON.parse(value)
 }
 
-export function GetSettingValue(name: SettingName) {	
+const changeCallbacks: {[key:string]:[(value:boolean)=>void]} = {}
+export function OnSettingChanged(name: SettingName, callback: (value:boolean) => void) {
+	console.log('OnSettingChanged', name)
+	if(!Array.isArray(changeCallbacks[name]))
+		changeCallbacks[name] = [callback]
+	else
+		changeCallbacks[name].push(callback)
+}
+
+export function GetSettingValue(name: SettingName): boolean {	
 	//setting hasn't been changed from the default, so get the default
 	if(localStorage.getItem(name) == null) 
-		return SettingsData.find(s => s.name == name)?.value
+		return SettingsData.find(s => s.name == name)?.value ?? false
 
-	return !!JSON.parse(localStorage.getItem(name))
+	const value = localStorage.getItem(name)
+	return !!(value && JSON.parse(value))
 }
 
 export function GetSetting(name: SettingName): Setting {
@@ -116,6 +132,7 @@ export function SettingCheckBox(props: { setting: Setting }) {
 	const handleChange = (e) => {
 		setting().value = e.currentTarget.checked
 		localStorage.setItem(setting().name, JSON.stringify(setting().value))
+		changeCallbacks[setting().name].forEach(cb => cb(setting().value))
 	}
 
 	return <label class="settingCheckBox" >

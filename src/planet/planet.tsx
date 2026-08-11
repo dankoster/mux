@@ -22,6 +22,7 @@ import { AreaRecord } from '../../server/data/table/area'
 import { addLights } from './lighting'
 import { onVisibilityChange } from '../onVisibilityChange'
 import { uiLog } from '../uiLog'
+import { GetSettingValue, OnSettingChanged } from '../Settings'
 
 function NotReady(): any { throw new Error('<Planet /> not ready!') }
 
@@ -250,9 +251,13 @@ export function Planet() {
 
 		let targetFps = 5
 		onVisibilityChange(visible => {
-			uiLog(visible ? 'focused' : 'unfocused')
-			targetFps = visible ? 60 : 5
+			const limitFps = GetSettingValue('Limit fps when focus is lost')
+			targetFps = (visible || !limitFps) ? 60 : 5
+			uiLog(visible ? 'focused' : 'focus lost', { logId: 998 })
 		})
+		
+		let showFps = GetSettingValue('Show fps')
+		OnSettingChanged('Show fps', value => showFps = value)
 
 		let prevTime = 0
 		async function render(time: number) {
@@ -264,9 +269,10 @@ export function Planet() {
 			const deltaTime = time - prevTime
 			prevTime = time
 
-			//actual fps
-			const fps = 1000 / deltaTime 
-			uiLog(`${Math.round(fps)} fps`, { logId: 999, timeoutMs: 1200 })
+			if(showFps) {
+				const fps = 1000 / deltaTime 
+				uiLog(`${Math.round(fps)} fps`, { logId: 999, timeoutMs: 2 * deltaTime })
+			}
 
 
 			if (selfAvatar) {
