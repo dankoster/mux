@@ -2,7 +2,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
 import "./KeyBind.css"
 
-export function CtrlKeyBind(props: { char: string, action: () => void }) {
+export function CtrlKeyBind(props: { char?: string, action: () => void }) {
 
 	if (!props.char) return;
 
@@ -37,7 +37,7 @@ export function CtrlKeyBind(props: { char: string, action: () => void }) {
 	</>
 }
 
-export function KeyBind(props: { char: string, action: () => void }) {
+export function KeyBind(props: { char?: string, action: () => void }) {
 
 	if (!props.char) return;
 
