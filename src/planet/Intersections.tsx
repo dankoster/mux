@@ -1,3 +1,4 @@
+import { shortId } from '../helpers';
 import { Area } from './entity/area';
 import { Avatar } from './entity/avatar';
 
@@ -11,7 +12,7 @@ export class Intersections extends EventTarget {
 	};
 
 	public intersecting = new Set<IntersectionTarget>();
-	labelFor = (target: IntersectionTarget) => (target instanceof Area && target.labeled?.text)
+	labelFor = (target: IntersectionTarget) => (target instanceof Area && target.labeled?.text || shortId((target as Area)?.uuid))
 		|| (target instanceof Avatar && target.label.text)
 
 	update(target: IntersectionTarget, isIntersecting: boolean | undefined) {
@@ -21,14 +22,14 @@ export class Intersections extends EventTarget {
 			if (!isIntersecting) {
 				this.intersecting.delete(target);
 				this.dispatchEvent(new CustomEvent<IntersectionTarget>(this.event.exit, { detail: target }));
-				// uiLog(`${isIntersecting ? 'started' : 'stopped'} intersecting ${this.labelFor(target)}`)
+				// uiLog(`${isIntersecting ? 'Started' : 'Stopped'} intersecting ${this.labelFor(target)}`)
 			}
 		}
 		else {
 			if (isIntersecting) {
 				this.intersecting.add(target);
 				this.dispatchEvent(new CustomEvent<IntersectionTarget>(this.event.enter, { detail: target }));
-				// uiLog(`${isIntersecting ? 'started' : 'stopped'} intersecting ${this.labelFor(target)}`)
+				// uiLog(`${isIntersecting ? 'Started' : 'Stopped'} intersecting ${this.labelFor(target)}`)
 			}
 		}
 	}
