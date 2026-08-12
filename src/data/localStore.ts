@@ -8,9 +8,9 @@ export const SHARED_KEYS = 'sharedKeys'
 export function localStorage_GetMap<K, V>(key: string) {
 	const lsValue = localStorage.getItem(key)
 	try {
-		return new Map<K, V>(JSON.parse(lsValue))
+		return new Map<K, V>(JSON.parse(lsValue ?? '{}'))
 	} catch (err) {
-		console.warn(`local storage value could not be converted to a map for ${key}: ${err.message}`)
+		console.warn(`local storage value could not be converted to a map for ${key}: ${err}`)
 		return new Map<K, V>()
 	}
 }
