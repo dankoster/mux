@@ -25,28 +25,18 @@ import { SSEventPayload } from "../server/types";
 // use view transitions to move always on video from user button to call view
 
 
-//start WebRTC connecton on proximity and only provide available tracks
-// - add and remove tracks on demand
-
-
 export default function AvatarProximityCall() {
 	
 	//const [intersected, setIntersected] = solid.createSignal<Avatar[]>([])
 	
 	const onInitiateCallFromServer = async (event: SSEventPayload) => {
+		if(!event.data) throw new Error(`${event.data} is ${event.data}`)
+
 		const callingConId = event.data
 		const callingAvatar = planet.getAvatarById(callingConId)
 
-		//TODO: check to see if we've already connected to this caller
-
-		if(videoCall.HasPeer(callingConId)) {
-			//uiLog(`Got call from ${callingAvatar.label?.text} but already connected`)
-			console.log(`Got call from ${callingAvatar.label?.text} but already connected`)
-			return
-		}
-
-		uiLog(`Answering connection from ${callingAvatar.label?.text}`)
-		console.log(`Answering connection from `, callingAvatar.label?.text)
+		uiLog(`Answering connection from ${callingAvatar?.label?.text}`)
+		console.log(`Answering connection from `, callingAvatar?.label?.text)
 		
 		
 		const callResult = await server.initiateCall(callingConId)
@@ -62,11 +52,7 @@ export default function AvatarProximityCall() {
 			const avatar = e.detail as Avatar
 			//setIntersected([...intersected(), avatar])
 
-			if (videoCall.HasPeer(avatar.connection?.id)) {
-				//uiLog(`Intersected ${avatar.label?.text} but already connected`)
-				console.log(`Intersected ${avatar.label?.text} but already connected`)
-				return
-			}
+			if(!avatar.connection) throw new Error(`${avatar.connection} is ${avatar.connection}`)
 			
 			uiLog(`Connecting to ${avatar.label?.text}`)
 			console.log(`Connecting to`, avatar.label?.text)
@@ -90,7 +76,7 @@ export default function AvatarProximityCall() {
 			// }
 			// setIntersected(intersected().toSpliced(index, 1))
 			console.log(`onEndIntersection`, avatar.label?.text)
-			videoCall.Disconnect(avatar?.connection?.id)
+			videoCall.Disconnect(avatar.connection.id)
 		}
 	}
 	
