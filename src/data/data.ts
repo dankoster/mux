@@ -1,7 +1,7 @@
 import { API_URI } from "../API_URI";
 import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store"
-import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, DMRequest, EncryptedMessage, initiateCallResult, AreaNotification, Position, SSEventPayload } from "../../server/types";
+import type { SSEvent, AuthTokenName, Connection, Update, FriendRequest, Friend, DM, initiateCallResult, AreaNotification, SSEventPayload } from "../../server/types";
 import { apiRoute, DELETE, GET, POST } from "./http";
 import { AreaParams, } from "../planet/entity/area";
 import * as Planet from "../planet/planet";
@@ -53,8 +53,8 @@ export {
 	pk, connections, self, stats, serverOnline, friendRequests, friends
 }
 
-export function isSelf(con: Connection) {
-	return con.identity && con.identity?.id === self()?.identity?.id
+export function isSelf(con?: Connection) {
+	return con?.identity && con.identity?.id === self()?.identity?.id
 }
 
 type AuthData = {
