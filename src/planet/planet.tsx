@@ -86,7 +86,7 @@ export function Planet() {
 		if (!avatar) {
 			console.log('avatar create!', con.identity?.name ?? con.id);
 			avatar = new Avatar(con)
-			
+
 			if (con.position) {
 				const position = new THREE.Vector3(con.position.x, con.position.y, con.position.z)
 				avatar.setPositionAndLook(position, con.quaternion)
@@ -249,14 +249,19 @@ export function Planet() {
 
 		sceneIsReady(scene)
 
-		let targetFps = 5
+		const HIGH_FPS = 60
+		const LOW_FPS = 2
+		let targetFps = LOW_FPS
 		onVisibilityChange(visible => {
 			const limitFps = GetSettingValue('Limit fps when focus is lost')
-			targetFps = (visible || !limitFps) ? 60 : 5
+			targetFps = (visible || !limitFps) ? HIGH_FPS : LOW_FPS
 			uiLog(visible ? 'focused' : 'focus lost', { logId: 998 })
 		})
-		
+
 		let showFps = GetSettingValue('Show fps')
+		const fpsUpdateFrequency = 1000
+		let msSinceLastFpsUpdate = 0
+		const fpsLog: number[] = []
 		OnSettingChanged('Show fps', value => showFps = value)
 
 		let prevTime = 0
@@ -269,9 +274,15 @@ export function Planet() {
 			const deltaTime = time - prevTime
 			prevTime = time
 
-			if(showFps) {
-				const fps = 1000 / deltaTime 
-				uiLog(`${Math.round(fps)} fps`, { logId: 999, timeoutMs: 2 * deltaTime })
+			if (showFps) {
+				msSinceLastFpsUpdate += deltaTime
+				fpsLog.push(1000 / deltaTime)
+				if (msSinceLastFpsUpdate >= fpsUpdateFrequency) {
+					msSinceLastFpsUpdate = 0
+					const meanFps = fpsLog.reduce((prev, cur) => prev + cur, 0) / fpsLog.length
+					fpsLog.length = 0
+					uiLog(`${Math.round(meanFps)} fps`, { logId: 999, timeoutMs: 2 * fpsUpdateFrequency })
+				}
 			}
 
 
@@ -324,7 +335,7 @@ export function Planet() {
 			const frameLength = performance.now() - start
 			const targetFrameLength = 1000 / targetFps
 			const timeRemainingInFrame = targetFrameLength - frameLength
-			if (timeRemainingInFrame > 20) { 
+			if (timeRemainingInFrame > 20) {
 				await new Promise<void>(resolve => setTimeout(() => resolve(), timeRemainingInFrame))
 			}
 
