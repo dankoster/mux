@@ -9,7 +9,6 @@ import * as server from "./data/data";
 import "./main.css"
 import Welcome, { welcomeVisible } from "./Welcome";
 import { UserToolbar } from "./UserToolbar";
-import AvatarProximityCall from "./AvatarProximityCall";
 
 render(() => <App />, document.body)
 
