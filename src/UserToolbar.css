@@ -1,0 +1,51 @@
+.toolbar {
+	padding: 1rem;
+
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+
+	column-gap: 2rem;
+	row-gap: 0.5rem;
+	justify-content: center;
+	align-items: center;
+	touch-action: none;
+
+	container-type: inline-size;
+	container-name: toolbar;
+
+	@media(max-width:500px) {
+		.max-video-button {
+			display: none;
+		}
+	}
+
+	input[type="text"] {
+		touch-action: none;
+		font-size: 16px;
+		background-color: transparent;
+		border-style: none;
+		border-radius: 5px;
+		padding: 0.5rem;
+		text-align: center;
+		flex-grow: 1;
+	}
+
+	.public-info {
+		flex-grow: 1;
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.buttons {
+		display: flex;
+		/* display: grid; */
+		gap: 0.5rem;
+
+		/* @container toolbar (width < 400px) {
+				display: flex;
+			} */
+	}
+
+}

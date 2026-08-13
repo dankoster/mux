@@ -12,6 +12,7 @@ import { AddPalm } from "./planet/entity/palm";
 import { AreaProximityCards } from "./AreaProximityCards";
 import AvatarProximityCall from "./AvatarProximityCall";
 
+import "./UserToolbar.css"
 
 export function UserToolbar() {
 	const showMenu = (e: MouseEvent) => {
@@ -88,7 +89,7 @@ export function UserToolbar() {
 							enabledIcon="share_screen"
 							disabledIcon="share_screen" />
 						<MediaButton
-							className="max-video"
+							className="max-video-button"
 							enabled={VideoCall.maxVideoEnabled}
 							action={() => VideoCall.toggleMaxVideo()}
 							enabledIcon="compress"
