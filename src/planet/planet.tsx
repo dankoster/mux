@@ -289,13 +289,8 @@ export function Planet() {
 			if (selfAvatar) {
 				//move our avatar to be under the camera
 				const c = calculateThirdPersonCamera({ deltaTime, target: sphere, camera })
-				if (c.currentPosition.distanceTo(c.idealPosition) > 0.01) {
-
-					if (!selfAvatar?.mesh?.position) {
-						debugger
-						return
-					}
-
+				if (c.currentPosition.distanceTo(c.idealPosition) > 0.01 
+				|| selfAvatar?.mesh?.position.distanceTo(c.currentPosition) > 0.01) {
 					selfAvatar.setPositionAndLook(c.currentPosition)
 				}
 			}
