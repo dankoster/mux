@@ -673,19 +673,27 @@ api.post(`/${apiRoute.dm}`, async (ctx) => {
 			return
 		}
 
-		const persistedDm = db.directMessage.persistDm({
-			toIdentityId: toCon.identity?.id,
-			fromIdentityId: fromCon.identity?.id,
-			toUuid,
-			fromUuid,
-			message: message.message
-		})
+		//do not try to persist messages from anonymous users
+		let dmId, dmTimestamp
+		if(toCon.identity?.id && fromCon.identity?.id)
+		{
+			const persistedDm = db.directMessage.persistDm({
+				toIdentityId: toCon.identity?.id,
+				fromIdentityId: fromCon.identity?.id,
+				toUuid,
+				fromUuid,
+				message: message.message
+			})
+
+			dmId = persistedDm.id
+			dmTimestamp = persistedDm.timestamp
+		}
 
 		//overwrite any data from the sender that they should not control
-		message.id = persistedDm.id
+		message.id = dmId ?? Date.now()
 		message.fromId = fromCon.id
 		message.fromName = fromCon.identity?.name
-		message.timestamp = (persistedDm.timestamp ?? 0) * 1000 //we don't need a subsecond timestamp on the frontend
+		message.timestamp = (dmTimestamp ?? Date.now()) * 1000 //we don't need a subsecond timestamp on the frontend
 
 		ctx.response.status = 200
 		ctx.response.body = message
