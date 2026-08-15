@@ -177,8 +177,13 @@ export class Avatar extends EventTarget {
 		if (!this.prevPositions.length || position.distanceTo(this.prevPositions[this.prevPositions.length - 1]) > 0.1) {
 			this.prevPositions.push(position.clone())
 		}
+		
+		//hack: the calcMeshQuaterionAlongPath function needs at least two points
+		// to calculate a quaternion tangental to the surface
+		if (this.prevPositions.length < 2)
+			this.prevPositions.push(position.clone().addScalar(0.2))
 
-		if (this.prevPositions.length > 2) {
+		if (this.prevPositions.length >= 2) {
 			var quat = this.calcMeshQuaterionAlongPath()
 			if(quat)
 				this.mesh.quaternion.copy(quat)
