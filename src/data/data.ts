@@ -125,8 +125,7 @@ async function startup() {
 	})
 
 	PositionSocket.connectSocket()
-
-
+	DirectMessages.InitKeys()
 }
 
 export async function loadAreas() {

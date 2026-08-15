@@ -19,7 +19,7 @@ const sharedJwkByConnectionId = new Map<string, string>(localStorage_GetMap(SHAR
 sharedJwkByConnectionId.forEach(async (value, key) =>
 	sharedKeyByConnectionId.set(key, await jwkToCryptoKey(JSON.parse(value), ['deriveBits'])))
 
-async function InitKeys() {
+export function InitKeys() {
 	getLocalKeyPair().then(async keypair => {
 		myKeys = keypair
 		await broadcastPublicKey(keypair.publicKey);
@@ -27,8 +27,6 @@ async function InitKeys() {
 		console.error(error)
 	})
 }
-
-InitKeys() // call this as soon as this module is imported
 
 async function broadcastPublicKey(publicKey: CryptoKey) {
 	console.trace(`broadcastPublicKey`)
