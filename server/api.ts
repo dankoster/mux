@@ -351,22 +351,25 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 		const caller = con.id
 		const callee = await ctx.request.body.json()
 
-		const result: initiateCallResult = {
-			polite: undefined,
-			peerConfig
-		}
+		var result: initiateCallResult
 
 		const pendingCall = calls.find(c => c.to == caller)
 		if (pendingCall) {
 			//we're answering a call
 			calls.splice(calls.indexOf(pendingCall), 1)
-			result.polite = true
+			result = {
+				polite: true,
+				peerConfig
+			}
 			console.log('answer call from', callee, 'to', caller, `polite: ${result.polite}`)
 		}
 		else {
 			//we're starting a new call
 			calls.push({ id: crypto.randomUUID(), from: caller, to: callee })
-			result.polite = false
+			result = {
+				polite: false,
+				peerConfig
+			}
 			console.log('initiate call from', caller, 'to', callee, `polite: ${result.polite}`)
 
 			//Send SSE message to the callee who will also POST to initiateCall
