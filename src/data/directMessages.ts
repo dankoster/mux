@@ -10,7 +10,6 @@ type DMEventType = 'unreadMessges' | 'newMessage'
 type UnreadCountByConId = { [key: string]: number }
 type LastReadTimestamp = { [key: string]: number }
 
-// console.log('GETTING DM CRYPTO KEYS')
 let myKeys: CryptoKeyPair
 
 const sharedKeyByConnectionId = new Map<string, CryptoKey>()
@@ -19,17 +18,13 @@ const sharedJwkByConnectionId = new Map<string, string>(localStorage_GetMap(SHAR
 sharedJwkByConnectionId.forEach(async (value, key) =>
 	sharedKeyByConnectionId.set(key, await jwkToCryptoKey(JSON.parse(value), ['deriveBits'])))
 
-export function InitKeys() {
-	getLocalKeyPair().then(async keypair => {
-		myKeys = keypair
-		await broadcastPublicKey(keypair.publicKey);
-	}).catch((error) => {
-		console.error(error)
-	})
+export async function InitKeys() {
+	myKeys = await getLocalKeyPair()
+	await broadcastPublicKey(myKeys.publicKey);
 }
 
 async function broadcastPublicKey(publicKey: CryptoKey) {
-	console.trace(`broadcastPublicKey`)
+	console.log(`broadcastPublicKey`)
 	const jwk = await exportJWK(publicKey)
 	const result = await POST(apiRoute.publicKey, { body: JSON.stringify(jwk) });
 	if (!result.ok) {
