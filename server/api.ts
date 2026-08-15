@@ -388,6 +388,7 @@ api.post(`/${apiRoute.initiateCall}`, async ctx => {
 	}
 })
 
+//adding a new area
 api.post(`/${apiRoute.area}`, async ctx => {
 	try {
 		const { uuid, con } = getConnection(ctx.request)
@@ -395,12 +396,11 @@ api.post(`/${apiRoute.area}`, async ctx => {
 		const area = await ctx.request.body.json() as AreaRecord
 		console.log(ctx.request.url.pathname, uuid, area)
 
-		if (!con.identity?.id) {
+		//make sure we have an authenticated user and don't trust their submitted ID
+		if (!con.identity?.id || area.ownerIdentityId !== con.identity?.id) {
 			ctx.response.status = 401 //unauthorized
 			return
 		}
-
-		area.ownerIdentityId = con.identity?.id!
 
 		db.area.add(area)
 
@@ -409,8 +409,9 @@ api.post(`/${apiRoute.area}`, async ctx => {
 		})
 
 		ctx.response.status = 200
-	} catch (err) {
+	} catch (err:any) {
 		console.error(err, ctx.request)
+		ctx.response.body = `${err}`
 		ctx.response.status = 500
 	}
 })
