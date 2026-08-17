@@ -22,7 +22,7 @@ export const [screenEnabled, setScreenEnabled] = createSignal(false)
 export const [maxVideoEnabled, setMaxVideoEnabled] = createSignal(false)
 export const [isConnected, setIsConnected] = createSignal(false)
 
-function NotReady<T=void>():T { throw new Error('<VideoCall /> not mounted') }
+function NotReady<T = void>(): T { throw new Error('<VideoCall /> not mounted') }
 async function NotReadyAsync() { throw new Error('<VideoCall /> not mounted') }
 
 export let toggleMic: (enabled?: boolean) => void = (enabled?: boolean) => NotReady()
@@ -42,7 +42,6 @@ type ConnectParams = {
 export default function VideoCall() {
 	let videoContainer: HTMLDivElement
 	let localVideoContainer: HTMLDivElement
-	// let observer: MutationObserver
 	let localVideo: HTMLVideoElement
 	let screenShareStream: MediaStream
 	let config: RTCConfiguration
@@ -58,7 +57,7 @@ export default function VideoCall() {
 	Connect = async ({ conId, rtcConfig, polite = true }: ConnectParams) => {
 		config = rtcConfig
 		polite = polite
-		
+
 		if (peersById.has(conId)) {
 			console.trace(`Peer already conneced! ${conId}`)
 			return //already connected?
@@ -83,7 +82,7 @@ export default function VideoCall() {
 
 	Disconnect = async (conId: string) => {
 		const peer = peersById.get(conId)
-		
+
 		if (!peer) {
 			console.warn(`Disconnect: conId already gone!  ${conId}`)
 			return
@@ -103,6 +102,9 @@ export default function VideoCall() {
 	}
 
 	toggleVideo = async (enabled?: boolean) => {
+
+		if (!localVideo!) throw new Error(`localVideo is ${localVideo!}`)
+
 		if (enabled === undefined)
 			enabled = !camEnabled()
 
@@ -112,7 +114,7 @@ export default function VideoCall() {
 			//remove video tracks from any connected peers
 			peersById.forEach(peer => peer.removeTracks(LocalMedia.stream))
 			LocalMedia.stopLocalStream()
-			localVideo.srcObject = undefined
+			localVideo.srcObject = null
 			setMicEnabled(false)
 			return
 		}
@@ -165,7 +167,7 @@ export default function VideoCall() {
 
 	const onWebRtcMessage = (sse: SSEventPayload) => {
 		// we got here because the other side is sending us RTC connection info
-		const data = JSON.parse(sse.data);
+		const data = JSON.parse(sse.data ?? '');
 
 		if (!peersById.has(data.senderId)) {
 			console.warn(`got WebRtc message but have no peer for`, data.senderId)
@@ -200,12 +202,14 @@ export default function VideoCall() {
 		return alone
 	})
 
-	return <div id="videos-container" class="video-call" classList={{ 'max-video': maxVideoEnabled() }} ref={videoContainer}>
-		<div class="video-ui local" classList={{ alone: isAlone() }} ref={localVideoContainer}>
-			<video id="local-video" ref={localVideo} style={{ "border-color": outlineColor() }} autoplay playsinline />
+	return <div class="video-call" classList={{ 'max-video': maxVideoEnabled() }} ref={videoContainer!}>
+		<div class="connection video-ui local" classList={{ alone: isAlone(), anon: !camEnabled() && !isAlone() }} ref={localVideoContainer!}>
+			<video id="local-video" ref={localVideo!} style={{ display: camEnabled() ? undefined : "none", "border-color": outlineColor() }} autoplay playsinline />
+			<Show when={!camEnabled() && !isAlone()}>
+				<SvgIcon icon="user" />
+			</Show>
 			<span class="name">{myName()}</span>
 			<Show when={!isAlone()}>
-
 				<div class="buttons">
 					<MediaButton
 						enabled={micEnabled}
@@ -227,7 +231,12 @@ export default function VideoCall() {
 			{(peer) => <PeerConnectionMedia peer={peer} />}
 		</For>
 	</div>
+
 }
+
+//this really just needs media streams and STREAMS_CHANGED events
+// and a connection for the chat
+// but it IS nice having it all encapsulated in one component
 
 function PeerConnectionMedia(props: { peer: PeerConnection }) {
 
@@ -245,6 +254,7 @@ function PeerConnectionMedia(props: { peer: PeerConnection }) {
 		})
 
 		const con = server.connections.find(con => con.id === props.peer.conId)
+		console.log('small chat connection', con)
 		setConnection(con)
 		setName((displayName(con) || shortId(props.peer?.conId)) ?? 'unknown')
 	})
@@ -254,36 +264,35 @@ function PeerConnectionMedia(props: { peer: PeerConnection }) {
 		console.log("PeerConnectionMedia.onCleanup")
 	})
 
-	return <div>
+	return <div class="connection">
+		<span class="name">{name()}</span>
 		<For each={mediaStreams()}>
 			{stream => <PeerVideo name={name()} peer={props.peer} stream={stream} />}
 		</For>
 		<Show when={!mediaStreams() || mediaStreams()?.length == 0}>
 			<div class="video-ui anon">
-				<span class="name">{name()}</span>
 				<SvgIcon icon="user" />
 			</div>
 		</Show>
-		
-		<SmallChat connection={connection()} />
+		<SmallChat connection={connection} />
 	</div>
 }
 
 function PeerVideo(props: { name: string, peer: PeerConnection, stream: MediaStream }) {
 	let videoElement: HTMLVideoElement
 
-	const [remoteAudioEnabled, setRemoteAudioEnabled] = createSignal(true)
+	const [audioEnabled, setAudioEnabled] = createSignal(true)
 	const [outlineColor, setOutlineColor] = createSignal('')
 	const [hasAudio, setHasAudio] = createSignal(false)
 
-	const toggleRemoteAudioEnabled = () => {
-		const enabled = !remoteAudioEnabled()
-		setRemoteAudioEnabled(enabled)
+	const toggleAudioEnabled = () => {
+		const enabled = !audioEnabled()
+		setAudioEnabled(enabled)
 		props.peer.enableRemoteAudio(enabled)
 	}
 
 	onMount(() => {
-		videoElement.srcObject = props.stream
+		videoElement!.srcObject = props.stream
 
 		const audioTracks = props.stream.getAudioTracks()
 		if (audioTracks?.length > 0) {
@@ -297,17 +306,17 @@ function PeerVideo(props: { name: string, peer: PeerConnection, stream: MediaStr
 
 	onCleanup(() => {
 		//TODO
-		console.log("PeerVideo.onCleanup")
+		console.log("TODO: PeerVideo.onCleanup")
 	})
 
 	return <div class="video-ui peer">
-		<video id={props.peer.conId} style={{ "border-color": outlineColor() }} class="remote" ref={videoElement} autoplay playsinline />
+		<video style={{ "border-color": outlineColor() }} class="remote" ref={videoElement!} autoplay playsinline />
 		<span class="name">{props.name}</span>
 		<Show when={hasAudio()}>
 			<div class="buttons">
 				<MediaButton
-					enabled={remoteAudioEnabled}
-					action={toggleRemoteAudioEnabled}
+					enabled={audioEnabled}
+					action={toggleAudioEnabled}
 					enabledIcon="unmute"
 					disabledIcon="mute"
 				/>

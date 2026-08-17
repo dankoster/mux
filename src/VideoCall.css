@@ -9,26 +9,24 @@
 	overflow: hidden;
 	z-index: 3;
 	padding: 1rem;
+	pointer-events: none;
 
 	&.max-video {
 		grid-template-columns: repeat(auto-fit, minmax(90px, max-content));
 	}
 
-	.anon {
-		display: grid;
-		align-content: center;
-		border-radius: 10px;
-		padding-inline: 4rem;
-		aspect-ratio: 1.5;
-		fill: rgb(255 255 255 / 67%);
-		backdrop-filter: brightness(0.3) blur(10px);
+	@media(max-width:500px) {
+		grid-template-columns: repeat(auto-fit, minmax(90px, max-content));
+
+		.max-video-button {
+			display: none;
+		}
 	}
-	.video-ui {
-		justify-items: center;
-		white-space: nowrap;
-		text-overflow: ellipsis;
-		overflow: hidden;
+
+	.connection {
+		/* outline: 1px solid magenta; */
 		position: relative;
+		pointer-events: visible;
 
 		.name {
 			text-overflow: ellipsis;
@@ -42,7 +40,27 @@
 			border-radius: 0.5rem;
 			padding-inline: 0.5rem;
 			font-size: x-small;
+			z-index: 1;
 		}
+	}
+
+	.anon {
+		display: grid;
+		align-content: center;
+		border-radius: 10px;
+		padding-inline: 4rem;
+		aspect-ratio: 1.5;
+		fill: rgb(255 255 255 / 67%);
+		backdrop-filter: brightness(0.3) blur(10px);
+	}
+
+	.video-ui {
+		justify-items: center;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		position: relative;
+
 
 		video {
 			border-radius: 10px;
@@ -66,11 +84,11 @@
 			.media-button {
 				padding: 0.3rem;
 				padding-inline: 0.4rem;
-				
+
 				svg {
 					width: 0.7rem;
 					height: 0.7rem;
-				}			
+				}
 			}
 		}
 	}
@@ -80,6 +98,7 @@
 
 		video {
 			transform: scaleX(-1);
+			background-color: #00000073;
 		}
 	}
 
