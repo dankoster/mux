@@ -14,10 +14,11 @@
 
 .small-chat {
 
+	pointer-events: visible;
 	overflow: auto;
 	padding: 0.3rem;
 	border-radius: 10px;
-	backdrop-filter: blur(2px) brightness(0.5);
+	backdrop-filter: blur(10px) brightness(0.2);
 
 	input {
 		padding: 0.3rem;

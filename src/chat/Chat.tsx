@@ -1,9 +1,9 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { Accessor, createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Connection, DM } from "../../server/types";
 import { ageTimestamp, diffTime, shortTime } from "../time";
 
-import * as directMessages from "../data/directMessages";
 import * as server from "../data/data";
+import * as directMessages from "../data/directMessages";
 
 import "./Chat.css"
 
@@ -19,14 +19,18 @@ import "./Chat.css"
 // 	inputRef?.focus()
 // }
 
-export default function Chat(props: { connection: Connection, onClose: () => void }) {
-	let inputRef: HTMLInputElement
+export default function Chat(props: { connection: Accessor<Connection | undefined>, onClose: () => void }) {
+
+	if (!props.connection) return <>no connection!</>
+
+
+	let inputRef: HTMLInputElement = undefined as unknown as HTMLInputElement
 
 	const [dmList, setDmList] = createSignal<directMessages.groupedDM[][]>([], { equals: false })
 	const [dmError, setDmError] = createSignal("")
 	const [selectedDmTarget, setSelectedDmTarget] = createSignal<Connection>()
 
-	directMessages.onNewMessage((dm: DM) => {
+	directMessages.onNewMessageForConnection(props.connection()!, (dm: DM) => {
 		updateDmDisplay(dm)
 	})
 
@@ -35,12 +39,12 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 	})
 
 	createEffect(() => {
-		console.log('CHAT - connection changed to', props.connection)
-		showDmConversation(props.connection)
+		console.log('CHAT - connection changed to', props.connection())
+		showDmConversation(props.connection()!)
 	})
 
 	const showDmConversation = async (con: Connection) => {
-		setDmError(null)
+		setDmError('')
 		setSelectedDmTarget(con)
 
 		if (!con) return
@@ -49,7 +53,7 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 			return
 		}
 		try {
-			let history = await directMessages.getRecentHistory(con.id, con.publicKey)
+			let history = await directMessages.getRecentHistory(con.id)
 			const lastRead = directMessages.lastReadTimestamp(con.id)
 
 			console.log('showDmConversation', { lastRead, history })
@@ -62,8 +66,8 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 			directMessages.setLastReadNow(con.id)
 
 			console.log('lastReadDmByConId', lastRead)
-		} catch (err) {
-			setDmError(err.message)
+		} catch (err: any) {
+			setDmError(err?.message || err)
 		}
 	}
 
@@ -72,6 +76,9 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 		const fromCon = server.connections.find(c => c.id === dm.fromId)
 		const toCon = server.connections.find(c => c.id === dm.toId)
 
+		if (!toCon) throw new Error(`toCon is ${toCon}`)
+		if (!fromCon) throw new Error(`fromCon is ${fromCon}`)
+
 		//handle messages from self on a different connection
 		const con = server.isSelf(fromCon) ? toCon : fromCon
 
@@ -79,44 +86,51 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 		const targetId = selectedDmTarget()?.id
 		console.log({ conId: con.id, targetId })
 		if (con.id === targetId) {
-			const messages = await directMessages.getRecentHistory(con.id, con.publicKey)
+			const messages = await directMessages.getRecentHistory(con.id)
 			const latestMessage = messages[messages.length - 1]
 			const groupedBySender = directMessages.groupBySender(messages)
 			setDmList(groupedBySender)
 			// scrollLatestMessageIntoView()
-			directMessages.setLastReadTimestamp(con.id, latestMessage.timestamp)
+
+			if (latestMessage.timestamp)
+				directMessages.setLastReadTimestamp(con.id, latestMessage.timestamp)
 		}
 	}
 
 	async function sendDm(con: Connection, message: string) {
 		try {
+			if (!con) throw new Error(`con is ${con}`)
+			if (!con.publicKey) throw new Error(`con.publicKey is ${con.publicKey}`)
+
 			const self = server.self();
+			if (!self) throw new Error(`self is ${self}`)
 			const dm: DM = {
 				toId: con.id,
 				fromId: self.id,
 				fromName: self.identity?.name,
+				timestamp: Date.now(),
 				message,
 				kind: "text"
 			}
 			await directMessages.sendDm(dm, con.publicKey);
 			updateDmDisplay(dm);
 		} catch (err) {
-			setDmError(err.message);
+			setDmError((err as unknown as Error).message);
 		}
 	}
 
-	const onMessageKeyDown = async (e: KeyboardEvent, con: Connection) => {
+	const onMessageKeyDown = async (e: KeyboardEvent, con?: Connection) => {
 		const input = e.target as HTMLTextAreaElement
 		const message = input.value?.trim()
-		if (e.key === 'Enter' && message) {
+		if (con && e.key === 'Enter' && message) {
 			input.value = '';
 			sendDm(con, message);
 		}
 	}
 
-	const onSendButtonClick = async (input: HTMLTextAreaElement, con: Connection) => {
+	const onSendButtonClick = async (input: HTMLTextAreaElement, con?: Connection) => {
 		const message = input.value?.trim()
-		if (message) {
+		if (con && message) {
 			input.value = '';
 			sendDm(con, message);
 		}
@@ -141,7 +155,7 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 						<For each={dmList()}>
 							{dmGroup => {
 								const firstMessage = dmGroup[0]
-								const diff = diffTime(firstMessage.timestamp, firstMessage.prevTimestamp)
+								const diff = firstMessage.prevTimestamp && diffTime(firstMessage.timestamp, firstMessage.prevTimestamp)
 								const moreMessages = dmGroup.slice(1)
 								return <>
 									<Show when={diff}><div class="dm-diffTime">{diff}</div></Show>
@@ -159,7 +173,7 @@ export default function Chat(props: { connection: Connection, onClose: () => voi
 											<div class="dm-content">{firstMessage.message as string}</div>
 										</div>
 										<For each={moreMessages}>{(dm) => {
-											const diff2 = diffTime(dm.timestamp, dm.prevTimestamp)
+											const diff2 = dm.prevTimestamp && diffTime(dm.timestamp, dm.prevTimestamp)
 											return <>
 												<Show when={diff2}><div class="dm-diffTime">{diff2}</div></Show>
 												<div class="dm-message">
