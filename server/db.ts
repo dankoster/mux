@@ -25,6 +25,8 @@ export function serverInitAndCleanup() {
 	console.log('serverInitAndCleanup ->',`Deleted ${cleanup1} from table connection with NULL position`)
 	const cleanup2 = connection.setAllConnectionsStatusToNull()
 	console.log('serverInitAndCleanup ->',`Set ${cleanup2} in table connection to status NULL`)
+	const cleanup3 = db.exec(`DROP TABLE IF EXISTS log;`)
+	console.log('serverInitAndCleanup ->',`Removed log table (result: ${cleanup3})`)
 }
 
 function test() {
